@@ -185,7 +185,10 @@ main(int argc, char* argv[])
         u_fcn.setDataOnPatchHierarchy(u_sc_idx, u_sc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
 
-        // We'll solve the Stokes equations with viscosity "D" and "timestep" C
+        f_u_fcn.setDataOnPatchHierarchy(e_sc_idx, e_sc_var, patch_hierarchy, 0.0);
+        f_p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
+
+        // Setup stokes poisson specifications
         PoissonSpecifications poisson_spec("poisson_spec");
         const double D = input_db->getDouble("D");
         const double C = input_db->getDouble("C");
@@ -198,12 +201,12 @@ main(int argc, char* argv[])
         stokes_op.setVelocityPoissonSpecifications(poisson_spec);
         stokes_op.initializeOperatorState(u_vec, f_vec);
 
-        // Compute the residual and print residual norms.
+        // Apply the operator
         stokes_op.apply(u_vec, f_vec);
 
         // Compute error and print error norms.
         e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),
-                       Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false));
+                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false));
         pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
