@@ -1,7 +1,12 @@
 D = 1.0
 C = 1.0
 
-u {
+un {
+   function_0 = "1 - 2*(cos(2*PI*X_0)*sin(2*PI*X_1))"
+   function_1 = "1 + 2*(sin(2*PI*X_0)*cos(2*PI*X_1))"
+}
+
+us {
    function_0 = "1 - 2*(cos(2*PI*X_0)*sin(2*PI*X_1))"
    function_1 = "1 + 2*(sin(2*PI*X_0)*cos(2*PI*X_1))"
 }
@@ -10,15 +15,22 @@ p {
    function = "-(cos(4*PI*X_0) + cos(4*PI*X_1))"
 }
 
-f_u {
-   c = C
-   d = D
-   function_0 = "c + 4.0*PI*sin(4.0*PI*X_0) - 2.0*(c - 8.0*d*PI*PI)*cos(2.0*PI*X_0)*sin(2.0*PI*X_1)"
-   function_1 = "c + 4.0*PI*sin(4.0*PI*X_1) + 2.0*(c - 8.0*d*PI*PI)*cos(2.0*PI*X_1)*sin(2.0*PI*X_0)"
+f_un {
+   function_0 = "16*sin(2*PI*X_0)*sin(2*PI*X_1)-4*sin(4*PI*X_0)"
+   function_1 = "-16*sin(2*PI*X_0)*sin(2*PI*X_1)-4*sin(4*PI*X_1)"
+}
+
+f_us {
+   function_0 = "0.0"
+   function_1 = "0.0"
 }
 
 f_p {
    function = "0.0"
+}
+
+thn {
+   function = "1.0"
 }
 
 Main {
