@@ -76,14 +76,22 @@ public:
      * operator.
      */
     virtual void
-    setVelocityPoissonSpecifications(const SAMRAI::solv::PoissonSpecifications& U_problem_coefs); // might be modified
+    setVelocityPoissonSpecifications(const SAMRAI::solv::PoissonSpecifications& un_problem_coefs,
+                                     const SAMRAI::solv::PoissonSpecifications& us_problem_coefs); // might be modified
 
     /*!
      * \brief Get the PoissonSpecifications object used to specify the
-     * coefficients for the momentum equation in the incompressible Stokes
+     * coefficients for the network momentum equation in the incompressible Stokes
      * operator.
      */
-    virtual const SAMRAI::solv::PoissonSpecifications& getVelocityPoissonSpecifications() const;
+    virtual const SAMRAI::solv::PoissonSpecifications& getNetworkVelocityPoissonSpecifications() const;
+
+    /*!
+     * \brief Get the PoissonSpecifications object used to specify the
+     * coefficients for the solvent momentum equation in the incompressible Stokes
+     * operator.
+     */
+    virtual const SAMRAI::solv::PoissonSpecifications& getSolventVelocityPoissonSpecifications() const;
 
     /*!
      * \brief Set the SAMRAI::solv::RobinBcCoefStrategy objects used to specify
@@ -94,14 +102,19 @@ public:
      * depth.  \a P_bc_coef may also be NULL; in that case, homogeneous Neumann
      * boundary conditions are employed for the pressure.
      *
-     * \param U_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
-     *condition coefficients for the velocity
+     * \param un_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
+     *condition coefficients for the network velocity
+
+     * \param us_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
+     *condition coefficients for the network velocity
+
      * \param P_bc_coef   Pointer to object that can set the Robin boundary condition
      *coefficients
      *for the pressure
      */
-    virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& U_bc_coefs,
-                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
+    virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                                    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs
+                                        SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
 
     /*!
      * \brief Set the physical boundary condition helper object.
@@ -205,9 +218,12 @@ public:
 
 protected:
     // Problem specification.
-    SAMRAI::solv::PoissonSpecifications d_U_problem_coefs; // might create a different set for second fluid equation
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_U_bc_coef;
-    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_U_bc_coefs;
+    SAMRAI::solv::PoissonSpecifications d_un_problem_coefs; // might create a different set for second fluid equation
+    SAMRAI::solv::PoissonSpecifications d_us_problem_coefs; // might create a different set for second fluid equation
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_un_bc_coef;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_us_bc_coef;
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
 
@@ -215,7 +231,8 @@ protected:
     SAMRAI::tbox::Pointer<StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;
 
     // Cached communications operators.
-    SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_U_fill_pattern, d_P_fill_pattern;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
+        d_P_fill_pattern;
     std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> d_transaction_comps;
     SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
 
