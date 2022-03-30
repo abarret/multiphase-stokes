@@ -57,18 +57,18 @@ namespace IBAMR
  *
  * \see INSStaggeredHierarchyIntegrator
  */
-class TwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
+class VCTwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
 {
 public:
     /*!
      * \brief Class constructor.
      */
-    TwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc = true);
+    VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc = true);
 
     /*!
      * \brief Destructor.
      */
-    ~TwoFluidStaggeredStokesOperator();
+    ~VCTwoFluidStaggeredStokesOperator();
 
     /*!
      * \brief Set the PoissonSpecifications object used to specify the
@@ -113,8 +113,8 @@ public:
      *for the pressure
      */
     virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-                                    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs
-                                        SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
+                                    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
 
     /*!
      * \brief Set the physical boundary condition helper object.
@@ -227,6 +227,9 @@ protected:
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
 
+    // Reference patch hierarchy
+    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
+
     // Boundary condition helper object.
     SAMRAI::tbox::Pointer<StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;
 
@@ -238,7 +241,7 @@ protected:
 
     // Scratch data.
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
-    const int d_thn_idx;
+    int d_thn_idx;
 
 private:
     /*!
@@ -246,7 +249,7 @@ private:
      *
      * \note This constructor is not implemented and should not be used.
      */
-    TwoFluidStaggeredStokesOperator() = delete;
+    VCTwoFluidStaggeredStokesOperator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -255,7 +258,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    TwoFluidStaggeredStokesOperator(const TwoFluidStaggeredStokesOperator& from) = delete;
+    VCTwoFluidStaggeredStokesOperator(const VCTwoFluidStaggeredStokesOperator& from) = delete;
 
     /*!
      * \brief Assignment operator.
@@ -266,7 +269,7 @@ private:
      *
      * \return A reference to this object.
      */
-    TwoFluidStaggeredStokesOperator& operator=(const TwoFluidStaggeredStokesOperator& that) = delete;
+    VCTwoFluidStaggeredStokesOperator& operator=(const VCTwoFluidStaggeredStokesOperator& that) = delete;
 };
 } // namespace IBAMR
 
