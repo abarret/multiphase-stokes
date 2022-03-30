@@ -14,7 +14,7 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
-#include "ibamr/VCTwoFluidTwoFluidStaggeredStokesOperator.h"
+#include "ibamr/VCTwoFluidStaggeredStokesOperator.h"
 #include "ibamr/ibamr_utilities.h"
 #include "ibamr/namespaces.h" // IWYU pragma: keep
 
