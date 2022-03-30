@@ -96,7 +96,7 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
     // boundary conditions for the pressure.
     for (unsigned int d = 0; d < NDIM; ++d)
     {
-        auto p_default_U_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_un_bc_coef);
+        auto p_default_un_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_un_bc_coef);
         auto p_default_us_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_us_bc_coef);
         p_default_un_bc_coef->setBoundaryValue(2 * d, 0.0);
         p_default_un_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
@@ -635,10 +635,10 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
     const bool homogeneous_bc = true;
     if (d_bc_helper)
     {
-        const int U_idx = y.getComponentDescriptorIndex(0);
-        const int P_idx = y.getComponentDescriptorIndex(1);
+        const int un_idx = y.getComponentDescriptorIndex(0);
+        const int P_idx = y.getComponentDescriptorIndex(2);
         StaggeredStokesPhysicalBoundaryHelper::setupBcCoefObjects(
-            d_U_bc_coefs, d_P_bc_coef, U_idx, P_idx, homogeneous_bc);
+            d_un_bc_coefs, d_P_bc_coef, un_idx, P_idx, homogeneous_bc);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(un_idx, P_idx, d_un_bc_coefs, d_new_time, homogeneous_bc);
         StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     }
