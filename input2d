@@ -12,12 +12,12 @@ us {
 }
 
 p {
-   function = "-(cos(4*PI*X_0) + cos(4*PI*X_1))"
+   function = "-cos(4*PI*X_0) - cos(4*PI*X_1)"
 }
 
 f_un {
-   function_0 = "16*sin(2*PI*X_0)*sin(2*PI*X_1)-4*sin(4*PI*X_0)"
-   function_1 = "-16*sin(2*PI*X_0)*sin(2*PI*X_1)-4*sin(4*PI*X_1)"
+   function_0 = "16*PI*cos(2*PI*X_0)*sin(2*PI*X_1)-4*PI*sin(4*PI*X_0)"
+   function_1 = "-16*PI*sin(2*PI*X_0)*cos(2*PI*X_1)-4*PI*sin(4*PI*X_1)"
 }
 
 f_us {
@@ -47,7 +47,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 4
+N = 8
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
