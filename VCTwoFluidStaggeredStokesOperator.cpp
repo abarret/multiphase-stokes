@@ -321,8 +321,8 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                     x[d] = xlow[d] + dx[d] * (idx(d) - idx_low(d) + 0.5); // Get's physical location of idx.
 
                 SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
                 SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
+                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
                 SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
 
                 // thn at sidess
@@ -330,25 +330,20 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
                 double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
                 double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-
+            
                 // conservation of mass
-                double div_un_dot_thn_dx =
-                    (thn_upper_x * (*un_data)(upper_x_idx)-thn_lower_x * (*un_data)(lower_x_idx)) / dx[0];
-                double div_un_dot_thn_dy =
-                    (thn_upper_y * (*un_data)(upper_y_idx)-thn_lower_y * (*un_data)(lower_y_idx)) / dx[1];
+                
+                double div_un_dot_thn_dx = ((thn_upper_x * (*un_data)(upper_x_idx))-(thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
+                //pout << "(*un_data)(upper_x_idx) is " << (*un_data)(upper_x_idx) << " at right edge of " << idx << "\n";
+                //pout << "(*un_data)(lower_x_idx) is " << (*un_data)(lower_x_idx) << " at left edge of " << idx << "\n";
+                double div_un_dot_thn_dy = ((thn_upper_y * (*un_data)(upper_y_idx))-(thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
                 double div_un_thn = div_un_dot_thn_dx + div_un_dot_thn_dy;
+                //pout << "div_un_thn is " << div_un_thn << " at idx = " << idx << "\n \n";
 
-                double div_us_dot_ths_dx =
-                    (convertToThs(thn_upper_x) * (*us_data)(upper_x_idx)-convertToThs(thn_lower_x) *
-                     (*us_data)(lower_x_idx)) /
-                    dx[0];
-                double div_us_dot_ths_dy =
-                    (convertToThs(thn_upper_y) * (*us_data)(upper_y_idx)-convertToThs(thn_lower_y) *
-                     (*us_data)(lower_y_idx)) /
-                    dx[1];
+                double div_us_dot_ths_dx =((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx))-(convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) / dx[0];
+                double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx))-(convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /dx[1];
                 double div_us_ths = div_us_dot_ths_dx + div_us_dot_ths_dy;
-                double div_u_theta = div_un_thn + div_us_ths;
-                (*A_P_data)(idx) = div_u_theta;
+                (*A_P_data)(idx) = div_un_thn + div_us_ths;
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
@@ -369,7 +364,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 // double thn_upper = 0.5 * (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + xp); // thn(i+1/2,j)
 
                 // thn at corners
-                (*thn_data)(idx_c_low + yp) = 1;
+                (*thn_data)(idx_c_low + yp) = 1; //thn (-1,1)
                 (*thn_data)(idx_c_up + yp) = 1;
                 double thn_imhalf_jphalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + yp) +
@@ -490,13 +485,13 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                // double thn_upper = 0.5 * (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp); // thn(i,j+1/2)
 
                 // thn at corners
-                (*thn_data)(idx_c_low - xp) = 1;
+                (*thn_data)(idx_c_low - xp) = 1; //thn (-1,1)
                 (*thn_data)(idx_c_up - xp) = 1;
                 double thn_imhalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) +
                             (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
 
-                (*thn_data)(idx_c_low + xp) = 1;
+                (*thn_data)(idx_c_low + xp) = 1; //thn (-1,1)
                 (*thn_data)(idx_c_up + xp) = 1;
                 double thn_iphalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
@@ -623,7 +618,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
-                                                               NULL); // defaults to fill corners
+                                                               d_P_bc_coef); // defaults to fill corners
 
     // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
