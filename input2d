@@ -2,31 +2,31 @@ D = 1.0
 C = 1.0
 
 un {
-   function_0 = "1 - 2*(cos(2*PI*X_0)*sin(2*PI*X_1))"
-   function_1 = "1 + 2*(sin(2*PI*X_0)*cos(2*PI*X_1))"
+   function_0 = "sin(2*PI*X_0)"
+   function_1 = "sin(2*PI*X_1)"
 }
 
 us {
-   function_0 = "1 - 2*(cos(2*PI*X_0)*sin(2*PI*X_1))"
-   function_1 = "1 + 2*(sin(2*PI*X_0)*cos(2*PI*X_1))"
+   function_0 = "sin(2*PI*X_0)"
+   function_1 = "sin(2*PI*X_1)"
 }
 
 p {
-   function = "-cos(4*PI*X_0) - cos(4*PI*X_1)"
+   function = "0"
 }
 
 f_un {
-   function_0 = "16*PI*cos(2*PI*X_0)*sin(2*PI*X_1)-4*PI*sin(4*PI*X_0)"
-   function_1 = "-16*PI*sin(2*PI*X_0)*cos(2*PI*X_1)-4*PI*sin(4*PI*X_1)"
+   function_0 = "-4*PI*PI*sin(2*PI*X_0)"
+   function_1 = "-4*PI*PI*sin(2*PI*X_1)"
 }
 
 f_us {
-   function_0 = "0.0"
-   function_1 = "0.0"
+   function_0 = "0"
+   function_1 = "0"
 }
 
 f_p {
-   function = "0.0"
+   function = "2*PI*cos(2*PI*X_0)+2*PI*cos(2*PI*X_1)"
 }
 
 thn {
@@ -47,7 +47,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 8
+N = 16
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
