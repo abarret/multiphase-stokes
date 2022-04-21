@@ -334,11 +334,8 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 // conservation of mass
                 
                 double div_un_dot_thn_dx = ((thn_upper_x * (*un_data)(upper_x_idx))-(thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
-                //pout << "(*un_data)(upper_x_idx) is " << (*un_data)(upper_x_idx) << " at right edge of " << idx << "\n";
-                //pout << "(*un_data)(lower_x_idx) is " << (*un_data)(lower_x_idx) << " at left edge of " << idx << "\n";
                 double div_un_dot_thn_dy = ((thn_upper_y * (*un_data)(upper_y_idx))-(thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
                 double div_un_thn = div_un_dot_thn_dx + div_un_dot_thn_dy;
-                //pout << "div_un_thn is " << div_un_thn << " at idx = " << idx << "\n \n";
 
                 double div_us_dot_ths_dx =((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx))-(convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) / dx[0];
                 double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx))-(convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /dx[1];
@@ -361,44 +358,18 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up));     // thn(i-1/2,j)
                 //pout << "thn_lower is " << thn_lower << "\n";
-                // double thn_upper = 0.5 * (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + xp); // thn(i+1/2,j)
-
                 // thn at corners
-                (*thn_data)(idx_c_low + yp) = 1; //thn (-1,1)
-                (*thn_data)(idx_c_up + yp) = 1;
                 double thn_imhalf_jphalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + yp) +
                             (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
-                //pout <<  "thn_imhalf_jphalf is " <<  thn_imhalf_jphalf <<"\n";
-                //pout <<  "converttoThs is " <<  convertToThs(thn_imhalf_jphalf) <<"\n";
-
-                (*thn_data)(idx_c_low - yp) = 1; //thn (-1,1)
-                (*thn_data)(idx_c_up - yp) = 1;
                 double thn_imhalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
                             (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
-                //pout <<  "thn_imhalf_jmhalf is " <<  thn_imhalf_jmhalf <<"\n";
-                //pout <<  "converttoThs is " <<  convertToThs(thn_imhalf_jmhalf) <<"\n";
-                /*
-                pout << "thn(i-1,j) at " << idx_c_low << " is "  << (*thn_data)(idx_c_low) << "\n";
-                pout << "thn(i,j) at "<< idx_c_up << " is "  << (*thn_data)(idx_c_up) << "\n";
-                pout << "thn(i,j-1) at "<< idx_c_up - yp << " is " << (*thn_data)(idx_c_up-yp) << "\n";
-                pout << "thn(i-1,j-1) at "<< idx_c_low - yp << " is " << (*thn_data)(idx_c_low-yp) << "\n \n";
-                */
 
                 // components of first row (x-component of network vel) of network equation
                 double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                //double first_part = (*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx));
-                //double second_part = (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp));
-                /*
-                pout << "First part of first term is " << first_part << "\n";
-                pout << "Second part of first term is " << second_part << "\n \n";
-                pout << "thn_data at " << idx_c_low << " is " << (*thn_data)(idx_c_low) << "\n";
-                pout << "un_data at idx is " << (*un_data)(u_x_idx) << "\n";
-                pout << "un_data at idx-xp = " << l_x_idx << " is " << (*un_data)(l_x_idx) << "\n \n";
-                */
                
                 double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
                                        (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
@@ -413,18 +384,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_un_data)(idx) = ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n + pressure_n;
-                //pout << "drag_n is " << drag_n << "\n";
-                //pout << "pressure_n is " << pressure_n << "\n \n";
-                //pout<< "A_un_data is " << (*A_un_data)(idx) ;
-                //pout<< " at index " << idx << "\n";
-                
-                /*
-                pout << "network: \n ";
-                pout << "first term is " << ddx_Thn_dx_un  << "\n";
-                pout << "second term is " << ddy_Thn_dy_un  << "\n";
-                pout << "third term is " << ddy_Thn_dx_vn  << "\n";
-                pout << "fourth term is " << ddx_Thn_dy_vn  << "\n";
-                */
 
                 // solvent equation
                 double ddx_Ths_dx_us =
@@ -447,23 +406,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double drag_s = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) = ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s;
-                //pout << "drag_s is " << drag_s << "\n";
-                //pout << "pressure_s is " << pressure_s << "\n";
-                /*
-                pout<< "ddx_Ths_dx_us is " << ddx_Ths_dx_us << "\n";
-                pout<< "ddy_Ths_dy_us is " << ddy_Ths_dy_us << "\n";
-                pout<< "ddy_Ths_dx_vs is " << ddy_Ths_dx_vs << "\n";
-                pout<< "ddx_Ths_dy_vs is " << ddx_Ths_dy_vs << "\n";
-                */
-                //pout<< "A_us_data is " << (*A_us_data)(idx) ;
-                //pout<< " at index " << idx << "\n \n";
-                /*
-                pout << "solvent: \n ";
-                pout << "first term is " << ddx_Ths_dx_us  << "\n";
-                pout << "second term is " << ddy_Ths_dy_us  << "\n";
-                pout << "third term is " << ddy_Ths_dx_vs  << "\n";
-                pout << "fourth term is " << ddx_Ths_dy_vs  << "\n \n";
-                */
             }
 
             //pout << "\n\n Looping over y-dir side-centers \n\n";
@@ -481,18 +423,11 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up));     // thn(i,j-1/2)
-                //pout << "thn_lower is " << thn_lower << "\n";
-               // double thn_upper = 0.5 * (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp); // thn(i,j+1/2)
 
                 // thn at corners
-                (*thn_data)(idx_c_low - xp) = 1; //thn (-1,1)
-                (*thn_data)(idx_c_up - xp) = 1;
                 double thn_imhalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) +
                             (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
-
-                (*thn_data)(idx_c_low + xp) = 1; //thn (-1,1)
-                (*thn_data)(idx_c_up + xp) = 1;
                 double thn_iphalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
                             (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
@@ -514,10 +449,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_un_data)(idx) = ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n;
-                //pout<< "A_un_data is " << (*A_un_data)(idx) ;
-                //pout<< " at index " << idx << "\n";
-                // pout << "drag_n is " << drag_n << "\n";
-                // pout << "pressure_n is " << pressure_n << "\n \n";
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
@@ -539,12 +470,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double drag_s = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) = ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s;
-                //pout << "drag_s is " << drag_s << "\n";
-                //pout << "pressure_s is " << pressure_s << "\n";
-
-                //pout<< "A_us_data is " << (*A_us_data)(idx) ;
-                //pout<< " at index " << idx << "\n \n";
-            
             }
         }
     }
