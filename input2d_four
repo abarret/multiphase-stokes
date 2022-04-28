@@ -13,21 +13,21 @@ p {
 }
 
 f_un {
-   function_0 = "(2*PI*cos(2*PI*X_0) - 2*PI*sin(2*PI*X_0))*(2*PI*sin(2*PI*X_0) + 2*PI*sin(2*PI*X_1)) - 2*PI*cos(2*PI*X_0)*(cos(2*PI*X_0) + sin(2*PI*X_0)) - 4*PI^2*cos(2*PI*X_0)*(cos(2*PI*X_0) + sin(2*PI*X_0)) - 4*PI*sin(2*PI*X_0)*(2*PI*cos(2*PI*X_0) - 2*PI*sin(2*PI*X_0))"
-   function_1 = "-4*PI^2*cos(2*PI*X_1)*(cos(2*PI*X_0) + sin(2*PI*X_0))"
+   function_0 = "-PI*cos(2*PI*X_0) - 2*PI^2*cos(2*PI*X_0)"
+   function_1 = "-2*PI^2*cos(2*PI*X_1)"
 }
 
 f_us {
-   function_0 = "2*PI*cos(2*PI*X_0)*(cos(2*PI*X_0) + sin(2*PI*X_0) - 1) - (2*PI*cos(2*PI*X_0) - 2*PI*sin(2*PI*X_0))*(2*PI*sin(2*PI*X_0) + 2*PI*sin(2*PI*X_1)) + 4*PI^2*cos(2*PI*X_0)*(cos(2*PI*X_0) + sin(2*PI*X_0) - 1) + 4*PI*sin(2*PI*X_0)*(2*PI*cos(2*PI*X_0) - 2*PI*sin(2*PI*X_0))"
-   function_1 = "4*PI^2*cos(2*PI*X_1)*(cos(2*PI*X_0) + sin(2*PI*X_0) - 1)"
+   function_0 = "-PI*cos(2*PI*X_0) - 2*PI^2*cos(2*PI*X_0)"
+   function_1 = "-2*PI^2*cos(2*PI*X_1)"
 }
 
 f_p {
-   function = "2*PI*sin(2*PI*X_0)*(cos(2*PI*X_0) + sin(2*PI*X_0) - 1) - 2*PI*sin(2*PI*X_0)*(cos(2*PI*X_0) + sin(2*PI*X_0)) - 2*PI*sin(2*PI*X_1)*(cos(2*PI*X_0) + sin(2*PI*X_0)) + 2*PI*sin(2*PI*X_1)*(cos(2*PI*X_0) + sin(2*PI*X_0) - 1)"
+   function = "-2*PI*sin(2*PI*X_0) - 2*PI*sin(2*PI*X_1)"
 }
 
 thn {
-   function = "cos(2*PI*X_0)+sin(2*PI*X_0)"
+   function = "0.5"
 }
 
 Main {
@@ -37,7 +37,7 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d"
+   viz_dump_dirname = "viz2d_n64_midRefine_conservative_lin"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
@@ -79,7 +79,9 @@ StandardTagAndInitialize {
    tagging_method = "REFINE_BOXES"
    RefineBoxes {
     // level_0 = [( N/4 , 0 ),( 3*N/4 - 1 , N - 1 )]   // if N = 8, (2,0) to (5,7)
-    level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+    // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+    // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
+    level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
    }
 }
 
