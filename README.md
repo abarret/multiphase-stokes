@@ -6,7 +6,7 @@ In the main.cpp file, the Staggered Stokes Operator is called and applied to the
 
 An acccompanying MATLAB script is provided which computes the Staggered Stokes Operator and interpolates the results onto the cell centers so that the user compare the results in Visit directly with the results obtained using MATLAB. 
 
-In order to generate the makefile and executable (main2d) associated with this test, we use Cmake, and so a CMakeLists.txt file is provided. To generate the makefile simply run: cmake -DIBAMR_ROOT=<path to IBAMR install> . Depending on the users setup, one may need to include their paths to their compilers and their compiler flags. 
+In order to generate the makefile and executable (main2d) associated with this test, we use Cmake, and so a CMakeLists.txt file is provided. To generate the makefile simply run: cmake -DIBAMR_ROOT= ../path to IBAMR install . Depending on the users setup, one may need to include their paths to their compilers and their compiler flags. 
 
 Once the makefile is generated, one can then run make to generate the executable main2d. 
 
