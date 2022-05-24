@@ -57,11 +57,11 @@ D_xp = (32)*(p(:,2:end)-p(:,1:end-1));
 D_yp = (32)*(p(2:end,:)-p(1:end-1,:));
 
 Stag_Stokes_u = lap_u + D_xp + u(:,2:end-1);
-Stag_Stokes_u = [u(:,1), Stag_Stokes, u(:,end)];
+Stag_Stokes_u = [u(:,1), Stag_Stokes_u, u(:,end)];
 
 %Now interpolate Stag_Stokes onto the cell centers so that I can compare to
 %the visit data
-Stag_Stokes_cc_u = 0.5*(Stag_Stokes(:,1:end-1) + Stag_Stokes(:,2:end));
+Stag_Stokes_cc_u = 0.5*(Stag_Stokes_u(:,1:end-1) + Stag_Stokes_u(:,2:end));
 
 
 
