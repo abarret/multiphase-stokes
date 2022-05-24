@@ -14,13 +14,16 @@
 #include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesOperator.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
+#include <ibamr/StaggeredStokesPhysicalBoundaryHelper.h>
 #include <ibamr/StokesSpecifications.h>
 #include <ibamr/app_namespaces.h>
+#include <ibamr/INSStaggeredHierarchyIntegrator.h>
 
 #include <ibtk/AppInitializer.h>
 #include <ibtk/IBTKInit.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
+
 
 #include <petscsys.h>
 
@@ -38,6 +41,8 @@
  *    executable <input file name>                                             *
  *                                                                             *
  *******************************************************************************/
+
+//The following program is used to test out whether or not the StokesOperator is performing correctly.
 int
 main(int argc, char* argv[])
 {
@@ -53,6 +58,9 @@ main(int argc, char* argv[])
 
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database.
+        //Pointer<INSHierarchyIntegrator> time_integrator;
+        //const string solver_type = "STAGGERED";
+        //time_integrator = new INSStaggeredHierarchyIntegrator("INSStaggeredHierarchyIntegrator",app_initializer->getComponentDatabase("INSStaggeredHierarchyIntegrator"));
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
         Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
@@ -67,12 +75,35 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
+        
+        //Setup the Boundary Conditions
+        const IntVector<NDIM>& periodic_shift = grid_geometry->getPeriodicShift();
+        vector<RobinBcCoefStrategy<NDIM>*> u_bc_coefs(NDIM);
+        if (periodic_shift.min()>0)
+        {
+            for(unsigned int d = 0; d< NDIM; ++d)
+            {
+                u_bc_coefs[d] = NULL;
+            }
+        }
+        else
+        {
+            for (unsigned int d = 0;d<NDIM;++d)
+            {
+                const std::string bc_coefs_name = "u_bc_coefs_" + std::to_string(d);
+                const std::string bc_coefs_db_name = "VelocityBcCoefs_"+std::to_string(d);
+                
+                u_bc_coefs[d] = new muParserRobinBcCoefs(bc_coefs_name,app_initializer->getComponentDatabase(bc_coefs_db_name),grid_geometry);
+        
+            }
+        }
 
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = var_db->getContext("context");
 
-        // State variables: Velocity and pressure.
+        // State variables: Velocity and pressure. Need to get both cell sides and centers
+        // since we are using the MAC scheme.
         Pointer<SideVariable<NDIM, double>> u_sc_var = new SideVariable<NDIM, double>("u_sc");
         Pointer<CellVariable<NDIM, double>> p_cc_var = new CellVariable<NDIM, double>("p_cc");
 
@@ -85,6 +116,7 @@ main(int argc, char* argv[])
         Pointer<CellVariable<NDIM, double>> e_cc_var = new CellVariable<NDIM, double>("e_cc");
 
         // Register patch data indices...
+        // Need to figure out what the registerVariableAndContext function does ...
         const int u_sc_idx = var_db->registerVariableAndContext(u_sc_var, ctx, IntVector<NDIM>(1));
         const int p_cc_idx = var_db->registerVariableAndContext(p_cc_var, ctx, IntVector<NDIM>(1));
         const int f_cc_idx = var_db->registerVariableAndContext(f_cc_var, ctx, IntVector<NDIM>(1));
@@ -92,7 +124,7 @@ main(int argc, char* argv[])
         const int e_sc_idx = var_db->registerVariableAndContext(e_sc_var, ctx, IntVector<NDIM>(1));
         const int e_cc_idx = var_db->registerVariableAndContext(e_cc_var, ctx, IntVector<NDIM>(1));
 
-        // Drawing variables
+        // Drawing variables (all cell variables since that how visit does it)
         Pointer<CellVariable<NDIM, double>> draw_u_var = new CellVariable<NDIM, double>("draw_u", NDIM);
         Pointer<CellVariable<NDIM, double>> draw_f_var = new CellVariable<NDIM, double>("draw_f", NDIM);
         Pointer<CellVariable<NDIM, double>> draw_e_var = new CellVariable<NDIM, double>("draw_e", NDIM);
@@ -184,7 +216,7 @@ main(int argc, char* argv[])
 
         u_fcn.setDataOnPatchHierarchy(u_sc_idx, u_sc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
-
+        
         f_u_fcn.setDataOnPatchHierarchy(e_sc_idx, e_sc_var, patch_hierarchy, 0.0);
         f_p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
@@ -194,22 +226,30 @@ main(int argc, char* argv[])
         const double C = input_db->getDouble("C");
         poisson_spec.setDConstant(D);
         poisson_spec.setCConstant(C);
-
+        
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper;
+        bc_helper->cacheBcCoefData(u_bc_coefs,0.0,patch_hierarchy);
+        bc_helper->copyDataAtDirichletBoundaries(e_sc_idx, u_sc_idx);
         // Setup the stokes operator
-        StaggeredStokesOperator stokes_op("stokes_op", true);
-
+        StaggeredStokesOperator stokes_op("stokes_op", false);
+        stokes_op.setPhysicalBcCoefs(u_bc_coefs,NULL);
         stokes_op.setVelocityPoissonSpecifications(poisson_spec);
+        stokes_op.setPhysicalBoundaryHelper(bc_helper);
         stokes_op.initializeOperatorState(u_vec, f_vec);
-
+        
         // Apply the operator
         stokes_op.apply(u_vec, f_vec);
 
         // Compute error and print error norms.
         e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),
                        Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false));
+        //print out the errors in each norm
         pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
+        
+        
+        
 
         // Interpolate the side-centered data to cell centers for output.
         static const bool synch_cf_interface = true;
@@ -222,6 +262,8 @@ main(int argc, char* argv[])
 
         // Deallocate level data
         // Allocate data on each level of the patch hierarchy.
+        
+        //Question-> Why does data need to be deallocated?
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
             Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
