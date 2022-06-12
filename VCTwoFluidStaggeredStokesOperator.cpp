@@ -58,22 +58,24 @@ static const int SIDEG = 1;
 
 // Types of refining and coarsening to perform prior to setting coarse-fine
 // boundary and physical boundary ghost cell values.
-static const std::string DATA_REFINE_TYPE = "NONE";
+static const std::string CC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine patch
+static const std::string SC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine patch
 static const bool USE_CF_INTERPOLATION = true;
-static const std::string DATA_COARSEN_TYPE = "CUBIC_COARSEN";
+static const std::string DATA_COARSEN_TYPE = "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing the hierarchies
 
 // Type of extrapolation to use at physical boundaries.
-static const std::string BDRY_EXTRAP_TYPE = "LINEAR";
+static const std::string BDRY_EXTRAP_TYPE = "LINEAR"; // these operations are all in IBAMR
 
 // Whether to enforce consistent interpolated values at Type 2 coarse-fine
 // interface ghost cells.
-static const bool CONSISTENT_TYPE_2_BDRY = false;
+static const bool CONSISTENT_TYPE_2_BDRY = true;
 
 // Timers.
 static Timer* t_apply;
 static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
+
 
 double convertToThs(double Thn);
 /////////////////////////////// PUBLIC ///////////////////////////////////////
@@ -246,7 +248,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     std::vector<InterpolationTransactionComponent> transaction_comps(4);
     transaction_comps[0] = InterpolationTransactionComponent(un_idx,
                                                              un_idx,
-                                                             DATA_REFINE_TYPE,
+                                                             SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
@@ -255,7 +257,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              d_un_fill_pattern);
     transaction_comps[1] = InterpolationTransactionComponent(us_idx,
                                                              us_idx,
-                                                             DATA_REFINE_TYPE,
+                                                             SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
@@ -263,7 +265,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              d_us_bc_coefs, // modify?
                                                              d_us_fill_pattern);
     transaction_comps[2] = InterpolationTransactionComponent(P_idx,
-                                                             DATA_REFINE_TYPE,
+                                                             CC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
@@ -271,7 +273,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              d_P_bc_coef,
                                                              d_P_fill_pattern);
     transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                             DATA_REFINE_TYPE,
+                                                             CC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
@@ -513,7 +515,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     d_transaction_comps.resize(4);
     d_transaction_comps[0] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(0),
                                                                in.getComponentDescriptorIndex(0),
-                                                               DATA_REFINE_TYPE,
+                                                               SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
@@ -522,7 +524,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                d_un_fill_pattern);
     d_transaction_comps[1] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(1),
                                                                in.getComponentDescriptorIndex(1),
-                                                               DATA_REFINE_TYPE,
+                                                               SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
@@ -530,7 +532,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                d_us_bc_coefs,
                                                                d_us_fill_pattern);
     d_transaction_comps[2] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(2),
-                                                               DATA_REFINE_TYPE,
+                                                               CC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
@@ -538,7 +540,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                d_P_bc_coef,
                                                                d_P_fill_pattern);  // noFillCorners
     d_transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                               DATA_REFINE_TYPE,
+                                                               CC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
