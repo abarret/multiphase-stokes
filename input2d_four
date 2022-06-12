@@ -4,8 +4,8 @@ un {
 }
 
 us {
-   function_0 = "cos(2*PI*X_0)"
-   function_1 = "cos(2*PI*X_1)"
+   function_0 = "1"
+   function_1 = "1"
 }
 
 p {
@@ -13,17 +13,17 @@ p {
 }
 
 f_un {
-   function_0 = "-PI*cos(2*PI*X_0) - 2*PI^2*cos(2*PI*X_0)"
-   function_1 = "-2*PI^2*cos(2*PI*X_1)"
+   function_0 = "-0.25*cos(2*PI*X_0)+0.25-PI*cos(2*PI*X_0) - 2*PI^2*cos(2*PI*X_0)"
+   function_1 = "-0.25*cos(2*PI*X_1)+0.25-2*PI^2*cos(2*PI*X_1)"
 }
 
 f_us {
-   function_0 = "-PI*cos(2*PI*X_0) - 2*PI^2*cos(2*PI*X_0)"
-   function_1 = "-2*PI^2*cos(2*PI*X_1)"
+   function_0 = "0.25*cos(2*PI*X_0)-0.25-PI*cos(2*PI*X_0)"
+   function_1 = "0.25*cos(2*PI*X_1)-0.25"
 }
 
 f_p {
-   function = "-2*PI*sin(2*PI*X_0) - 2*PI*sin(2*PI*X_1)"
+   function = "-PI*sin(2*PI*X_0) - PI*sin(2*PI*X_1)"
 }
 
 thn {
@@ -37,7 +37,7 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_n64_midRefine_conservative_lin"
+   viz_dump_dirname = "viz2d_n32_NEW"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
@@ -54,7 +54,7 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 4, 4              // vector ratio to next coarser level
@@ -81,7 +81,7 @@ StandardTagAndInitialize {
     // level_0 = [( N/4 , 0 ),( 3*N/4 - 1 , N - 1 )]   // if N = 8, (2,0) to (5,7)
     // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
     // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
-    level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
+    // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
    }
 }
 
