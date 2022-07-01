@@ -15,6 +15,7 @@
 
 #include <ibtk/AppInitializer.h>
 #include <ibtk/CCLaplaceOperator.h>
+#include <ibtk/CCPoissonPointRelaxationFACOperator.h>
 #include <ibtk/CCPoissonSolverManager.h>
 #include <ibtk/IBTKInit.h>
 #include <ibtk/PETScKrylovPoissonSolver.h>
@@ -166,9 +167,13 @@ main(int argc, char* argv[])
         poisson_solver->setPoissonSpecifications(poisson_spec);
 
         // Now create a preconditioner
+        Pointer<FACPreconditionerStrategy> poisson_strategy =
+            new CCPoissonPointRelaxationFACOperator("PoissonPrecondStrategy",
+                                                    app_initializer->getComponentDatabase("PoissonPrecondStrategy"),
+                                                    "poisson_precond_");
         Pointer<FACPreconditioner> poisson_precond =
             new FullFACPreconditioner("PoissonPrecond",
-                                      nullptr,
+                                      poisson_strategy,
                                       app_initializer->getComponentDatabase("PoissonPrecond"),
                                       multigrid_gridding_alg,
                                       "poisson_precond_");
