@@ -13,7 +13,7 @@
 
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
-#include <ibamr/VCTwoFluidStaggeredStokesOperator.h>
+#include "VCTwoFluidStaggeredStokesOperator.h"
 #include <ibtk/LinearOperator.h>
 
 #include <ibtk/AppInitializer.h>
@@ -226,6 +226,26 @@ main(int argc, char* argv[])
         e_vec.setToScalar(0.0);
         r_vec.setToScalar(0.0);
 
+        Pointer<SAMRAIVectorReal<NDIM, double>> null_vec = u_vec.cloneVector("null");
+        null_vec->allocateVectorData();
+        null_vec->setToScalar(0.0);
+        // Pull out pressure component and set to constant
+        {
+            for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
+                for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+                {
+                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                    Pointer<SideData<NDIM, double>> un_data = null_vec->getComponentPatchData(0, *patch);
+                    Pointer<SideData<NDIM, double>> us_data = null_vec->getComponentPatchData(0, *patch);
+                    Pointer<CellData<NDIM, double>> p_data = null_vec->getComponentPatchData(2, *patch);
+                    un_data->fillAll(1.0);
+                    us_data->fillAll(-1.0);
+                }
+            }
+        }
+
         // Setup velocity and pressures functions.
         muParserCartGridFunction un_fcn("un", app_initializer->getComponentDatabase("un"), grid_geometry);
         muParserCartGridFunction us_fcn("us", app_initializer->getComponentDatabase("us"), grid_geometry);
@@ -256,6 +276,7 @@ main(int argc, char* argv[])
         Pointer<PETScKrylovLinearSolver> krylov_solver = new PETScKrylovLinearSolver(
             "solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
         krylov_solver->setOperator(stokes_op);
+        krylov_solver->setNullspace(false, { null_vec });
         krylov_solver->initializeSolverState(u_vec, f_vec);
         krylov_solver->solveSystem(u_vec,f_vec);
 
@@ -273,18 +294,18 @@ main(int argc, char* argv[])
         const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in f_un :\n"
+        pout << "Error in u_n :\n"
                 << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
                 << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
                 << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
-        pout << "Error in f_us :\n"
+        pout << "Error in u_s :\n"
                 << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
                 << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
                 << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
         HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in f_p :\n"
+        pout << "Error in p :\n"
                 << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
                 << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
                 << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
