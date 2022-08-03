@@ -238,10 +238,10 @@ main(int argc, char* argv[])
                 {
                     Pointer<Patch<NDIM>> patch = level->getPatch(p());
                     Pointer<SideData<NDIM, double>> un_data = null_vec->getComponentPatchData(0, *patch);
-                    Pointer<SideData<NDIM, double>> us_data = null_vec->getComponentPatchData(0, *patch);
+                    Pointer<SideData<NDIM, double>> us_data = null_vec->getComponentPatchData(1, *patch);
                     Pointer<CellData<NDIM, double>> p_data = null_vec->getComponentPatchData(2, *patch);
                     un_data->fillAll(1.0);
-                    us_data->fillAll(-1.0);
+                    us_data->fillAll(1.0);
                 }
             }
         }
