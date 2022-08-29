@@ -21,8 +21,9 @@
 #include <ibtk/config.h>
 
 #include "ibtk/CCPoissonSolverManager.h"
+#include "ibtk/FACPreconditionerStrategy.h"
 #include "ibtk/PoissonFACPreconditioner.h"
-#include "ibtk/PoissonFACPreconditionerStrategy.h"
+#include "ibtk/HierarchyGhostCellInterpolation.h"
 
 #include "IntVector.h"
 #include "PoissonSpecifications.h"
@@ -66,46 +67,7 @@ class SAMRAIVectorReal;
 
 namespace IBTK
 {
-/*!
- * \brief Class CCPoissonLevelRelaxationFACOperator is a concrete
- * PoissonFACPreconditionerStrategy for solving elliptic equations of the form
- * \f$ \mbox{$L u$} = \mbox{$(C I + \nabla \cdot D \nabla) u$} = f \f$ using a
- * globally second-order accurate cell-centered finite-volume discretization,
- * with support for Robin and periodic boundary conditions.
- *
- * This class provides operators that are used by class FACPreconditioner to
- * solve scalar Poisson-type equations of the form \f[ (C I + \nabla \cdot D
- * \nabla) u = f \f] using a cell-centered, globally second-order accurate
- * finite-volume discretization, where
- *
- * - \f$ C \f$, \f$ D \f$ and \f$ f \f$ are independent of \f$ u \f$,
- * - \f$ C \f$ is a cell-centered scalar field,
- * - \f$ D \f$ is a side-centered scalar field of diffusion coefficients, and
- * - \f$ f \f$ is a cell-centered scalar function.
- *
- * Robin boundary conditions may be specified at physical boundaries; see class
- * SAMRAI::solv::RobinBcCoefStrategy.
- *
- * By default, the class is configured to solve the Poisson problem \f$
- * -\nabla^2 u = f \f$, subject to homogeneous Dirichlet boundary conditions.
- *
- * Sample parameters for initialization from database (and their default
- * values): \verbatim
- smoother_type = "PATCH_GAUSS_SEIDEL"         // see setSmootherType()
- prolongation_method = "LINEAR_REFINE"        // see setProlongationMethod()
- restriction_method = "CONSERVATIVE_COARSEN"  // see setRestrictionMethod()
- coarse_solver_type = "HYPRE_LEVEL_SOLVER"    // see setCoarseSolverType()
- coarse_solver_rel_residual_tol = 1.0e-5      // see setCoarseSolverRelativeTolerance()
- coarse_solver_abs_residual_tol = 1.0e-50     // see setCoarseSolverAbsoluteTolerance()
- coarse_solver_max_iterations = 1             // see setCoarseSolverMaxIterations()
- coarse_solver_db {                           // SAMRAI::tbox::Database for coarse level solver
-    solver_type = "PFMG"
-    num_pre_relax_steps = 0
-    num_post_relax_steps = 2
- }
- \endverbatim
-*/
-class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public PoissonFACPreconditionerStrategy
+class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public FACPreconditionerStrategy
 {
 public:
     /*!
@@ -121,34 +83,49 @@ public:
     ~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator();
 
     /*!
-     * \brief Static function to construct a PoissonFACPreconditioner with a
-     * VCTwoFluidStaggeredStokesBoxRelaxationFACOperator FAC strategy.
-     */
-    static SAMRAI::tbox::Pointer<PoissonSolver> allocate_solver(const std::string& object_name,
-                                                                SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                                                const std::string& default_options_prefix)
-    {
-        SAMRAI::tbox::Pointer<PoissonFACPreconditionerStrategy> fac_operator = new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-            object_name + "::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator", input_db, default_options_prefix);
-        return new PoissonFACPreconditioner(object_name, fac_operator, input_db, default_options_prefix);
-    } // allocate
-
-    /*!
      * \name Functions for configuring the solver.
      */
     //\{
+    
+    /*!
+     * \brief Zero-out the provided vector on the specified level of the patch
+     * hierarchy.
+     */  
+    void setToZero(SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& error, int level_num) override;
+   
+    /*!
+     * \brief Restrict the residual from the source vector to the destination
+     * vector on the specified level of the patch hierarchy.
+     *
+     * \note Implementations must support the case in which source and dest are
+     * the same vector.
+     */
+    void restrictResidual(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& source,
+                                  SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
+                                  int dest_level_num) override;
 
     /*!
-     * \brief Specify the level solver type.
+     * \brief Prolong the error from the source vector to the destination
+     * vector on the specified level of the patch hierarchy.
+     *
+     * \note Implementations must support the case in which source and dest are
+     * the same vector.
      */
-    void setSmootherType(const std::string& level_solver_type) override;
+    void prolongError(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& source,
+                              SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
+                              int dest_level_num) override;
 
     /*!
-     * \brief Specify the coarse level solver.
+     * \brief Prolong the error from the source vector to the destination vector
+     * on the specified level of the patch hierarchy and correct the fine-grid
+     * error.
+     *
+     * \note Implementations must support the case in which source and dest are
+     * the same vector.
      */
-    void setCoarseSolverType(const std::string& coarse_solver_type) override;
-
-    //\}
+    void prolongErrorAndCorrect(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& source,
+                                        SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
+                                        int dest_level_num) override;
 
     /*!
      * \name Implementation of FACPreconditionerStrategy interface.
@@ -175,12 +152,6 @@ public:
 
     /*! \brief This method sets up the patch data indices for \param Thn */
     void setThnIdx(int thn_idx);
-    
-    /*!
-     * \brief Zero-out the provided vector on the specified level of the patch
-     * hierarchy.
-     */
-    virtual void setToZero(SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& error, int level_num) = 0;
 
     /*!
      * \brief Solve the residual equation Ae=r on the coarsest level of the
@@ -211,21 +182,32 @@ public:
                          int finest_level_num) override;
 
     //\}
-
-protected:
-    /*!
+     /*!
      * \brief Compute implementation-specific hierarchy-dependent data.
      */
-    void initializeOperatorStateSpecialized(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& solution,
-                                            const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& rhs,
-                                            int coarsest_reset_ln,
-                                            int finest_reset_ln) override;
+    void initializeOperatorState(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& solution,
+                                            const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& rhs) override;
 
     /*!
      * \brief Remove implementation-specific hierarchy-dependent data.
      */
-    void deallocateOperatorStateSpecialized(int coarsest_reset_ln, int finest_reset_ln) override;
+    void deallocateOperatorState() override;
 
+protected:
+   
+    int d_thn_idx;
+    int un_scr_idx, us_scr_idx, p_scr_idx;
+    
+    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
+    // Cached communications operators.
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
+        d_P_fill_pattern;
+    std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> transaction_comps;
+    SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
+    
 private:
     /*!
      * \brief Default constructor.
@@ -277,3 +259,5 @@ private:
 } // namespace IBTK
 
 //////////////////////////////////////////////////////////////////////////////
+
+#endif //#ifndef included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
