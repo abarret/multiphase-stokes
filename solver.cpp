@@ -13,16 +13,18 @@
 
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
-#include "VCTwoFluidStaggeredStokesOperator.h"
-#include <ibtk/LinearOperator.h>
+#include <ibamr/app_namespaces.h>
 
-#include <ibtk/AppInitializer.h>
-#include <ibtk/IBTKInit.h>
-#include <ibtk/muParserCartGridFunction.h>
-#include <ibtk/muParserRobinBcCoefs.h>
 #include "ibtk/CartCellDoubleQuadraticRefine.h"
 #include "ibtk/CartSideDoubleRT0Refine.h"
 #include "ibtk/PETScKrylovLinearSolver.h"
+#include <ibtk/AppInitializer.h>
+#include <ibtk/IBTKInit.h>
+#include <ibtk/LinearOperator.h>
+#include <ibtk/muParserCartGridFunction.h>
+#include <ibtk/muParserRobinBcCoefs.h>
+
+#include "VCTwoFluidStaggeredStokesOperator.h"
 
 #include <petscsys.h>
 
@@ -32,8 +34,6 @@
 #include <LoadBalancer.h>
 #include <SAMRAI_config.h>
 #include <StandardTagAndInitialize.h>
-
-#include <ibamr/app_namespaces.h>
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -57,17 +57,18 @@ main(int argc, char* argv[])
 
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database.
-        Pointer<CartesianGridGeometry<NDIM> > grid_geometry = new CartesianGridGeometry<NDIM>(
+        Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine());    // refine op for cell-centered variables
-        grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine());          // refine op for side-centered variables
-        Pointer<PatchHierarchy<NDIM> > patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
-        Pointer<StandardTagAndInitialize<NDIM> > error_detector = new StandardTagAndInitialize<NDIM>(
+        grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
+                                                                                      // variables
+        grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables
+        Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
+        Pointer<StandardTagAndInitialize<NDIM>> error_detector = new StandardTagAndInitialize<NDIM>(
             "StandardTagAndInitialize", NULL, app_initializer->getComponentDatabase("StandardTagAndInitialize"));
-        Pointer<BergerRigoutsos<NDIM> > box_generator = new BergerRigoutsos<NDIM>();
-        Pointer<LoadBalancer<NDIM> > load_balancer =
+        Pointer<BergerRigoutsos<NDIM>> box_generator = new BergerRigoutsos<NDIM>();
+        Pointer<LoadBalancer<NDIM>> load_balancer =
             new LoadBalancer<NDIM>("LoadBalancer", app_initializer->getComponentDatabase("LoadBalancer"));
-        Pointer<GriddingAlgorithm<NDIM> > gridding_algorithm =
+        Pointer<GriddingAlgorithm<NDIM>> gridding_algorithm =
             new GriddingAlgorithm<NDIM>("GriddingAlgorithm",
                                         app_initializer->getComponentDatabase("GriddingAlgorithm"),
                                         error_detector,
@@ -79,28 +80,29 @@ main(int argc, char* argv[])
         Pointer<VariableContext> ctx = var_db->getContext("context");
 
         // State variables: Velocity and pressure.
-        Pointer<SideVariable<NDIM, double> > un_sc_var = new SideVariable<NDIM, double>("un_sc");
-        Pointer<SideVariable<NDIM, double> > us_sc_var = new SideVariable<NDIM, double>("us_sc");
-        Pointer<CellVariable<NDIM, double> > p_cc_var = new CellVariable<NDIM, double>("p_cc");
+        Pointer<SideVariable<NDIM, double>> un_sc_var = new SideVariable<NDIM, double>("un_sc");
+        Pointer<SideVariable<NDIM, double>> us_sc_var = new SideVariable<NDIM, double>("us_sc");
+        Pointer<CellVariable<NDIM, double>> p_cc_var = new CellVariable<NDIM, double>("p_cc");
 
         // variable coefficient: theta_n
-        Pointer<CellVariable<NDIM, double> > thn_cc_var = new CellVariable<NDIM, double>("thn_cc");
+        Pointer<CellVariable<NDIM, double>> thn_cc_var = new CellVariable<NDIM, double>("thn_cc");
 
         // Results of operator "forces" and "divergence"
-        Pointer<SideVariable<NDIM, double> > f_un_sc_var = new SideVariable<NDIM, double>("f_un_sc");
-        Pointer<SideVariable<NDIM, double> > f_us_sc_var = new SideVariable<NDIM, double>("f_us_sc");
-        Pointer<CellVariable<NDIM, double> > f_cc_var = new CellVariable<NDIM, double>("f_cc");
+        Pointer<SideVariable<NDIM, double>> f_un_sc_var = new SideVariable<NDIM, double>("f_un_sc");
+        Pointer<SideVariable<NDIM, double>> f_us_sc_var = new SideVariable<NDIM, double>("f_us_sc");
+        Pointer<CellVariable<NDIM, double>> f_cc_var = new CellVariable<NDIM, double>("f_cc");
 
         // Error terms.
-        Pointer<SideVariable<NDIM, double> > e_un_sc_var = new SideVariable<NDIM, double>("e_un_sc");
-        Pointer<SideVariable<NDIM, double> > e_us_sc_var = new SideVariable<NDIM, double>("e_us_sc");
-        Pointer<CellVariable<NDIM, double> > e_cc_var = new CellVariable<NDIM, double>("e_cc");
+        Pointer<SideVariable<NDIM, double>> e_un_sc_var = new SideVariable<NDIM, double>("e_un_sc");
+        Pointer<SideVariable<NDIM, double>> e_us_sc_var = new SideVariable<NDIM, double>("e_us_sc");
+        Pointer<CellVariable<NDIM, double>> e_cc_var = new CellVariable<NDIM, double>("e_cc");
 
         // Register patch data indices...
         const int un_sc_idx = var_db->registerVariableAndContext(un_sc_var, ctx, IntVector<NDIM>(1));
         const int us_sc_idx = var_db->registerVariableAndContext(us_sc_var, ctx, IntVector<NDIM>(1));
         const int p_cc_idx = var_db->registerVariableAndContext(p_cc_var, ctx, IntVector<NDIM>(1));
-        const int thn_cc_idx = var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1));  // 1 layer of ghost cells
+        const int thn_cc_idx =
+            var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1)); // 1 layer of ghost cells
         const int f_cc_idx = var_db->registerVariableAndContext(f_cc_var, ctx, IntVector<NDIM>(1));
         const int f_un_sc_idx = var_db->registerVariableAndContext(f_un_sc_var, ctx, IntVector<NDIM>(1));
         const int f_us_sc_idx = var_db->registerVariableAndContext(f_us_sc_var, ctx, IntVector<NDIM>(1));
@@ -109,22 +111,22 @@ main(int argc, char* argv[])
         const int e_cc_idx = var_db->registerVariableAndContext(e_cc_var, ctx, IntVector<NDIM>(1));
 
         // Drawing variables
-        Pointer<CellVariable<NDIM, double> > draw_un_var = new CellVariable<NDIM, double>("draw_un", NDIM);
-        Pointer<CellVariable<NDIM, double> > draw_fn_var = new CellVariable<NDIM, double>("draw_fn", NDIM);
-        Pointer<CellVariable<NDIM, double> > draw_en_var = new CellVariable<NDIM, double>("draw_en", NDIM);
+        Pointer<CellVariable<NDIM, double>> draw_un_var = new CellVariable<NDIM, double>("draw_un", NDIM);
+        Pointer<CellVariable<NDIM, double>> draw_fn_var = new CellVariable<NDIM, double>("draw_fn", NDIM);
+        Pointer<CellVariable<NDIM, double>> draw_en_var = new CellVariable<NDIM, double>("draw_en", NDIM);
         const int draw_un_idx = var_db->registerVariableAndContext(draw_un_var, ctx);
         const int draw_fn_idx = var_db->registerVariableAndContext(draw_fn_var, ctx);
         const int draw_en_idx = var_db->registerVariableAndContext(draw_en_var, ctx);
 
-        Pointer<CellVariable<NDIM, double> > draw_us_var = new CellVariable<NDIM, double>("draw_us", NDIM);
-        Pointer<CellVariable<NDIM, double> > draw_fs_var = new CellVariable<NDIM, double>("draw_fs", NDIM);
-        Pointer<CellVariable<NDIM, double> > draw_es_var = new CellVariable<NDIM, double>("draw_es", NDIM);
+        Pointer<CellVariable<NDIM, double>> draw_us_var = new CellVariable<NDIM, double>("draw_us", NDIM);
+        Pointer<CellVariable<NDIM, double>> draw_fs_var = new CellVariable<NDIM, double>("draw_fs", NDIM);
+        Pointer<CellVariable<NDIM, double>> draw_es_var = new CellVariable<NDIM, double>("draw_es", NDIM);
         const int draw_us_idx = var_db->registerVariableAndContext(draw_us_var, ctx);
         const int draw_fs_idx = var_db->registerVariableAndContext(draw_fs_var, ctx);
         const int draw_es_idx = var_db->registerVariableAndContext(draw_es_var, ctx);
 
         // Register variables for plotting.
-        Pointer<VisItDataWriter<NDIM> > visit_data_writer = app_initializer->getVisItDataWriter();
+        Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
         TBOX_ASSERT(visit_data_writer);
 
         visit_data_writer->registerPlotQuantity("Pressure", "SCALAR", p_cc_idx);
@@ -182,7 +184,7 @@ main(int argc, char* argv[])
         // Allocate data on each level of the patch hierarchy.
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
-            Pointer<PatchLevel<NDIM> > level = patch_hierarchy->getPatchLevel(ln);
+            Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
             level->allocatePatchData(un_sc_idx, 0.0);
             level->allocatePatchData(us_sc_idx, 0.0);
             level->allocatePatchData(f_un_sc_idx, 0.0);
@@ -272,17 +274,17 @@ main(int argc, char* argv[])
         Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
 
         stokes_op->setThnIdx(thn_cc_idx);
-    
-        Pointer<PETScKrylovLinearSolver> krylov_solver = new PETScKrylovLinearSolver(
-            "solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
+
+        Pointer<PETScKrylovLinearSolver> krylov_solver =
+            new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
         krylov_solver->setOperator(stokes_op);
         krylov_solver->setNullspace(false, { null_vec });
         krylov_solver->initializeSolverState(u_vec, f_vec);
-        krylov_solver->solveSystem(u_vec,f_vec);
+        krylov_solver->solveSystem(u_vec, f_vec);
 
         // Compute error and print error norms.
-        e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double> >(&u_vec, false),  // numerical
-                        Pointer<SAMRAIVectorReal<NDIM, double> >(&e_vec, false)); // analytical
+        e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical
+                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
         pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
@@ -293,23 +295,25 @@ main(int argc, char* argv[])
         const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
         const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
-        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         pout << "Error in u_n :\n"
-                << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-                << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-                << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
+             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
         pout << "Error in u_s :\n"
-                << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-                << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-                << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
+             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
-        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         pout << "Error in p :\n"
-                << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
-                << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
-                << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
-                << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+             << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
+             << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
+             << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
+             << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 
         // Interpolate the side-centered data to cell centers for output.
         static const bool synch_cf_interface = true;
@@ -326,7 +330,7 @@ main(int argc, char* argv[])
         // Allocate data on each level of the patch hierarchy.
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
-            Pointer<PatchLevel<NDIM> > level = patch_hierarchy->getPatchLevel(ln);
+            Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
             level->deallocatePatchData(un_sc_idx);
             level->deallocatePatchData(us_sc_idx);
             level->deallocatePatchData(f_un_sc_idx);

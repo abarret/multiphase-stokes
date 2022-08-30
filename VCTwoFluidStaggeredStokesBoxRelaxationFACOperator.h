@@ -22,8 +22,8 @@
 
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/FACPreconditionerStrategy.h"
-#include "ibtk/PoissonFACPreconditioner.h"
 #include "ibtk/HierarchyGhostCellInterpolation.h"
+#include "ibtk/PoissonFACPreconditioner.h"
 
 #include "IntVector.h"
 #include "PoissonSpecifications.h"
@@ -74,8 +74,8 @@ public:
      * \brief Constructor.
      */
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
-                                        SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                        const std::string& default_options_prefix);
+                                                      SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                                                      const std::string& default_options_prefix);
 
     /*!
      * \brief Destructor.
@@ -86,13 +86,13 @@ public:
      * \name Functions for configuring the solver.
      */
     //\{
-    
+
     /*!
      * \brief Zero-out the provided vector on the specified level of the patch
      * hierarchy.
-     */  
+     */
     void setToZero(SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& error, int level_num) override;
-   
+
     /*!
      * \brief Restrict the residual from the source vector to the destination
      * vector on the specified level of the patch hierarchy.
@@ -101,8 +101,8 @@ public:
      * the same vector.
      */
     void restrictResidual(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& source,
-                                  SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
-                                  int dest_level_num) override;
+                          SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
+                          int dest_level_num) override;
 
     /*!
      * \brief Prolong the error from the source vector to the destination
@@ -112,8 +112,8 @@ public:
      * the same vector.
      */
     void prolongError(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& source,
-                              SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
-                              int dest_level_num) override;
+                      SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
+                      int dest_level_num) override;
 
     /*!
      * \brief Prolong the error from the source vector to the destination vector
@@ -124,8 +124,8 @@ public:
      * the same vector.
      */
     void prolongErrorAndCorrect(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& source,
-                                        SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
-                                        int dest_level_num) override;
+                                SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& dest,
+                                int dest_level_num) override;
 
     /*!
      * \name Implementation of FACPreconditionerStrategy interface.
@@ -182,11 +182,11 @@ public:
                          int finest_level_num) override;
 
     //\}
-     /*!
+    /*!
      * \brief Compute implementation-specific hierarchy-dependent data.
      */
     void initializeOperatorState(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& solution,
-                                            const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& rhs) override;
+                                 const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& rhs) override;
 
     /*!
      * \brief Remove implementation-specific hierarchy-dependent data.
@@ -194,10 +194,9 @@ public:
     void deallocateOperatorState() override;
 
 protected:
-   
     int d_thn_idx;
     int un_scr_idx, us_scr_idx, p_scr_idx;
-    
+
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
@@ -207,7 +206,7 @@ protected:
         d_P_fill_pattern;
     std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> transaction_comps;
     SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
-    
+
 private:
     /*!
      * \brief Default constructor.
@@ -223,7 +222,8 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& from) = delete;
+    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& from) =
+        delete;
 
     /*!
      * \brief Assignment operator.
@@ -234,7 +234,8 @@ private:
      *
      * \return A reference to this object.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& operator=(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& that) = delete;
+    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator&
+    operator=(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& that) = delete;
 
     /*
      * Level solvers and solver parameters.
@@ -242,7 +243,7 @@ private:
     std::string d_level_solver_type = CCPoissonSolverManager::PETSC_LEVEL_SOLVER, d_level_solver_default_options_prefix;
     double d_level_solver_abs_residual_tol = 1.0e-50, d_level_solver_rel_residual_tol = 1.0e-5;
     int d_level_solver_max_iterations = 1;
-    std::vector<SAMRAI::tbox::Pointer<PoissonSolver> > d_level_solvers;
+    std::vector<SAMRAI::tbox::Pointer<PoissonSolver>> d_level_solvers;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_level_solver_db;
 
     /*
@@ -254,7 +255,7 @@ private:
     /*
      * Patch overlap data.
      */
-    std::vector<std::vector<SAMRAI::hier::BoxList<NDIM> > > d_patch_bc_box_overlap;
+    std::vector<std::vector<SAMRAI::hier::BoxList<NDIM>>> d_patch_bc_box_overlap;
 };
 } // namespace IBTK
 

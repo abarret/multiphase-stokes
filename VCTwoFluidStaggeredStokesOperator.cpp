@@ -14,8 +14,8 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
-#include "ibamr/VCTwoFluidStaggeredStokesOperator.h"
 #include "ibamr/ibamr_utilities.h"
+#include "ibamr/namespaces.h" // IWYU pragma: keep
 
 #include "ibtk/CellNoCornersFillPattern.h"
 #include "ibtk/HierarchyGhostCellInterpolation.h"
@@ -42,7 +42,8 @@
 #include <string>
 #include <vector>
 
-#include "ibamr/namespaces.h" // IWYU pragma: keep
+// Local includes
+#include "VCTwoFluidStaggeredStokesOperator.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
@@ -58,10 +59,16 @@ static const int SIDEG = 1;
 
 // Types of refining and coarsening to perform prior to setting coarse-fine
 // boundary and physical boundary ghost cell values.
-static const std::string CC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine patch
-static const std::string SC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine patch
+static const std::string CC_DATA_REFINE_TYPE =
+    "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
+                                  // patch
+static const std::string SC_DATA_REFINE_TYPE =
+    "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
+                                  // patch
 static const bool USE_CF_INTERPOLATION = true;
-static const std::string DATA_COARSEN_TYPE = "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing the hierarchies
+static const std::string DATA_COARSEN_TYPE =
+    "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
+                     // the hierarchies
 
 // Type of extrapolation to use at physical boundaries.
 static const std::string BDRY_EXTRAP_TYPE = "LINEAR"; // these operations are all in IBAMR
@@ -75,7 +82,6 @@ static Timer* t_apply;
 static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
-
 
 double convertToThs(double Thn);
 /////////////////////////////// PUBLIC ///////////////////////////////////////
@@ -236,12 +242,12 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     const int us_scratch_idx = d_x->getComponentDescriptorIndex(1);
     const int thn_idx = d_thn_idx;
 
-    Pointer<SideVariable<NDIM, double> > un_sc_var = x.getComponentVariable(0);
-    Pointer<SideVariable<NDIM, double> > us_sc_var = x.getComponentVariable(1);
-    Pointer<CellVariable<NDIM, double> > P_cc_var = x.getComponentVariable(2);
-    Pointer<SideVariable<NDIM, double> > A_un_sc_var = y.getComponentVariable(0);
-    Pointer<SideVariable<NDIM, double> > A_us_sc_var = y.getComponentVariable(1);
-    Pointer<CellVariable<NDIM, double> > A_P_cc_var = y.getComponentVariable(2);
+    Pointer<SideVariable<NDIM, double>> un_sc_var = x.getComponentVariable(0);
+    Pointer<SideVariable<NDIM, double>> us_sc_var = x.getComponentVariable(1);
+    Pointer<CellVariable<NDIM, double>> P_cc_var = x.getComponentVariable(2);
+    Pointer<SideVariable<NDIM, double>> A_un_sc_var = y.getComponentVariable(0);
+    Pointer<SideVariable<NDIM, double>> A_us_sc_var = y.getComponentVariable(1);
+    Pointer<CellVariable<NDIM, double>> A_P_cc_var = y.getComponentVariable(2);
 
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
@@ -294,24 +300,24 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
-        Pointer<PatchLevel<NDIM> > level = d_hierarchy->getPatchLevel(ln);
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
-            Pointer<Patch<NDIM> > patch = level->getPatch(p());
-            Pointer<CartesianPatchGeometry<NDIM> > pgeom = patch->getPatchGeometry();
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
             const double* const xlow =
                 pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
             const hier::Index<NDIM>& idx_low = patch->getBox().lower();
-            Pointer<CellData<NDIM, double> > p_data = patch->getPatchData(P_idx);
-            Pointer<CellData<NDIM, double> > A_P_data =
+            Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
+            Pointer<CellData<NDIM, double>> A_P_data =
                 patch->getPatchData(A_P_idx); // result of applying operator (eqn 3)
-            Pointer<CellData<NDIM, double> > thn_data = patch->getPatchData(thn_idx);
-            Pointer<SideData<NDIM, double> > un_data = patch->getPatchData(un_idx);
-            Pointer<SideData<NDIM, double> > A_un_data =
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+            Pointer<SideData<NDIM, double>> A_un_data =
                 patch->getPatchData(A_un_idx); // result of applying operator (eqn 1)
-            Pointer<SideData<NDIM, double> > us_data = patch->getPatchData(us_idx);
-            Pointer<SideData<NDIM, double> > A_us_data =
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+            Pointer<SideData<NDIM, double>> A_us_data =
                 patch->getPatchData(A_us_idx); // result of applying operator (eqn 2)
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
@@ -332,15 +338,21 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
                 double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
                 double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-            
+
                 // conservation of mass
-                
-                double div_un_dot_thn_dx = ((thn_upper_x * (*un_data)(upper_x_idx))-(thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
-                double div_un_dot_thn_dy = ((thn_upper_y * (*un_data)(upper_y_idx))-(thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
+
+                double div_un_dot_thn_dx =
+                    ((thn_upper_x * (*un_data)(upper_x_idx)) - (thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
+                double div_un_dot_thn_dy =
+                    ((thn_upper_y * (*un_data)(upper_y_idx)) - (thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
                 double div_un_thn = div_un_dot_thn_dx + div_un_dot_thn_dy;
 
-                double div_us_dot_ths_dx =((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx))-(convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) / dx[0];
-                double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx))-(convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /dx[1];
+                double div_us_dot_ths_dx = ((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx)) -
+                                            (convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) /
+                                           dx[0];
+                double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx)) -
+                                            (convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /
+                                           dx[1];
                 double div_us_ths = div_us_dot_ths_dx + div_us_dot_ths_dy;
                 (*A_P_data)(idx) = div_un_thn + div_us_ths;
             }
@@ -348,18 +360,18 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
                 const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
-                //pout << "\n At idx " << idx << " \n ";
+                // pout << "\n At idx " << idx << " \n ";
 
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)   
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)     
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
                 SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
                 SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
                 SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
                 SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
 
                 // thn at sides
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up));     // thn(i-1/2,j)
-                //pout << "thn_lower is " << thn_lower << "\n";
+                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
+                // pout << "thn_lower is " << thn_lower << "\n";
                 // thn at corners
                 double thn_imhalf_jphalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + yp) +
@@ -372,7 +384,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-               
+
                 double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
                                        (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
@@ -392,10 +404,9 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                     eta_s / (dx[0] * dx[0]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-                double ddy_Ths_dy_us =
-                    eta_s / (dx[1] * dx[1]) *
-                    (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
-                     convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
+                double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+                                       (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
+                                        convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
                 double ddy_Ths_dx_vs =
                     eta_s / (dx[1] * dx[0]) *
                     (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
@@ -410,21 +421,21 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 (*A_us_data)(idx) = ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s;
             }
 
-            //pout << "\n\n Looping over y-dir side-centers \n\n";
+            // pout << "\n\n Looping over y-dir side-centers \n\n";
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
             {
                 const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
 
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)  
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)  
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
                 SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
                 SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
                 SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
                 SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
 
                 // thn at sides
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up));     // thn(i,j-1/2)
+                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
 
                 // thn at corners
                 double thn_imhalf_jmhalf =
@@ -500,7 +511,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     d_x = in.cloneVector(in.getName());
     d_b = out.cloneVector(out.getName());
 
-     // Setup operator state.
+    // Setup operator state.
     d_hierarchy = in.getPatchHierarchy();
 
     // Allocate scratch data.
@@ -538,7 +549,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_P_bc_coef,
-                                                               d_P_fill_pattern);  // noFillCorners
+                                                               d_P_fill_pattern); // noFillCorners
     d_transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
                                                                CC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
@@ -620,8 +631,8 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
     {
         // Set y := y - A*0, i.e., shift the right-hand-side vector to account for
         // inhomogeneous boundary conditions.
-        Pointer<SAMRAIVectorReal<NDIM, double> > x = y.cloneVector("");
-        Pointer<SAMRAIVectorReal<NDIM, double> > b = y.cloneVector("");
+        Pointer<SAMRAIVectorReal<NDIM, double>> x = y.cloneVector("");
+        Pointer<SAMRAIVectorReal<NDIM, double>> b = y.cloneVector("");
         x->allocateVectorData();
         b->allocateVectorData();
         x->setToScalar(0.0);
@@ -636,7 +647,7 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
         }
         StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
         apply(*x, *b);
-        y.subtract(Pointer<SAMRAIVectorReal<NDIM, double> >(&y, false), b);
+        y.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&y, false), b);
         x->freeVectorComponents();
         b->freeVectorComponents();
     }
