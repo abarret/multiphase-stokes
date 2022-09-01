@@ -127,7 +127,7 @@ main(int argc, char* argv[])
         visit_data_writer->registerPlotQuantity("Pressure", "SCALAR", p_cc_idx);
         visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_cc_idx);
         visit_data_writer->registerPlotQuantity("RHS_P", "SCALAR", f_cc_idx);
-        visit_data_writer->registerPlotQuantity("error_p", "SCALAR", e_cc_idx);
+        visit_data_writer->registerPlotQuantity("error_RHS_p", "SCALAR", e_cc_idx);
 
         visit_data_writer->registerPlotQuantity("Un", "VECTOR", draw_un_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
@@ -141,10 +141,10 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("RHS_Un_" + std::to_string(d), "SCALAR", draw_fn_idx, d);
         }
 
-        visit_data_writer->registerPlotQuantity("error_un", "VECTOR", draw_en_idx);
+        visit_data_writer->registerPlotQuantity("error_RHS_un", "VECTOR", draw_en_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
         {
-            visit_data_writer->registerPlotQuantity("error_un_" + std::to_string(d), "SCALAR", draw_en_idx, d);
+            visit_data_writer->registerPlotQuantity("error_RHS_un_" + std::to_string(d), "SCALAR", draw_en_idx, d);
         }
 
         visit_data_writer->registerPlotQuantity("Us", "VECTOR", draw_us_idx);
@@ -159,10 +159,10 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("RHS_Us_" + std::to_string(d), "SCALAR", draw_fs_idx, d);
         }
 
-        visit_data_writer->registerPlotQuantity("error_us", "VECTOR", draw_es_idx);
+        visit_data_writer->registerPlotQuantity("error_RHS_us", "VECTOR", draw_es_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
         {
-            visit_data_writer->registerPlotQuantity("error_us_" + std::to_string(d), "SCALAR", draw_es_idx, d);
+            visit_data_writer->registerPlotQuantity("error_RHS_us_" + std::to_string(d), "SCALAR", draw_es_idx, d);
         }
 
         gridding_algorithm->makeCoarsestLevel(patch_hierarchy, 0.0);
@@ -245,13 +245,6 @@ main(int argc, char* argv[])
         f_us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
         f_p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
-        // Setup stokes poisson specifications
-        PoissonSpecifications poisson_spec("poisson_spec");
-        const double D = input_db->getDouble("D");
-        const double C = input_db->getDouble("C");
-        poisson_spec.setDConstant(D);
-        poisson_spec.setCConstant(C);
-
         // Setup the stokes operator
         VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
 
@@ -276,19 +269,19 @@ main(int argc, char* argv[])
 
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in un :\n"
+        pout << "Error in RHS_un :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
              << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
-        pout << "Error in us :\n"
+        pout << "Error in RHS_us :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
              << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
         HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in p :\n"
+        pout << "Error in RHS_p :\n"
              << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
