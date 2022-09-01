@@ -116,14 +116,15 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
     Pointer<VariableContext> d_ctx = var_db->getContext("context");
 
     // State scratch variables: Velocity and pressure.
-    Pointer<SideVariable<NDIM, double>> un_scr_var = new SideVariable<NDIM, double>("un_scr");
-    Pointer<SideVariable<NDIM, double>> us_scr_var = new SideVariable<NDIM, double>("us_scr");
-    Pointer<CellVariable<NDIM, double>> p_scr_var = new CellVariable<NDIM, double>("p_scr");
+    // Prepend with d_object_name to ensure there are no conflicts.
+    Pointer<SideVariable<NDIM, double>> un_scr_var = new SideVariable<NDIM, double>(d_object_name + "::un_scr");
+    Pointer<SideVariable<NDIM, double>> us_scr_var = new SideVariable<NDIM, double>(d_object_name + "::us_scr");
+    Pointer<CellVariable<NDIM, double>> p_scr_var = new CellVariable<NDIM, double>(d_object_name + "::p_scr");
 
     // Register patch data indices
-    const int un_scr_idx = var_db->registerVariableAndContext(un_scr_var, d_ctx, IntVector<NDIM>(1));
-    const int us_scr_idx = var_db->registerVariableAndContext(us_scr_var, d_ctx, IntVector<NDIM>(1));
-    const int p_scr_idx = var_db->registerVariableAndContext(p_scr_var, d_ctx, IntVector<NDIM>(1));
+    d_un_scr_idx = var_db->registerVariableAndContext(un_scr_var, d_ctx, IntVector<NDIM>(1));
+    d_us_scr_idx = var_db->registerVariableAndContext(us_scr_var, d_ctx, IntVector<NDIM>(1));
+    d_p_scr_idx = var_db->registerVariableAndContext(p_scr_var, d_ctx, IntVector<NDIM>(1));
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
@@ -150,26 +151,107 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setThnIdx(int thn_idx)
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& source,
-                                                                    SAMRAIVectorReal<NDIM, double>& dest,
-                                                                    int dest_level_num)
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
+                                                                    SAMRAIVectorReal<NDIM, double>& dst,
+                                                                    const int dst_ln)
 {
+    // Pull out patch indices.
+    const int dst_un_idx = dst.getComponentDescriptorIndex(0);
+    const int dst_us_idx = dst.getComponentDescriptorIndex(1);
+    const int dst_p_idx = dst.getComponentDescriptorIndex(2);
+    std::array<int, 3> dst_idxs = { dst_un_idx, dst_us_idx, dst_p_idx };
+
+    const int src_un_idx = src.getComponentDescriptorIndex(0);
+    const int src_us_idx = src.getComponentDescriptorIndex(1);
+    const int src_p_idx = src.getComponentDescriptorIndex(2);
+    std::array<int, 3> src_idxs = { src_un_idx, src_us_idx, src_p_idx };
+
+    // SAMRAI's refine operators will copy data from patch interiors if the patch indices are different.
+    // Therefore, I don't think we need to do this
+    // TODO: test if this is necessary.
+    if (dst_un_idx != src_un_idx)
+    {
+        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
+        level_sc_data_ops.copyData(dst_un_idx, src_un_idx, false /*interior_only*/);
+    }
+    if (dst_us_idx != src_us_idx)
+    {
+        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
+        level_sc_data_ops.copyData(dst_us_idx, src_us_idx, false /*interior_only*/);
+    }
+    if (dst_p_idx != src_p_idx)
+    {
+        HierarchyCellDataOpsReal<NDIM, double> level_cc_data_ops(d_hierarchy, dst_ln, dst_ln);
+        level_cc_data_ops.copyData(dst_p_idx, src_p_idx, false /*interior_only*/);
+    }
+
+    // Now perform restriction
+    performRestriction(dst_idxs, src_idxs, dst_ln);
     return;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& source,
-                                                                SAMRAIVectorReal<NDIM, double>& dest,
-                                                                int dest_level_num)
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
+                                                                SAMRAIVectorReal<NDIM, double>& dst,
+                                                                const int dst_ln)
 {
+    // Pull out patch indices.
+    const int dst_un_idx = dst.getComponentDescriptorIndex(0);
+    const int dst_us_idx = dst.getComponentDescriptorIndex(1);
+    const int dst_p_idx = dst.getComponentDescriptorIndex(2);
+    std::array<int, 3> dst_idxs = { dst_un_idx, dst_us_idx, dst_p_idx };
+
+    const int src_un_idx = src.getComponentDescriptorIndex(0);
+    const int src_us_idx = src.getComponentDescriptorIndex(1);
+    const int src_p_idx = src.getComponentDescriptorIndex(2);
+    std::array<int, 3> src_idxs = { src_un_idx, src_us_idx, src_p_idx };
+
+    // Now perform prolongation
+    performProlongation(dst_idxs, src_idxs, dst_ln);
     return;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& source,
-                                                                          SAMRAIVectorReal<NDIM, double>& dest,
-                                                                          int dest_level_num)
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
+                                                                          SAMRAIVectorReal<NDIM, double>& dst,
+                                                                          const int dst_ln)
 {
+    // Pull out patch indices.
+    const int dst_un_idx = dst.getComponentDescriptorIndex(0);
+    const int dst_us_idx = dst.getComponentDescriptorIndex(1);
+    const int dst_p_idx = dst.getComponentDescriptorIndex(2);
+    std::array<int, 3> dst_idxs = { d_un_scr_idx, d_us_scr_idx, d_p_scr_idx };
+
+    const int src_un_idx = src.getComponentDescriptorIndex(0);
+    const int src_us_idx = src.getComponentDescriptorIndex(1);
+    const int src_p_idx = src.getComponentDescriptorIndex(2);
+    std::array<int, 3> src_idxs = { src_un_idx, src_us_idx, src_p_idx };
+
+    // I'm not sure why/if we need to do this, but this was done in other implementations...
+    // TODO: Test if this is necessary.
+    if (dst_un_idx != src_un_idx)
+    {
+        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln - 1, dst_ln - 1);
+        level_sc_data_ops.add(dst_un_idx, dst_un_idx, src_un_idx, false /*interior_only*/);
+    }
+    if (dst_us_idx != src_us_idx)
+    {
+        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln - 1, dst_ln - 1);
+        level_sc_data_ops.add(dst_us_idx, dst_us_idx, src_us_idx, false /*interior_only*/);
+    }
+    if (dst_p_idx != src_p_idx)
+    {
+        HierarchyCellDataOpsReal<NDIM, double> level_cc_data_ops(d_hierarchy, dst_ln - 1, dst_ln - 1);
+        level_cc_data_ops.add(dst_p_idx, dst_p_idx, src_p_idx, false /*interior_only*/);
+    }
+
+    // Now prolong and correct data
+    performProlongation(dst_idxs, src_idxs, dst_ln);
+    HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
+    level_sc_data_ops.add(dst_un_idx, dst_un_idx, d_un_scr_idx, false /*interior_only*/);
+    level_sc_data_ops.add(dst_us_idx, dst_us_idx, d_us_scr_idx, false /*interior_only*/);
+    HierarchyCellDataOpsReal<NDIM, double> level_cc_data_ops(d_hierarchy, dst_ln, dst_ln);
+    level_cc_data_ops.add(dst_p_idx, dst_p_idx, d_p_scr_idx, false /*interior_only*/);
     return;
 }
 
@@ -201,9 +283,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     // Allocate data on all patches. (better to do this in InitializeSolverState)
     // d_hierarchy = error.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
-    level->allocatePatchData(un_scr_idx, 0.0);
-    level->allocatePatchData(us_scr_idx, 0.0);
-    level->allocatePatchData(p_scr_idx, 0.0);
 
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
@@ -267,9 +346,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
             Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
-            Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(un_scr_idx);
-            Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(us_scr_idx);
-            Pointer<CellData<NDIM, double>> p_scr_data = patch->getPatchData(p_scr_idx);
+            Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(d_un_scr_idx);
+            Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(d_us_scr_idx);
+            Pointer<CellData<NDIM, double>> p_scr_data = patch->getPatchData(d_p_scr_idx);
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
             Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
             Pointer<CellData<NDIM, double>> f_p_data = patch->getPatchData(f_P_idx);
@@ -807,7 +886,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 double
 convertToThs(double Thn)
 {
-    return 1 - Thn; // Thn+Ths = 1
+    return 1.0 - Thn; // Thn+Ths = 1
 }
 
 void
@@ -823,32 +902,132 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
 } // setToZero
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(
-    const SAMRAIVectorReal<NDIM, double>& solution,
-    const SAMRAIVectorReal<NDIM, double>& rhs)
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
+                                                                           const SAMRAIVectorReal<NDIM, double>& rhs)
 {
     // Setup solution and rhs vectors.
-    Pointer<CellVariable<NDIM, double>> solution_var = solution.getComponentVariable(0);
-    Pointer<CellVariable<NDIM, double>> rhs_var = rhs.getComponentVariable(0);
+    Pointer<SideVariable<NDIM, double>> un_sol_var = sol.getComponentVariable(0);
+    Pointer<SideVariable<NDIM, double>> us_sol_var = sol.getComponentVariable(1);
+    Pointer<CellVariable<NDIM, double>> p_sol_var = sol.getComponentVariable(2);
 
-    Pointer<CellDataFactory<NDIM, double>> solution_pdat_fac = solution_var->getPatchDataFactory();
-    Pointer<CellDataFactory<NDIM, double>> rhs_pdat_fac = rhs_var->getPatchDataFactory();
-    d_hierarchy = solution.getPatchHierarchy();
+    Pointer<SideVariable<NDIM, double>> un_rhs_var = rhs.getComponentVariable(0);
+    Pointer<SideVariable<NDIM, double>> us_rhs_var = rhs.getComponentVariable(1);
+    Pointer<CellVariable<NDIM, double>> p_rhs_var = rhs.getComponentVariable(2);
 
+    d_hierarchy = sol.getPatchHierarchy();
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+
+    // Rudimentary error checking.
 #if !defined(NDEBUG)
-    TBOX_ASSERT(solution_var);
-    TBOX_ASSERT(rhs_var);
-    TBOX_ASSERT(solution_pdat_fac);
-    TBOX_ASSERT(rhs_pdat_fac);
+    TBOX_ASSERT(un_sol_var && us_sol_var && p_sol_var);
+    TBOX_ASSERT(un_rhs_var && us_rhs_var && p_rhs_var);
+    TBOX_ASSERT(d_hierarchy == rhs.getPatchHierarchy());
 #endif
 
+    // Allocate scratch data
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        level->allocatePatchData(d_un_scr_idx, d_new_time);
+        level->allocatePatchData(d_us_scr_idx, d_new_time);
+        level->allocatePatchData(d_p_scr_idx, d_new_time);
+    }
+
+    // Cache prolongation operators. Creating refinement schedules can be expensive for hierarchies with many levels. We
+    // create the schedules here, and SAMRAI will determine whether they need to be regenerated whenever we switch patch
+    // indices.
+    // TODO: Set the refine type via input database or setter.
+    Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
+    d_un_prolong_op = grid_geom->lookupRefineOperator(un_sol_var, "CONSERVATIVE_LINEAR_REFINE");
+    d_us_prolong_op = grid_geom->lookupRefineOperator(us_sol_var, "CONSERVATIVE_LINEAR_REFINE");
+    d_p_prolong_op = grid_geom->lookupRefineOperator(p_sol_var, "CONSERVATIVE_LINEAR_REFINE");
+    const int un_sol_idx = sol.getComponentDescriptorIndex(0);
+    const int us_sol_idx = sol.getComponentDescriptorIndex(1);
+    const int p_sol_idx = sol.getComponentDescriptorIndex(0);
+
+    RefineAlgorithm<NDIM> refine_alg;
+    refine_alg.registerRefine(d_un_scr_idx, un_sol_idx, d_un_scr_idx, d_un_prolong_op);
+    refine_alg.registerRefine(d_us_scr_idx, us_sol_idx, d_us_scr_idx, d_us_prolong_op);
+    refine_alg.registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, d_p_prolong_op);
+
+    d_prolong_scheds.resize(finest_ln - coarsest_ln);
+    // Note start from zero because you can't prolong to the coarsest level.
+    for (int dst_ln = coarsest_ln + 1; dst_ln <= finest_ln; ++dst_ln)
+    {
+        // TODO: The last argument should be the refine patch strategies. These should be, e.g. physical boundary
+        // routines and fix-ups related to coarse fine interfaces.
+        d_prolong_scheds[dst_ln] = refine_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln),
+                                                             d_hierarchy->getPatchLevel(dst_ln - 1),
+                                                             dst_ln - 1,
+                                                             d_hierarchy,
+                                                             nullptr /* Refine patch strategy*/);
+    }
+
+    // Cache restriction operators.
+    // TODO: Set the coarsen type via input database or setter.
+    d_un_restrict_op = grid_geom->lookupCoarsenOperator(un_sol_var, "CONSERVATIVE_COARSEN");
+    d_us_restrict_op = grid_geom->lookupCoarsenOperator(us_sol_var, "CONSERVATIVE_COARSEN");
+    d_p_restrict_op = grid_geom->lookupCoarsenOperator(p_sol_var, "CONSERVATIVE_COARSEN");
+
+    CoarsenAlgorithm<NDIM> coarsen_alg;
+    coarsen_alg.registerCoarsen(d_un_scr_idx, un_sol_idx, d_un_restrict_op);
+    coarsen_alg.registerCoarsen(d_us_scr_idx, us_sol_idx, d_us_restrict_op);
+    coarsen_alg.registerCoarsen(d_p_scr_idx, p_sol_idx, d_p_restrict_op);
+
+    d_restrict_scheds.resize(finest_ln - coarsest_ln);
+    // Note don't create one for finest_ln because you can't restrict to the finest level.
+    for (int dst_ln = coarsest_ln; dst_ln < finest_ln; ++dst_ln)
+    {
+        d_restrict_scheds[dst_ln] =
+            coarsen_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_hierarchy->getPatchLevel(dst_ln + 1));
+    }
     return;
 }
 
 void
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
 {
+    // Delete the operators and schedules
+    d_un_restrict_op.setNull();
+    d_us_restrict_op.setNull();
+    d_p_restrict_op.setNull();
+    d_restrict_scheds.resize(0);
+
+    d_un_prolong_op.setNull();
+    d_us_prolong_op.setNull();
+    d_p_prolong_op.setNull();
+    d_prolong_scheds.resize(0);
     return;
+}
+
+void
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std::array<int, 3>& dst_idxs,
+                                                                       const std::array<int, 3>& src_idxs,
+                                                                       const int dst_ln)
+{
+    RefineAlgorithm<NDIM> refine_alg;
+    refine_alg.registerRefine(dst_idxs[0], src_idxs[0], dst_idxs[0], d_un_prolong_op);
+    refine_alg.registerRefine(dst_idxs[1], src_idxs[1], dst_idxs[1], d_us_prolong_op);
+    refine_alg.registerRefine(dst_idxs[2], src_idxs[2], dst_idxs[2], d_p_prolong_op);
+
+    refine_alg.resetSchedule(d_prolong_scheds[dst_ln]);
+    d_prolong_scheds[dst_ln]->fillData(d_new_time);
+    return;
+}
+
+void
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std::array<int, 3>& dst_idxs,
+                                                                      const std::array<int, 3>& src_idxs,
+                                                                      const int dst_ln)
+{
+    CoarsenAlgorithm<NDIM> coarsen_alg;
+    coarsen_alg.registerCoarsen(dst_idxs[0], src_idxs[0], d_un_restrict_op);
+    coarsen_alg.registerCoarsen(dst_idxs[1], src_idxs[1], d_us_restrict_op);
+    coarsen_alg.registerCoarsen(dst_idxs[2], src_idxs[2], d_p_restrict_op);
+
+    coarsen_alg.resetSchedule(d_restrict_scheds[dst_ln]);
+    d_restrict_scheds[dst_ln]->coarsenData();
 }
 
 /////////////////////////////// PRIVATE //////////////////////////////////////

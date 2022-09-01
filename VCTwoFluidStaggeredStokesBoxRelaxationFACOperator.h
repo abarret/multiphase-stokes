@@ -194,13 +194,13 @@ public:
     void deallocateOperatorState() override;
 
 protected:
-    int d_thn_idx;
-    int un_scr_idx, us_scr_idx, p_scr_idx;
+    int d_thn_idx = IBTK::invalid_index;
+    int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef = nullptr;
     // Cached communications operators.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
         d_P_fill_pattern;
@@ -237,6 +237,14 @@ private:
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator&
     operator=(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& that) = delete;
 
+    /*!
+     * \brief Perform prolongation or restriction on the provided indices.
+     */
+    //\{
+    void performProlongation(const std::array<int, 3>& dst_idxs, const std::array<int, 3>& src_idxs, int dst_ln);
+    void performRestriction(const std::array<int, 3>& dst_idxs, const std::array<int, 3>& src_idxs, int dst_ln);
+    //\}
+
     /*
      * Level solvers and solver parameters.
      */
@@ -256,6 +264,12 @@ private:
      * Patch overlap data.
      */
     std::vector<std::vector<SAMRAI::hier::BoxList<NDIM>>> d_patch_bc_box_overlap;
+
+    // Cache the prolongation and restriction schedules
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineOperator<NDIM>> d_un_prolong_op, d_us_prolong_op, d_p_prolong_op;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenOperator<NDIM>> d_un_restrict_op, d_us_restrict_op, d_p_restrict_op;
+    std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_prolong_scheds;
+    std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_restrict_scheds;
 };
 } // namespace IBTK
 
