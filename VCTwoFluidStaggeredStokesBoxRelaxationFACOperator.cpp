@@ -277,10 +277,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
     const int f_P_idx = residual.getComponentDescriptorIndex(2);  // RHS_pressure
 
-    // Create scratch indices
-    // Copy values from the residual at step 0 into scratch indices
-    // We want to solve for Un, Us and P at step k+1 using data from step k
-    // Allocate data on all patches. (better to do this in InitializeSolverState)
     // d_hierarchy = error.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
 
@@ -353,9 +349,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
             Pointer<CellData<NDIM, double>> f_p_data = patch->getPatchData(f_P_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
-            // un_scr_data->fillAll(*un_data);
-            // us_scr_data->fillAll(*us_data);
-            // p_scr_data->fillAll(*p_data);
 
             MatrixXd A_box(9, 9); // 9 x 9 Matrix
             VectorXd b;           // 9 x 1 RHS vector
@@ -363,6 +356,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
+                // Jacobi-type solve: We want to solve for Un, Us and P at step k+1 using data from step k
                 un_scr_data->fillAll(un_data);
                 us_scr_data->fillAll(us_data);
                 p_scr_data->fillAll(p_data);
@@ -407,7 +401,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(4, 4) =
                     eta_s / (dx[0] * dx[0]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx - xp))) -
                     eta_s / (dx[1] * dx[1]) * (convertToThs(thn_imhalf_jmhalf) + convertToThs(thn_imhalf_jphalf)) -
-                    xi / nu_n * thn_lower_x * convertToThs(thn_lower_x);
+                    xi / nu_s * thn_lower_x * convertToThs(thn_lower_x);
                 A_box(4, 5) = eta_s / (dx[0] * dx[0]) * (convertToThs((*thn_data)(idx)));
                 A_box(4, 6) =
                     eta_s / (dx[0] * dx[1]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_imhalf_jmhalf));
@@ -434,9 +428,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     eta_s / (dx[1] * dx[1]) * (convertToThs(thn_iphalf_jphalf) + convertToThs(thn_iphalf_jmhalf)) -
                     xi / nu_s * thn_upper_x * convertToThs(thn_upper_x);
                 A_box(5, 6) =
-                    eta_n / (dx[1] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) - convertToThs((*thn_data)(idx)));
+                    eta_s / (dx[1] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) - convertToThs((*thn_data)(idx)));
                 A_box(5, 7) =
-                    eta_n / (dx[1] * dx[0]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_iphalf_jphalf));
+                    eta_s / (dx[1] * dx[0]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_iphalf_jphalf));
                 A_box(5, 0) = A_box(5, 2) = A_box(5, 3) = 0.0;
                 A_box(5, 1) = xi / nu_s * thn_upper_x * convertToThs(thn_upper_x);
                 A_box(5, 8) = convertToThs(thn_upper_x) / dx[0];
@@ -459,7 +453,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(6, 6) =
                     eta_s / (dx[1] * dx[1]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx - yp))) -
                     eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) + convertToThs(thn_imhalf_jmhalf)) -
-                    xi / nu_n * thn_lower_y * convertToThs(thn_lower_y);
+                    xi / nu_s * thn_lower_y * convertToThs(thn_lower_y);
                 A_box(6, 7) = eta_s / (dx[1] * dx[1]) * (convertToThs((*thn_data)(idx)));
                 A_box(6, 0) = A_box(6, 1) = A_box(6, 3) = 0.0;
                 A_box(6, 2) = xi / nu_s * thn_lower_y * convertToThs(thn_lower_y);
@@ -614,8 +608,13 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVect
                                                                       const SAMRAIVectorReal<NDIM, double>& residual,
                                                                       int coarsest_ln)
 {
-    return false;
-}
+    IBTK_TIMER_START(t_solve_coarsest_level);
+
+    smoothError(error, residual, coarsest_ln, 3, false, false);
+
+    IBTK_TIMER_STOP(t_solve_coarsest_level);
+    return true;
+} // solveCoarsestLevel
 
 void
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
@@ -895,9 +894,17 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
     const int un_idx = vec.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = vec.getComponentDescriptorIndex(1); // solvent velocity, Us
     const int P_idx = vec.getComponentDescriptorIndex(2);  // pressure
-    // d_level_data_ops[level_num]->setToScalar(un_idx, 0.0, /*interior_only*/ false);
-    // d_level_data_ops[level_num]->setToScalar(us_idx, 0.0, /*interior_only*/ false);
-    // d_level_data_ops[level_num]->setToScalar(p_idx, 0.0, /*interior_only*/ false);
+    Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p()); 
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+            Pointer<SideData<NDIM, double>> p_data = patch->getPatchData(P_idx);
+            un_data->fillAll(0.0);
+            us_data->fillAll(0.0);
+            p_data->fillAll(0.0);
+        }
     return;
 } // setToZero
 
