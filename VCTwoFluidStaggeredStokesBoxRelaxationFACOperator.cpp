@@ -27,6 +27,7 @@
 #include "ibtk/PETScLevelSolver.h"
 #include "ibtk/PoissonSolver.h"
 #include "ibtk/RobinPhysBdryPatchStrategy.h"
+#include "ibtk/SideNoCornersFillPattern.h"
 #include "ibtk/ibtk_utilities.h"
 #include "ibtk/namespaces.h" // IWYU pragma: keep
 
@@ -81,6 +82,7 @@ static const int DEFAULT_DATA_DEPTH = 1;
 
 // Number of ghosts cells used for each variable quantity.
 static const int CELLG = 1;
+static const int SIDEG = 1;
 
 // Types of refining and coarsening to perform prior to setting coarse-fine
 // boundary and physical boundary ghost cell values.
@@ -107,7 +109,7 @@ double convertToThs(double Thn);
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    const Pointer<Database> input_db,
+    //const Pointer<Database> input_db,
     const std::string& default_options_prefix)
     : FACPreconditionerStrategy(object_name)
 {
@@ -277,9 +279,19 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
     const int f_P_idx = residual.getComponentDescriptorIndex(2);  // RHS_pressure
 
-    // d_hierarchy = error.getPatchHierarchy();
+    d_hierarchy = error.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
 
+    level->allocatePatchData(d_un_scr_idx, d_new_time);
+    level->allocatePatchData(d_us_scr_idx, d_new_time);
+    level->allocatePatchData(d_p_scr_idx, d_new_time);
+    
+    pout << "get patch level in smooth error" << "\n";
+
+    // Setup the interpolation transaction information.
+    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
+    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
+    d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(4);
@@ -317,6 +329,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef); // defaults to fill corner
 
+    // Initialize the interpolation operators.
+    d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
+    d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy);
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
     d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
@@ -326,6 +341,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     const double xi = 1.0;
     const double nu_n = 1.0;
     const double nu_s = 1.0;
+
+    pout << "before for loop in smooth error" << "\n";
+
     // outer for loop for number of sweeps
     for (int sweep = 0; sweep <= num_sweeps; sweep++)
     {
@@ -597,8 +615,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 (*p_data)(idx) = sol(8);
 
             } // cell centers
-        }     // patches
-    }         // num_sweeps
+        } // patches
+    } // num_sweeps
     IBTK_TIMER_STOP(t_smooth_error);
     return;
 }
@@ -894,13 +912,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
     const int un_idx = vec.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = vec.getComponentDescriptorIndex(1); // solvent velocity, Us
     const int P_idx = vec.getComponentDescriptorIndex(2);  // pressure
+    d_hierarchy = vec.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
     for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p()); 
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-            Pointer<SideData<NDIM, double>> p_data = patch->getPatchData(P_idx);
+            Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
             un_data->fillAll(0.0);
             us_data->fillAll(0.0);
             p_data->fillAll(0.0);
