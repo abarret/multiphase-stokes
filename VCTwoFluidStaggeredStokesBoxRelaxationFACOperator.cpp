@@ -109,7 +109,7 @@ double convertToThs(double Thn);
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    //const Pointer<Database> input_db,
+    const Pointer<Database> input_db,
     const std::string& default_options_prefix)
     : FACPreconditionerStrategy(object_name)
 {
@@ -369,8 +369,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
             MatrixXd A_box(9, 9); // 9 x 9 Matrix
-            VectorXd b;           // 9 x 1 RHS vector
-            VectorXd sol;         // 9 x 1 solution vector
+            VectorXd b(9);           // 9 x 1 RHS vector
+            VectorXd sol(9);         // 9 x 1 solution vector
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
