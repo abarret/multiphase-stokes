@@ -33,6 +33,10 @@ thn {
 KrylovSolver {
 }
 
+FACPreconditionerStrategy{
+
+}
+
 Main {
 // log file parameters
    log_file_name = "output"

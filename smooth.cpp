@@ -272,7 +272,7 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
         pout << "Here" << "\n";
         // Setup the box relaxation FAC operator
-        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
+        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", app_initializer->getComponentDatabase("FACPreconditionerStrategy"), "");
 
         box_relax.setThnIdx(thn_cc_idx);
         pout << "set Thn Idx" << "\n";
