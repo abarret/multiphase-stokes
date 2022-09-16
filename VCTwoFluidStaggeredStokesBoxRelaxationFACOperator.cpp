@@ -109,7 +109,7 @@ double convertToThs(double Thn);
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    const Pointer<Database> input_db,
+    //const Pointer<Database> input_db,
     const std::string& default_options_prefix)
     : FACPreconditionerStrategy(object_name)
 {
@@ -285,8 +285,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     level->allocatePatchData(d_un_scr_idx, d_new_time);
     level->allocatePatchData(d_us_scr_idx, d_new_time);
     level->allocatePatchData(d_p_scr_idx, d_new_time);
-    
-    pout << "get patch level in smooth error" << "\n";
 
     // Setup the interpolation transaction information.
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
@@ -329,7 +327,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef); // defaults to fill corner
 
-    // Initialize the interpolation operators.
+                                                                 // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
     d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy);
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
@@ -342,11 +340,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     const double nu_n = 1.0;
     const double nu_s = 1.0;
 
-    pout << "before for loop in smooth error" << "\n";
-
     // outer for loop for number of sweeps
     for (int sweep = 0; sweep <= num_sweeps; sweep++)
     {
+        // pout << "At sweep number " << sweep << "\n";
         // loop through all patches on this level
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
@@ -502,14 +499,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(7, 8) = convertToThs(thn_upper_y) / dx[1];
 
                 // incompressible constrain term at center
-                A_box(8, 0) = thn_lower_x / dx[0];
-                A_box(8, 1) = -thn_upper_x / dx[0];
-                A_box(8, 2) = thn_lower_y / dx[1];
-                A_box(8, 3) = -thn_upper_y / dx[1];
-                A_box(8, 4) = convertToThs(thn_lower_x) / dx[0];
-                A_box(8, 5) = -convertToThs(thn_upper_x) / dx[0];
-                A_box(8, 6) = convertToThs(thn_lower_y) / dx[1];
-                A_box(8, 7) = -convertToThs(thn_upper_y) / dx[1];
+                A_box(8, 0) = -thn_lower_x / dx[0];
+                A_box(8, 1) = thn_upper_x / dx[0];
+                A_box(8, 2) = -thn_lower_y / dx[1];
+                A_box(8, 3) = thn_upper_y / dx[1];
+                A_box(8, 4) = -convertToThs(thn_lower_x) / dx[0];
+                A_box(8, 5) = convertToThs(thn_upper_x) / dx[0];
+                A_box(8, 6) = -convertToThs(thn_lower_y) / dx[1];
+                A_box(8, 7) = convertToThs(thn_upper_y) / dx[1];
                 A_box(8, 8) = 0.0;
 
                 // set-up RHS vector (include terms from residual (f_un,f_us,f_p))
@@ -984,7 +981,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         // TODO: The last argument should be the refine patch strategies. These should be, e.g. physical boundary
         // routines and fix-ups related to coarse fine interfaces.
         d_prolong_scheds[dst_ln] = refine_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln),
-                                                             d_hierarchy->getPatchLevel(dst_ln - 1),
+                                                             nullptr,
                                                              dst_ln - 1,
                                                              d_hierarchy,
                                                              nullptr /* Refine patch strategy*/);

@@ -35,6 +35,7 @@
 
 // Local includes
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "VCTwoFluidStaggeredStokesOperator.h"
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -270,53 +271,58 @@ main(int argc, char* argv[])
         un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
-        pout << "Here" << "\n";
+        
         // Setup the box relaxation FAC operator
-        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", app_initializer->getComponentDatabase("FACPreconditionerStrategy"), "");
-
+        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
         box_relax.setThnIdx(thn_cc_idx);
-        pout << "set Thn Idx" << "\n";
-        // box_relax.initializeOperatorState(u_vec, f_vec);   // throwing some errors regarding Refine(?)
-
         box_relax.setToZero(u_vec, 0);
-        pout << "set to zero" << "\n";
+        box_relax.smoothError(u_vec, f_vec, 0, 500, false, false); // 50 sweeps
 
-        box_relax.smoothError(u_vec, f_vec, 0, 5, false, false);
-        pout << "smooth error" << "\n";
+        // Setup the stokes operator
+        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
+        stokes_op.setThnIdx(thn_cc_idx);
+        stokes_op.initializeOperatorState(u_vec, e_vec);
+        stokes_op.apply(u_vec, e_vec); // e_vec is A*u
 
+        // calculate residual norm: b - A*u
+        f_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),  // RHS
+                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // A*u
+        pout << "|f|_oo = " << f_vec.maxNorm() << "\n";
+        pout << "|f|_2  = " << f_vec.L2Norm() << "\n";
+        pout << "|f|_1  = " << f_vec.L1Norm() << "\n";
 
         // Compute error and print error norms.
-        e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical
-                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
-        pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
-        pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
-        pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
+        // e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical
+        //                Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
+        // pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
+        // pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
+        // pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
 
-        hier_math_ops.setPatchHierarchy(patch_hierarchy);
-        hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
-        // just computes quadrature weights
-        const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
-        const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
+        // hier_math_ops.setPatchHierarchy(patch_hierarchy);
+        // hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
+        // // just computes quadrature weights
+        // const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
+        // const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
-        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
-            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in u_n :\n"
-             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
+        // HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
+        //     patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        // pout << "Error in u_n :\n"
+        //      << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+        //      << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+        //      << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
-        pout << "Error in u_s :\n"
-             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
+        // pout << "Error in u_s :\n"
+        //      << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+        //      << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+        //      << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
-        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
-            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in p :\n"
-             << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+        // HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
+        //     patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        // pout << "Error in p :\n"
+        //      << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
+        //      << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
+        //      << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
+        //      << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 
         // Interpolate the side-centered data to cell centers for output.
         static const bool synch_cf_interface = true;
