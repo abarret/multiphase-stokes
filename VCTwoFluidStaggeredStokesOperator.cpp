@@ -436,10 +436,10 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                             (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
 
                 // components of second row (y-component of network vel) of network equation
-                double ddy_Thn_dy_un = eta_n / (dx[0] * dx[0]) *
+                double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddx_Thn_dx_un = eta_n / (dx[1] * dx[1]) *
+                double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
                                        (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
                 double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
@@ -454,10 +454,10 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 (*A_un_data)(idx) = ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n;
 
                 // Solvent equation
-                double ddy_Ths_dy_us = eta_s / (dx[0] * dx[0]) *
+                double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
                                         (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                         convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddx_Ths_dx_us = eta_s / (dx[1] * dx[1]) *
+                double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
                                         (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                         convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
                 double ddx_Ths_dy_vs = eta_s / (dx[1] * dx[0]) *

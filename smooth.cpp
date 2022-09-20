@@ -268,28 +268,31 @@ main(int argc, char* argv[])
         f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
         thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
 
-        un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
-        us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
-        p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
+        un_fcn.setDataOnPatchHierarchy(un_sc_idx, un_sc_var, patch_hierarchy, 0.0);
+        us_fcn.setDataOnPatchHierarchy(us_sc_idx, us_sc_var, patch_hierarchy, 0.0);
+        p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
         
         // Setup the box relaxation FAC operator
+
         VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
         box_relax.setThnIdx(thn_cc_idx);
+        //box_relax.initializeOperatorState(u_vec,f_vec);
         box_relax.setToZero(u_vec, 0);
-        box_relax.smoothError(u_vec, f_vec, 0, 500, false, false); // 50 sweeps
-
+        box_relax.smoothError(u_vec, f_vec, 0, 15, false, false); // 5 sweeps
+        box_relax.computeResidual(e_vec, u_vec, f_vec, 0, 0);
+        
         // Setup the stokes operator
-        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
-        stokes_op.setThnIdx(thn_cc_idx);
-        stokes_op.initializeOperatorState(u_vec, e_vec);
-        stokes_op.apply(u_vec, e_vec); // e_vec is A*u
-
+        // VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
+        // stokes_op.setThnIdx(thn_cc_idx);
+        // stokes_op.initializeOperatorState(u_vec, e_vec);
+        // stokes_op.apply(u_vec, e_vec); // e_vec is A*u
+       
         // calculate residual norm: b - A*u
-        f_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),  // RHS
-                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // A*u
-        pout << "|f|_oo = " << f_vec.maxNorm() << "\n";
-        pout << "|f|_2  = " << f_vec.L2Norm() << "\n";
-        pout << "|f|_1  = " << f_vec.L1Norm() << "\n";
+        // f_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),  // RHS
+                       //Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // A*u
+        // pout << "|r|_oo = " << e_vec.maxNorm() << "\n";
+        // pout << "|r|_2  = " << e_vec.L2Norm() << "\n";
+        // pout << "|r|_1  = " << e_vec.L1Norm() << "\n";
 
         // Compute error and print error norms.
         // e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical

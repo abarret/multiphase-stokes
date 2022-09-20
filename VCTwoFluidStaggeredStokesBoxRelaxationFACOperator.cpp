@@ -327,7 +327,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef); // defaults to fill corner
 
-                                                                 // Initialize the interpolation operators.
+    // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
     d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy);
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
@@ -339,11 +339,12 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     const double xi = 1.0;
     const double nu_n = 1.0;
     const double nu_s = 1.0;
-
+    IntVector<NDIM> xp(1, 0), yp(0, 1);
+    
     // outer for loop for number of sweeps
     for (int sweep = 0; sweep <= num_sweeps; sweep++)
     {
-        // pout << "At sweep number " << sweep << "\n";
+        pout << "At sweep number " << sweep << "\n";
         // loop through all patches on this level
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
@@ -363,29 +364,32 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
             Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
             Pointer<CellData<NDIM, double>> f_p_data = patch->getPatchData(f_P_idx);
-            IntVector<NDIM> xp(1, 0), yp(0, 1);
-
-            MatrixXd A_box(9, 9); // 9 x 9 Matrix
-            VectorXd b(9);           // 9 x 1 RHS vector
-            VectorXd sol(9);         // 9 x 1 solution vector
-
+                
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
-                // Jacobi-type solve: We want to solve for Un, Us and P at step k+1 using data from step k
-                un_scr_data->fillAll(un_data);
-                us_scr_data->fillAll(us_data);
-                p_scr_data->fillAll(p_data);
+                MatrixXd A_box(9, 9);    // 9 x 9 Matrix
+                VectorXd b(9);           // 9 x 1 RHS vector
+                VectorXd sol(9);         // 9 x 1 solution vector
 
                 const CellIndex<NDIM>& idx = ci(); // (i,j)
                 VectorNd x;                        // <- Eigen3 vector
                 for (int d = 0; d < NDIM; ++d)
                     x[d] = xlow[d] + dx[d] * (idx(d) - idx_low(d) + 0.5); // Get's physical location of idx.
 
+                // Jacobi-type solve: We want to solve for Un, Us and P at step k+1 using data from step k
+                // un_scr_data = un_data;
+                // us_scr_data = us_data;
+                // p_scr_data = p_data;
+
                 SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
                 SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
                 SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
                 SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-
+                //pout << "(i,j) is " << idx(0) << " " << idx(1) << "\n";
+                //pout << "f_un_data is " << (*f_un_data)(upper_x_idx) << "\n";
+                //pout << "un_data at lower_x is " <<  (*un_data)(lower_x_idx)<< "\n";
+                //     pout << "thn_data is " << (*thn_data)(upper_x_idx) << "\n";
+                
                 // thn at sidess
                 double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
                 double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
@@ -405,49 +409,57 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 // network at west edge
                 A_box(0, 0) = eta_n / (dx[0] * dx[0]) * (-(*thn_data)(idx) - (*thn_data)(idx - xp)) -
                               eta_n / (dx[1] * dx[1]) * (thn_imhalf_jmhalf + thn_imhalf_jphalf) -
-                              xi / nu_n * thn_lower_x * convertToThs(thn_lower_x);
+                              (xi / nu_n) * thn_lower_x * convertToThs(thn_lower_x);
                 A_box(0, 1) = eta_n / (dx[0] * dx[0]) * ((*thn_data)(idx));
                 A_box(0, 2) = eta_n / (dx[0] * dx[1]) * ((*thn_data)(idx)-thn_imhalf_jmhalf);
                 A_box(0, 3) = eta_n / (dx[0] * dx[1]) * (thn_imhalf_jphalf - (*thn_data)(idx));
-                A_box(0, 4) = xi / nu_n * thn_lower_x * convertToThs(thn_lower_x);
-                A_box(0, 5) = A_box(0, 6) = A_box(0, 7) = 0.0;
+                A_box(0, 4) = (xi / nu_n) * thn_lower_x * convertToThs(thn_lower_x);
+                A_box(0, 5) = 0.0;
+                A_box(0, 6) = 0.0;
+                A_box(0, 7) = 0.0;
                 A_box(0, 8) = -thn_lower_x / dx[0];
 
                 A_box(4, 4) =
                     eta_s / (dx[0] * dx[0]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx - xp))) -
                     eta_s / (dx[1] * dx[1]) * (convertToThs(thn_imhalf_jmhalf) + convertToThs(thn_imhalf_jphalf)) -
-                    xi / nu_s * thn_lower_x * convertToThs(thn_lower_x);
+                    (xi / nu_s) * thn_lower_x * convertToThs(thn_lower_x);
                 A_box(4, 5) = eta_s / (dx[0] * dx[0]) * (convertToThs((*thn_data)(idx)));
                 A_box(4, 6) =
                     eta_s / (dx[0] * dx[1]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_imhalf_jmhalf));
                 A_box(4, 7) =
                     eta_s / (dx[0] * dx[1]) * (convertToThs(thn_imhalf_jphalf) - convertToThs((*thn_data)(idx)));
-                A_box(4, 0) = xi / nu_s * thn_lower_x * convertToThs(thn_lower_x);
-                A_box(4, 1) = A_box(4, 2) = A_box(4, 3) = 0.0;
+                A_box(4, 0) = (xi / nu_s) * thn_lower_x * convertToThs(thn_lower_x);
+                A_box(4, 1) = 0.0;
+                A_box(4, 2) = 0.0;
+                A_box(4, 3) = 0.0;
                 A_box(4, 8) = -convertToThs(thn_lower_x) / dx[0];
 
                 // network at east edge
                 A_box(1, 0) = eta_n / (dx[0] * dx[0]) * (*thn_data)(idx);
                 A_box(1, 1) = eta_n / (dx[0] * dx[0]) * (-(*thn_data)(idx + xp) - (*thn_data)(idx)) -
                               eta_n / (dx[1] * dx[1]) * (thn_iphalf_jphalf + thn_iphalf_jmhalf) -
-                              xi / nu_n * thn_upper_x * convertToThs(thn_upper_x);
+                              (xi / nu_n) * thn_upper_x * convertToThs(thn_upper_x);
                 A_box(1, 2) = eta_n / (dx[1] * dx[0]) * (thn_iphalf_jmhalf - (*thn_data)(idx));
                 A_box(1, 3) = eta_n / (dx[1] * dx[0]) * ((*thn_data)(idx)-thn_iphalf_jphalf);
-                A_box(1, 4) = A_box(1, 6) = A_box(1, 7) = 0.0;
-                A_box(1, 5) = xi / nu_n * thn_upper_x * convertToThs(thn_upper_x);
+                A_box(1, 4) = 0.0;
+                A_box(1, 6) = 0.0;
+                A_box(1, 7) = 0.0;
+                A_box(1, 5) = (xi / nu_n) * thn_upper_x * convertToThs(thn_upper_x);
                 A_box(1, 8) = thn_upper_x / dx[0];
 
                 A_box(5, 4) = eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx));
                 A_box(5, 5) =
                     eta_s / (dx[0] * dx[0]) * (-convertToThs((*thn_data)(idx + xp)) - convertToThs((*thn_data)(idx))) -
                     eta_s / (dx[1] * dx[1]) * (convertToThs(thn_iphalf_jphalf) + convertToThs(thn_iphalf_jmhalf)) -
-                    xi / nu_s * thn_upper_x * convertToThs(thn_upper_x);
+                    (xi / nu_s) * thn_upper_x * convertToThs(thn_upper_x);
                 A_box(5, 6) =
                     eta_s / (dx[1] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) - convertToThs((*thn_data)(idx)));
                 A_box(5, 7) =
                     eta_s / (dx[1] * dx[0]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_iphalf_jphalf));
-                A_box(5, 0) = A_box(5, 2) = A_box(5, 3) = 0.0;
-                A_box(5, 1) = xi / nu_s * thn_upper_x * convertToThs(thn_upper_x);
+                A_box(5, 0) = 0.0;
+                A_box(5, 2) = 0.0;
+                A_box(5, 3) = 0.0;
+                A_box(5, 1) = (xi / nu_s) * thn_upper_x * convertToThs(thn_upper_x);
                 A_box(5, 8) = convertToThs(thn_upper_x) / dx[0];
 
                 // network at south edge
@@ -455,10 +467,12 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(2, 1) = eta_n / (dx[0] * dx[1]) * (thn_iphalf_jmhalf - (*thn_data)(idx));
                 A_box(2, 2) = eta_n / (dx[1] * dx[1]) * (-(*thn_data)(idx) - (*thn_data)(idx - yp)) -
                               eta_n / (dx[0] * dx[0]) * (thn_iphalf_jmhalf + thn_imhalf_jmhalf) -
-                              xi / nu_n * thn_lower_y * convertToThs(thn_lower_y);
+                              (xi / nu_n) * thn_lower_y * convertToThs(thn_lower_y);
                 A_box(2, 3) = eta_n / (dx[1] * dx[1]) * ((*thn_data)(idx));
-                A_box(2, 4) = A_box(2, 5) = A_box(2, 7) = 0.0;
-                A_box(2, 6) = xi / nu_n * thn_lower_y * convertToThs(thn_lower_y);
+                A_box(2, 4) = 0.0;
+                A_box(2, 5) = 0.0;
+                A_box(2, 7) = 0.0;
+                A_box(2, 6) = (xi / nu_n) * thn_lower_y * convertToThs(thn_lower_y);
                 A_box(2, 8) = -thn_lower_y / dx[1];
 
                 A_box(6, 4) =
@@ -468,10 +482,12 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(6, 6) =
                     eta_s / (dx[1] * dx[1]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx - yp))) -
                     eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) + convertToThs(thn_imhalf_jmhalf)) -
-                    xi / nu_s * thn_lower_y * convertToThs(thn_lower_y);
+                    (xi / nu_s) * thn_lower_y * convertToThs(thn_lower_y);
                 A_box(6, 7) = eta_s / (dx[1] * dx[1]) * (convertToThs((*thn_data)(idx)));
-                A_box(6, 0) = A_box(6, 1) = A_box(6, 3) = 0.0;
-                A_box(6, 2) = xi / nu_s * thn_lower_y * convertToThs(thn_lower_y);
+                A_box(6, 0) = 0.0;
+                A_box(6, 1) = 0.0;
+                A_box(6, 3) = 0.0;
+                A_box(6, 2) = (xi / nu_s) * thn_lower_y * convertToThs(thn_lower_y);
                 A_box(6, 8) = -convertToThs(thn_lower_y) / dx[1];
 
                 // network at north edge
@@ -480,9 +496,11 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(3, 2) = eta_n / (dx[1] * dx[1]) * ((*thn_data)(idx));
                 A_box(3, 3) = eta_n / (dx[1] * dx[1]) * (-(*thn_data)(idx) - (*thn_data)(idx + yp)) -
                               eta_n / (dx[0] * dx[0]) * (thn_iphalf_jphalf - thn_imhalf_jphalf) -
-                              xi / nu_n * thn_upper_y * convertToThs(thn_upper_y);
-                A_box(3, 4) = A_box(3, 5) = A_box(3, 6) = 0.0;
-                A_box(3, 7) = xi / nu_n * thn_upper_y * convertToThs(thn_upper_y);
+                              (xi / nu_n) * thn_upper_y * convertToThs(thn_upper_y);
+                A_box(3, 4) = 0.0;
+                A_box(3, 5) = 0.0;
+                A_box(3, 6) = 0.0;
+                A_box(3, 7) = (xi / nu_n) * thn_upper_y * convertToThs(thn_upper_y);
                 A_box(3, 8) = thn_upper_y / dx[1];
 
                 A_box(7, 4) =
@@ -493,9 +511,11 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(7, 7) =
                     eta_s / (dx[1] * dx[1]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx + yp))) -
                     eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jphalf) - convertToThs(thn_imhalf_jphalf)) -
-                    xi / nu_s * thn_upper_y * convertToThs(thn_upper_y);
-                A_box(7, 0) = A_box(7, 1) = A_box(7, 2) = 0.0;
-                A_box(7, 3) = xi / nu_s * thn_upper_y * convertToThs(thn_upper_y);
+                    (xi / nu_s) * thn_upper_y * convertToThs(thn_upper_y);
+                A_box(7, 0) = 0.0;
+                A_box(7, 1) = 0.0;
+                A_box(7, 2) = 0.0;
+                A_box(7, 3) = (xi / nu_s) * thn_upper_y * convertToThs(thn_upper_y);
                 A_box(7, 8) = convertToThs(thn_upper_y) / dx[1];
 
                 // incompressible constrain term at center
@@ -513,88 +533,88 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 // should be populated with the values from the previous iteration
 
                 // network at west edge
-                b(0) = (*f_un_data)(lower_x_idx)-thn_lower_x / dx[0] * (*p_scr_data)(idx - xp) -
-                       eta_n / (dx[0] * dx[0]) * (*thn_data)(idx - xp) * (*un_scr_data)(lower_x_idx - xp) +
-                       eta_n / (dx[1] * dx[1]) * thn_imhalf_jphalf * (*un_scr_data)(lower_x_idx + yp) -
-                       eta_n / (dx[1] * dx[1]) * thn_imhalf_jmhalf * (*un_scr_data)(lower_x_idx - yp) +
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jphalf * (*un_scr_data)(upper_y_idx - xp) -
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jmhalf * (*un_scr_data)(lower_y_idx - xp) -
+                b(0) = (*f_un_data)(lower_x_idx)-thn_lower_x / dx[0] * (*p_data)(idx - xp) -
+                       eta_n / (dx[0] * dx[0]) * (*thn_data)(idx - xp) * (*un_data)(lower_x_idx - xp) -
+                       eta_n / (dx[1] * dx[1]) * thn_imhalf_jphalf * (*un_data)(lower_x_idx + yp) -
+                       eta_n / (dx[1] * dx[1]) * thn_imhalf_jmhalf * (*un_data)(lower_x_idx - yp) +
+                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jphalf * (*un_data)(upper_y_idx - xp) -
+                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jmhalf * (*un_data)(lower_y_idx - xp) -
                        eta_n / (dx[0] * dx[1]) * (*thn_data)(idx - xp) *
-                           ((*un_scr_data)(upper_y_idx - xp) - (*un_scr_data)(lower_y_idx - xp));
+                           ((*un_data)(upper_y_idx - xp) - (*un_data)(lower_y_idx - xp));
 
                 // solvent at west edge
                 b(4) =
-                    (*f_us_data)(lower_x_idx)-convertToThs(thn_lower_x) / dx[0] * (*p_scr_data)(idx - xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx - xp)) * (*us_scr_data)(lower_x_idx - xp) +
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_scr_data)(lower_x_idx + yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_scr_data)(lower_x_idx - yp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_scr_data)(upper_y_idx - xp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_scr_data)(lower_y_idx - xp) -
+                    (*f_us_data)(lower_x_idx)-convertToThs(thn_lower_x) / dx[0] * (*p_data)(idx - xp) -
+                    eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx - xp)) * (*us_data)(lower_x_idx - xp) -
+                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(lower_x_idx + yp) -
+                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_x_idx - yp) +
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(upper_y_idx - xp) -
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_y_idx - xp) -
                     eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx - xp)) *
-                        ((*us_scr_data)(upper_y_idx - xp) - (*us_scr_data)(lower_y_idx - xp));
+                        ((*us_data)(upper_y_idx - xp) - (*us_data)(lower_y_idx - xp));
 
                 // network at east edge
-                b(1) = (*f_un_data)(upper_x_idx) + thn_upper_x / dx[0] * (*p_scr_data)(idx + xp) -
-                       eta_n / (dx[0] * dx[0]) * (*thn_data)(idx + xp) * (*un_scr_data)(upper_x_idx + xp) -
-                       eta_n / (dx[1] * dx[1]) * thn_iphalf_jphalf * (*un_scr_data)(upper_x_idx + yp) -
-                       eta_n / (dx[1] * dx[1]) * thn_iphalf_jmhalf * (*un_scr_data)(upper_x_idx - yp) -
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jphalf * (*un_scr_data)(upper_y_idx + xp) +
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jmhalf * (*un_scr_data)(lower_y_idx + xp) +
+                b(1) = (*f_un_data)(upper_x_idx) + thn_upper_x / dx[0] * (*p_data)(idx + xp) -
+                       eta_n / (dx[0] * dx[0]) * (*thn_data)(idx + xp) * (*un_data)(upper_x_idx + xp) -
+                       eta_n / (dx[1] * dx[1]) * thn_iphalf_jphalf * (*un_data)(upper_x_idx + yp) -
+                       eta_n / (dx[1] * dx[1]) * thn_iphalf_jmhalf * (*un_data)(upper_x_idx - yp) -
+                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jphalf * (*un_data)(upper_y_idx + xp) +
+                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jmhalf * (*un_data)(lower_y_idx + xp) +
                        eta_n / (dx[0] * dx[1]) * (*thn_data)(idx + xp) *
-                           ((*un_scr_data)(upper_y_idx + xp) - (*un_scr_data)(lower_y_idx + xp));
+                           ((*un_data)(upper_y_idx + xp) - (*un_data)(lower_y_idx + xp));
 
                 // solvent at east edge
                 b(5) =
-                    (*f_us_data)(upper_x_idx) + convertToThs(thn_upper_x) / dx[0] * (*p_scr_data)(idx + xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx + xp)) * (*us_scr_data)(upper_x_idx + xp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_scr_data)(upper_x_idx + yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_scr_data)(upper_x_idx - yp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_scr_data)(upper_y_idx + xp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_scr_data)(lower_y_idx + xp) +
+                    (*f_us_data)(upper_x_idx) + convertToThs(thn_upper_x) / dx[0] * (*p_data)(idx + xp) -
+                    eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx + xp)) * (*us_data)(upper_x_idx + xp) -
+                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_x_idx + yp) -
+                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(upper_x_idx - yp) -
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_y_idx + xp) +
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(lower_y_idx + xp) +
                     eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx + xp)) *
-                        ((*us_scr_data)(upper_y_idx + xp) - (*us_scr_data)(lower_y_idx + xp));
+                        ((*us_data)(upper_y_idx + xp) - (*us_data)(lower_y_idx + xp));
 
                 // network at south edge
-                b(2) = (*f_un_data)(lower_y_idx)-thn_lower_y / dx[1] * (*p_scr_data)(idx - yp) -
-                       eta_n / (dx[1] * dx[1]) * (*thn_data)(idx - yp) * (*un_scr_data)(lower_y_idx - yp) -
-                       eta_n / (dx[0] * dx[0]) * thn_iphalf_jmhalf * (*un_scr_data)(lower_y_idx + xp) -
-                       eta_n / (dx[0] * dx[0]) * thn_imhalf_jmhalf * (*un_scr_data)(lower_y_idx - xp) +
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jmhalf * (*un_scr_data)(upper_x_idx - yp) -
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jmhalf * (*un_scr_data)(lower_x_idx - yp) -
+                b(2) = (*f_un_data)(lower_y_idx)-thn_lower_y / dx[1] * (*p_data)(idx - yp) -
+                       eta_n / (dx[1] * dx[1]) * (*thn_data)(idx - yp) * (*un_data)(lower_y_idx - yp) -
+                       eta_n / (dx[0] * dx[0]) * thn_iphalf_jmhalf * (*un_data)(lower_y_idx + xp) -
+                       eta_n / (dx[0] * dx[0]) * thn_imhalf_jmhalf * (*un_data)(lower_y_idx - xp) +
+                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jmhalf * (*un_data)(upper_x_idx - yp) -
+                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jmhalf * (*un_data)(lower_x_idx - yp) -
                        eta_n / (dx[0] * dx[1]) * (*thn_data)(idx - yp) *
-                           ((*un_scr_data)(upper_x_idx - yp) - (*un_scr_data)(lower_x_idx - yp));
+                           ((*un_data)(upper_x_idx - yp) - (*un_data)(lower_x_idx - yp));
 
                 // solvent at south edge
                 b(6) =
-                    (*f_us_data)(lower_y_idx)-convertToThs(thn_lower_y) / dx[1] * (*p_scr_data)(idx - yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs((*thn_data)(idx - yp)) * (*us_scr_data)(lower_y_idx - yp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_iphalf_jmhalf) * (*us_scr_data)(lower_y_idx + xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_imhalf_jmhalf) * (*us_scr_data)(lower_y_idx - xp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_scr_data)(upper_x_idx - yp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_scr_data)(lower_x_idx - yp) -
+                    (*f_us_data)(lower_y_idx)-convertToThs(thn_lower_y) / dx[1] * (*p_data)(idx - yp) -
+                    eta_s / (dx[1] * dx[1]) * convertToThs((*thn_data)(idx - yp)) * (*us_data)(lower_y_idx - yp) -
+                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(lower_y_idx + xp) -
+                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_y_idx - xp) +
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(upper_x_idx - yp) -
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_x_idx - yp) -
                     eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx - yp)) *
-                        ((*us_scr_data)(upper_x_idx - yp) - (*us_scr_data)(lower_x_idx - yp));
+                        ((*us_data)(upper_x_idx - yp) - (*us_data)(lower_x_idx - yp));
 
                 // network at north edge
-                b(3) = (*f_un_data)(upper_y_idx) + thn_upper_y / dx[1] * (*p_scr_data)(idx + yp) -
-                       eta_n / (dx[1] * dx[1]) * (*thn_data)(idx + yp) * (*un_scr_data)(upper_y_idx + yp) -
-                       eta_n / (dx[0] * dx[0]) * thn_iphalf_jphalf * (*un_scr_data)(upper_y_idx + xp) -
-                       eta_n / (dx[0] * dx[0]) * thn_imhalf_jphalf * (*un_scr_data)(upper_y_idx - xp) -
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jphalf * (*un_scr_data)(upper_x_idx + yp) +
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jphalf * (*un_scr_data)(lower_x_idx + yp) +
+                b(3) = (*f_un_data)(upper_y_idx) + thn_upper_y / dx[1] * (*p_data)(idx + yp) -
+                       eta_n / (dx[1] * dx[1]) * (*thn_data)(idx + yp) * (*un_data)(upper_y_idx + yp) -
+                       eta_n / (dx[0] * dx[0]) * thn_iphalf_jphalf * (*un_data)(upper_y_idx + xp) -
+                       eta_n / (dx[0] * dx[0]) * thn_imhalf_jphalf * (*un_data)(upper_y_idx - xp) -
+                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jphalf * (*un_data)(upper_x_idx + yp) +
+                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jphalf * (*un_data)(lower_x_idx + yp) +
                        eta_n / (dx[0] * dx[1]) * (*thn_data)(idx + yp) *
-                           ((*un_scr_data)(upper_x_idx + yp) - (*un_scr_data)(lower_x_idx + yp));
+                           ((*un_data)(upper_x_idx + yp) - (*un_data)(lower_x_idx + yp));
 
                 // solvent at north edge
                 b(7) =
-                    (*f_us_data)(upper_y_idx) + convertToThs(thn_upper_y) / dx[1] * (*p_scr_data)(idx + yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs((*thn_data)(idx + yp)) * (*us_scr_data)(upper_y_idx + yp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_iphalf_jphalf) * (*us_scr_data)(upper_y_idx + xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_imhalf_jphalf) * (*us_scr_data)(upper_y_idx - xp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_scr_data)(upper_x_idx + yp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_scr_data)(lower_x_idx + yp) +
+                    (*f_us_data)(upper_y_idx) + convertToThs(thn_upper_y) / dx[1] * (*p_data)(idx + yp) -
+                    eta_s / (dx[1] * dx[1]) * convertToThs((*thn_data)(idx + yp)) * (*us_data)(upper_y_idx + yp) -
+                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_y_idx + xp) -
+                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(upper_y_idx - xp) -
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_x_idx + yp) +
+                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(lower_x_idx + yp) +
                     eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx + yp)) *
-                        ((*us_scr_data)(upper_x_idx + yp) - (*us_scr_data)(lower_x_idx + yp));
+                        ((*us_data)(upper_x_idx + yp) - (*us_data)(lower_x_idx + yp));
 
                 // pressure at cell center
                 b(8) = (*f_p_data)(idx);
@@ -611,8 +631,29 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 (*us_data)(upper_y_idx) = sol(7);
                 (*p_data)(idx) = sol(8);
 
+                // (*un_scr_data)(lower_x_idx) = (*un_data)(lower_x_idx);
+                // (*un_scr_data)(upper_x_idx) = (*un_data)(upper_x_idx);
+                // (*un_scr_data)(lower_y_idx) = (*un_data)(lower_y_idx);
+                // (*un_scr_data)(upper_y_idx) = (*un_data)(upper_y_idx);
+                // (*us_scr_data)(lower_x_idx) = (*us_data)(lower_x_idx);
+                // (*us_scr_data)(upper_x_idx) = (*us_data)(upper_x_idx);
+                // (*us_scr_data)(lower_y_idx) = (*us_data)(lower_y_idx);
+                // (*us_scr_data)(upper_y_idx) = (*us_data)(upper_y_idx);
+                // (*p_scr_data)(idx) = (*p_data)(idx);
+
+                // VectorXd res(9);         // 9 x 1 solution vector
+                //     //pout << "un_scr_data is " <<  (*un_scr_data)(lower_x_idx)<< "\n";
+                // pout << "sol(1) is " <<  sol(1)<< "\n";
+                //     res = b - (A_box*sol);
+                //     pout << "residual norm at sweep " << sweep << " is " << res.norm() << "\n";
+                // pout << "un_data at upper_x is " <<  (*un_data)(upper_x_idx)<< "\n\n";
+
             } // cell centers
         } // patches
+        Pointer<SAMRAIVectorReal<NDIM, double>> r_vec = error.cloneVector("r_vec");
+        r_vec->allocateVectorData();
+        r_vec->setToScalar(0.0);
+        computeResidual(*(r_vec), error, residual, 0, 0);
     } // num_sweeps
     IBTK_TIMER_STOP(t_smooth_error);
     return;
@@ -651,7 +692,11 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     const int res_us_idx = residual.getComponentDescriptorIndex(1);
     const int res_P_idx = residual.getComponentDescriptorIndex(2);
     const int thn_idx = d_thn_idx;
-
+    
+    // Setup the interpolation transaction information.
+    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
+    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
+    d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(4);
@@ -720,7 +765,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             Pointer<SideData<NDIM, double>> rhs_us_data =
                 patch->getPatchData(rhs_us_idx); // result of applying operator (eqn 2)
             Pointer<SideData<NDIM, double>> res_un_data = patch->getPatchData(res_un_idx);
-            Pointer<SideData<NDIM, double>> res_us_data = patch->getPatchData(res_un_idx);
+            Pointer<SideData<NDIM, double>> res_us_data = patch->getPatchData(res_us_idx);
             Pointer<CellData<NDIM, double>> res_P_data = patch->getPatchData(res_P_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
@@ -850,10 +895,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
                             (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
 
                 // components of second row (y-component of network vel) of network equation
-                double ddy_Thn_dy_un = eta_n / (dx[0] * dx[0]) *
+                double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddx_Thn_dx_un = eta_n / (dx[1] * dx[1]) *
+                double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
                                        (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
                 double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
@@ -870,10 +915,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
-                    eta_s / (dx[0] * dx[0]) *
+                    eta_s / (dx[1] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddx_Ths_dx_us = eta_s / (dx[1] * dx[1]) *
+                double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
                                        (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                         convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
                 double ddx_Ths_dy_vs =
@@ -892,7 +937,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             }
         }
     }
-
+    pout << "res_norm in main = " << residual.L2Norm() << "\n";
+    // pout << "sol_norm  = " << solution.L2Norm() << "\n";
+    // pout << "rhs_norm  = " << rhs.L2Norm() << "\n";
     IBTK_TIMER_STOP(t_compute_residual);
     return;
 }
@@ -912,15 +959,15 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
     d_hierarchy = vec.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
     for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p()); 
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-            Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
-            un_data->fillAll(0.0);
-            us_data->fillAll(0.0);
-            p_data->fillAll(0.0);
-        }
+    {
+        Pointer<Patch<NDIM>> patch = level->getPatch(p()); 
+        Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+        Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+        Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
+        un_data->fillAll(0.0);
+        us_data->fillAll(0.0);
+        p_data->fillAll(0.0);
+    }
     return;
 } // setToZero
 
