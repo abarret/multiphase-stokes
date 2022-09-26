@@ -364,7 +364,27 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
             Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
             Pointer<CellData<NDIM, double>> f_p_data = patch->getPatchData(f_P_idx);
-                
+
+            double* un_data_0 = un_data->getPointer(0);
+            double* un_data_1 = un_data->getPointer(1);
+            double* us_data_0 = us_data->getPointer(0);
+            double* us_data_1 = us_data->getPointer(1);
+            double* thn_ptr_data = thn_data->getPointer(0);
+            double* p_ptr_data = p_data->getPointer(0);
+            double* f_un_data_0 = f_un_data->getPointer(0);
+            double* f_un_data_1 = f_un_data->getPointer(1);
+            double* f_us_data_0 = f_us_data->getPointer(0);
+            double* f_us_data_1 = f_us_data->getPointer(1);
+            double* f_p_ptr_data = f_p_data->getPointer(0);
+
+            const IntVector<NDIM> patch_lower = patch_box.lower();  // patch_lower(0), patch_lower(1) are min indices in x and y-dir
+            const IntVector<NDIM> patch_upper = patch_box.upper();  // patch_upper(0), patch_upper(1) are max indices in x and y-dir
+
+            const IntVector<NDIM> thn_data_gcw = thn_data->getGhostCellWidth();
+            const IntVector<NDIM> un_data_gcw = un_data->getGhostCellWidth();
+            const IntVector<NDIM> us_data_gcw = us_data->getGhostCellWidth();
+            const IntVector<NDIM> p_data_gcw = p_data->getGhostCellWidth();
+
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 MatrixXd A_box(9, 9);    // 9 x 9 Matrix
@@ -385,10 +405,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
                 SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
                 SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-                //pout << "(i,j) is " << idx(0) << " " << idx(1) << "\n";
-                //pout << "f_un_data is " << (*f_un_data)(upper_x_idx) << "\n";
-                //pout << "un_data at lower_x is " <<  (*un_data)(lower_x_idx)<< "\n";
-                //     pout << "thn_data is " << (*thn_data)(upper_x_idx) << "\n";
                 
                 // thn at sidess
                 double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
@@ -495,7 +511,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(3, 1) = eta_n / (dx[0] * dx[1]) * ((*thn_data)(idx)-thn_iphalf_jphalf);
                 A_box(3, 2) = eta_n / (dx[1] * dx[1]) * ((*thn_data)(idx));
                 A_box(3, 3) = eta_n / (dx[1] * dx[1]) * (-(*thn_data)(idx) - (*thn_data)(idx + yp)) -
-                              eta_n / (dx[0] * dx[0]) * (thn_iphalf_jphalf - thn_imhalf_jphalf) -
+                              eta_n / (dx[0] * dx[0]) * (thn_iphalf_jphalf + thn_imhalf_jphalf) -
                               (xi / nu_n) * thn_upper_y * convertToThs(thn_upper_y);
                 A_box(3, 4) = 0.0;
                 A_box(3, 5) = 0.0;
@@ -510,7 +526,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 A_box(7, 6) = eta_s / (dx[1] * dx[1]) * (convertToThs((*thn_data)(idx)));
                 A_box(7, 7) =
                     eta_s / (dx[1] * dx[1]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx + yp))) -
-                    eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jphalf) - convertToThs(thn_imhalf_jphalf)) -
+                    eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jphalf) + convertToThs(thn_imhalf_jphalf)) -
                     (xi / nu_s) * thn_upper_y * convertToThs(thn_upper_y);
                 A_box(7, 0) = 0.0;
                 A_box(7, 1) = 0.0;
@@ -630,23 +646,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 (*us_data)(lower_y_idx) = sol(6);
                 (*us_data)(upper_y_idx) = sol(7);
                 (*p_data)(idx) = sol(8);
-
-                // (*un_scr_data)(lower_x_idx) = (*un_data)(lower_x_idx);
-                // (*un_scr_data)(upper_x_idx) = (*un_data)(upper_x_idx);
-                // (*un_scr_data)(lower_y_idx) = (*un_data)(lower_y_idx);
-                // (*un_scr_data)(upper_y_idx) = (*un_data)(upper_y_idx);
-                // (*us_scr_data)(lower_x_idx) = (*us_data)(lower_x_idx);
-                // (*us_scr_data)(upper_x_idx) = (*us_data)(upper_x_idx);
-                // (*us_scr_data)(lower_y_idx) = (*us_data)(lower_y_idx);
-                // (*us_scr_data)(upper_y_idx) = (*us_data)(upper_y_idx);
-                // (*p_scr_data)(idx) = (*p_data)(idx);
-
-                // VectorXd res(9);         // 9 x 1 solution vector
-                //     //pout << "un_scr_data is " <<  (*un_scr_data)(lower_x_idx)<< "\n";
-                // pout << "sol(1) is " <<  sol(1)<< "\n";
-                //     res = b - (A_box*sol);
-                //     pout << "residual norm at sweep " << sweep << " is " << res.norm() << "\n";
-                // pout << "un_data at upper_x is " <<  (*un_data)(upper_x_idx)<< "\n\n";
 
             } // cell centers
         } // patches
