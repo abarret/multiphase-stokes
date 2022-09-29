@@ -365,25 +365,25 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
             Pointer<CellData<NDIM, double>> f_p_data = patch->getPatchData(f_P_idx);
 
-            double* un_data_0 = un_data->getPointer(0);
-            double* un_data_1 = un_data->getPointer(1);
-            double* us_data_0 = us_data->getPointer(0);
-            double* us_data_1 = us_data->getPointer(1);
-            double* thn_ptr_data = thn_data->getPointer(0);
-            double* p_ptr_data = p_data->getPointer(0);
-            double* f_un_data_0 = f_un_data->getPointer(0);
-            double* f_un_data_1 = f_un_data->getPointer(1);
-            double* f_us_data_0 = f_us_data->getPointer(0);
-            double* f_us_data_1 = f_us_data->getPointer(1);
-            double* f_p_ptr_data = f_p_data->getPointer(0);
+            double* const un_data_0 = un_data->getPointer(0);
+            double* const un_data_1 = un_data->getPointer(1);
+            double* const us_data_0 = us_data->getPointer(0);
+            double* const us_data_1 = us_data->getPointer(1);
+            double* const thn_ptr_data = thn_data->getPointer(0);
+            double* const p_ptr_data = p_data->getPointer(0);
+            double* const f_un_data_0 = f_un_data->getPointer(0);
+            double* const f_un_data_1 = f_un_data->getPointer(1);
+            double* const f_us_data_0 = f_us_data->getPointer(0);
+            double* const f_us_data_1 = f_us_data->getPointer(1);
+            double* const f_p_ptr_data = f_p_data->getPointer(0);
 
-            const IntVector<NDIM> patch_lower = patch_box.lower();  // patch_lower(0), patch_lower(1) are min indices in x and y-dir
-            const IntVector<NDIM> patch_upper = patch_box.upper();  // patch_upper(0), patch_upper(1) are max indices in x and y-dir
+            const IntVector<NDIM>& patch_lower = patch_box.lower();  // patch_lower(0), patch_lower(1) are min indices in x and y-dir
+            const IntVector<NDIM>& patch_upper = patch_box.upper();  // patch_upper(0), patch_upper(1) are max indices in x and y-dir
 
-            const IntVector<NDIM> thn_data_gcw = thn_data->getGhostCellWidth();
-            const IntVector<NDIM> un_data_gcw = un_data->getGhostCellWidth();
-            const IntVector<NDIM> us_data_gcw = us_data->getGhostCellWidth();
-            const IntVector<NDIM> p_data_gcw = p_data->getGhostCellWidth();
+            const IntVector<NDIM>& thn_data_gcw = thn_data->getGhostCellWidth();
+            const IntVector<NDIM>& un_data_gcw = un_data->getGhostCellWidth();
+            const IntVector<NDIM>& us_data_gcw = us_data->getGhostCellWidth();
+            const IntVector<NDIM>& p_data_gcw = p_data->getGhostCellWidth();
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
