@@ -66,6 +66,41 @@
 // Local includes
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 
+// FORTRAN ROUTINES
+#define R_B_G_S IBTK_FC_FUNC_(rbgs, RBGS)
+
+extern "C"
+{
+    void R_B_G_S(const double*, // dx
+                const int&,  // ilower0
+                const int&,  // iupper0
+                const int&,  // ilower1
+                const int&,  // iupper1
+                double* const, // un_data_0
+                double* const, // un_data_1
+                const int&,  // un_gcw
+                double* const, // us_data_0
+                double* const, // us_data_0
+                const int&, // us_gcw
+                double* const, // p_data_
+                const int&, // p_gcw
+                double* const, // f_p_data
+                const int&, // f_p_gcw
+                double* const, // f_un_data_0
+                double* const, // f_un_data_1
+                const int&,  // f_un_gcw
+                double* const, // f_us_data_0
+                double* const, // f_us_data_1
+                const int&, // f_us_gcw
+                double* const, // thn_data
+                const int&, // thn_gcw
+                const double,  // eta_n
+                const double,  // eta_s 
+                const double,  // nu_n
+                const double,  // nu_s 
+                const double);  // xi
+                         
+}
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
 {
@@ -377,14 +412,48 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             double* const f_us_data_1 = f_us_data->getPointer(1);
             double* const f_p_ptr_data = f_p_data->getPointer(0);
 
+            const Box<NDIM>& patch_box = patch->getBox();
             const IntVector<NDIM>& patch_lower = patch_box.lower();  // patch_lower(0), patch_lower(1) are min indices in x and y-dir
             const IntVector<NDIM>& patch_upper = patch_box.upper();  // patch_upper(0), patch_upper(1) are max indices in x and y-dir
 
-            const IntVector<NDIM>& thn_data_gcw = thn_data->getGhostCellWidth();
-            const IntVector<NDIM>& un_data_gcw = un_data->getGhostCellWidth();
-            const IntVector<NDIM>& us_data_gcw = us_data->getGhostCellWidth();
-            const IntVector<NDIM>& p_data_gcw = p_data->getGhostCellWidth();
+            const IntVector<NDIM>& thn_gcw = thn_data->getGhostCellWidth();
+            const IntVector<NDIM>& un_gcw = un_data->getGhostCellWidth();
+            const IntVector<NDIM>& us_gcw = us_data->getGhostCellWidth();
+            const IntVector<NDIM>& p_gcw = p_data->getGhostCellWidth();
+            const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
+            const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
+            const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
+            
+            R_B_G_S(dx,  
+                    patch_lower(0),  // ilower0
+                    patch_upper(0),  // iupper0
+                    patch_lower(1),  // ilower1
+                    patch_upper(1),  // iupper1
+                    un_data_0, 
+                    un_data_1, 
+                    un_gcw.min(),  
+                    us_data_0, 
+                    us_data_1, 
+                    us_gcw.min(), 
+                    p_ptr_data, 
+                    p_gcw.min(), 
+                    f_p_ptr_data, 
+                    f_p_gcw.min(),
+                    f_un_data_0, 
+                    f_un_data_1, 
+                    f_un_gcw.min(),  
+                    f_us_data_0, 
+                    f_us_data_1,
+                    f_us_gcw.min(), 
+                    thn_ptr_data, 
+                    f_us_gcw.min(), 
+                    eta_n,
+                    eta_s,
+                    nu_n,
+                    nu_s,
+                    xi);
 
+            /*
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 MatrixXd A_box(9, 9);    // 9 x 9 Matrix
@@ -648,6 +717,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 (*p_data)(idx) = sol(8);
 
             } // cell centers
+            */
+
         } // patches
         Pointer<SAMRAIVectorReal<NDIM, double>> r_vec = error.cloneVector("r_vec");
         r_vec->allocateVectorData();
