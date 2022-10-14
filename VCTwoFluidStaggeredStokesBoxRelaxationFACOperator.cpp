@@ -93,12 +93,12 @@ extern "C"
                 double* const, // f_us_data_1
                 const int&, // f_us_gcw
                 double* const, // thn_data
-                const int&, // thn_gcw
-                const double,  // eta_n
-                const double,  // eta_s 
-                const double,  // nu_n
-                const double,  // nu_s 
-                const double);  // xi
+                const int&); // thn_gcw
+                //const double,  // eta_n
+                //const double,  // eta_s 
+                //const double,  // nu_n
+                //const double,  // nu_s 
+                // const double);  // xi
                          
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
@@ -423,7 +423,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
             const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
             const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
-            
             R_B_G_S(dx,  
                     patch_lower(0),  // ilower0
                     patch_upper(0),  // iupper0
@@ -446,12 +445,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     f_us_data_1,
                     f_us_gcw.min(), 
                     thn_ptr_data, 
-                    f_us_gcw.min(), 
-                    eta_n,
-                    eta_s,
-                    nu_n,
-                    nu_s,
-                    xi);
+                    thn_gcw.min());
 
             /*
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers

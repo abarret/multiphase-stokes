@@ -4,26 +4,33 @@ ENABLE_LANGUAGE(Fortran)
 PROJECT(MultiphaseStokes LANGUAGES C CXX Fortran)
 FIND_PACKAGE(IBAMR REQUIRED)
 
-SET(SRC
+SET(CXX_SRC1
+    VCTwoFluidStaggeredStokesOperator.cpp
+    )
+
+SET(CXX_SRC2
     VCTwoFluidStaggeredStokesOperator.cpp
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp
+    )
+
+SET(F_SRC
     RBGS.f
     )
 
 ADD_EXECUTABLE(apply2d apply.cpp)
-TARGET_SOURCES(apply2d PRIVATE ${SRC})
+TARGET_SOURCES(apply2d PRIVATE ${CXX_SRC1})
 TARGET_LINK_LIBRARIES(apply2d IBAMR::IBAMR2d)
 
 ADD_EXECUTABLE(solver2d solver.cpp)
-TARGET_SOURCES(solver2d PRIVATE ${SRC})
+TARGET_SOURCES(solver2d PRIVATE ${CXX_SRC1})
 TARGET_LINK_LIBRARIES(solver2d IBAMR::IBAMR2d)
 
 ADD_EXECUTABLE(smooth2d smooth.cpp)
-TARGET_SOURCES(smooth2d PRIVATE ${SRC})
+TARGET_SOURCES(smooth2d PRIVATE ${CXX_SRC2} ${F_SRC})
 TARGET_LINK_LIBRARIES(smooth2d IBAMR::IBAMR2d)
 
 ADD_EXECUTABLE(rbgs_smooth2d smooth.cpp)
-TARGET_SOURCES(rbgs_smooth2d PRIVATE ${SRC})
+TARGET_SOURCES(rbgs_smooth2d PRIVATE ${CXX_SRC2} ${F_SRC})
 TARGET_LINK_LIBRARIES(rbgs_smooth2d IBAMR::IBAMR2d)
 
 CONFIGURE_FILE(input2d_four ${CMAKE_CURRENT_BINARY_DIR}/input2d_four COPYONLY)

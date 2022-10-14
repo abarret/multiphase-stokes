@@ -278,7 +278,7 @@ main(int argc, char* argv[])
         box_relax.setThnIdx(thn_cc_idx);
         //box_relax.initializeOperatorState(u_vec,f_vec);
         box_relax.setToZero(u_vec, 0);
-        box_relax.smoothError(u_vec, f_vec, 0, 15, false, false); // 5 sweeps
+        box_relax.smoothError(u_vec, f_vec, 0, 680, false, false); // stops at 672 sweeps
         box_relax.computeResidual(e_vec, u_vec, f_vec, 0, 0);
         
         // Setup the stokes operator
