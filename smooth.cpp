@@ -49,6 +49,7 @@ main(int argc, char* argv[])
 {
     // Initialize IBAMR and libraries. Deinitialization is handled by this object as well.
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
+    SAMRAIManager::setMaxNumberPatchDataEntries(2500);
 
     { // cleanup dynamically allocated objects prior to shutdown
 
@@ -213,7 +214,6 @@ main(int argc, char* argv[])
         SAMRAIVectorReal<NDIM, double> u_vec("u", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         SAMRAIVectorReal<NDIM, double> f_vec("f", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         SAMRAIVectorReal<NDIM, double> e_vec("e", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        SAMRAIVectorReal<NDIM, double> r_vec("r", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
 
         u_vec.addComponent(un_sc_var, un_sc_idx, h_sc_idx);
         u_vec.addComponent(us_sc_var, us_sc_idx, h_sc_idx);
@@ -228,7 +228,6 @@ main(int argc, char* argv[])
         u_vec.setToScalar(0.0);
         f_vec.setToScalar(0.0);
         e_vec.setToScalar(0.0);
-        r_vec.setToScalar(0.0);
 
         Pointer<SAMRAIVectorReal<NDIM, double>> null_vec = u_vec.cloneVector("null");
         null_vec->allocateVectorData();
@@ -278,8 +277,14 @@ main(int argc, char* argv[])
         box_relax.setThnIdx(thn_cc_idx);
         //box_relax.initializeOperatorState(u_vec,f_vec);
         box_relax.setToZero(u_vec, 0);
-        box_relax.smoothError(u_vec, f_vec, 0, 680, false, false); // stops at 672 sweeps
-        box_relax.computeResidual(e_vec, u_vec, f_vec, 0, 0);
+
+        for (int i = 0; i <= 680; i++){
+            box_relax.smoothError(u_vec, f_vec, 0, 1, false, false); 
+            box_relax.computeResidual(e_vec, u_vec, f_vec, 0, 0);
+            pout << "Sweep = " << i << "\n";
+            pout << "|r|_2  = " << e_vec.L2Norm() << "\n";
+        }
+        
         
         // Setup the stokes operator
         // VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);

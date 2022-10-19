@@ -34,7 +34,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        p_data, p_gcw, f_p_data, f_p_gcw,
      &        f_un_data_0, f_un_data_1, f_un_gcw,
      &        f_us_data_0, f_us_data_1, f_us_gcw,
-     &        thn_data, thn_gcw)
+     &        thn_data, thn_gcw, eta_n, eta_s,
+     &        nu_n, nu_s, xi)
 c
       use my_subs
       implicit none
@@ -87,13 +88,8 @@ c
       integer i0, i1
 c    
       do i1 = ilow1, iup1   
-        do i0 = ilow0, iup0  ! same loop as the c++ code
+        do i0 = ilow0, iup0  ! same loop as the c++ code (currently this is just GS)
 c
-          eta_n = 1.d0
-          eta_s = 1.d0
-          nu_n = 1.d0
-          nu_s = 1.d0
-          xi = 1.d0
           ! calculate thn at sides
           thn_lower_x = 0.5d0*(thn_data(i0,i1)+thn_data(i0-1,i1))  ! thn(i-1/2, j)
           thn_upper_x = 0.5d0*(thn_data(i0,i1)+thn_data(i0+1,i1))  ! thn(i+1/2, j)
@@ -111,8 +107,6 @@ c
      &                     +thn_data(i0,i1-1)+thn_data(i0+1,i1-1))   ! thn(i+1/2, j-1/2)
 
           ! network at west edge
-          ! print *, 'eta_n is:'
-          ! print *, eta_n
           A_box(1, 1) = eta_n / (dx(0)*dx(0)) * 
      &    (-thn_data(i0,i1)-thn_data(i0-1,i1))-eta_n/(dx(1)*dx(1))*    
      &    (thn_imhalf_jmhalf + thn_imhalf_jphalf)

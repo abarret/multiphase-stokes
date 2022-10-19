@@ -93,12 +93,12 @@ extern "C"
                 double* const, // f_us_data_1
                 const int&, // f_us_gcw
                 double* const, // thn_data
-                const int&); // thn_gcw
-                //const double,  // eta_n
-                //const double,  // eta_s 
-                //const double,  // nu_n
-                //const double,  // nu_s 
-                // const double);  // xi
+                const int&, // thn_gcw
+                const double&,  // eta_n    // whatever will be passed in will be treated as a reference to a double
+                const double&,  // eta_s    // telling the compiler that the function is expecting a reference
+                const double&,  // nu_n
+                const double&,  // nu_s 
+                const double&);  // xi
                          
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
@@ -317,10 +317,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     d_hierarchy = error.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
 
-    level->allocatePatchData(d_un_scr_idx, d_new_time);
-    level->allocatePatchData(d_us_scr_idx, d_new_time);
-    level->allocatePatchData(d_p_scr_idx, d_new_time);
-
     // Setup the interpolation transaction information.
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
@@ -377,9 +373,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     IntVector<NDIM> xp(1, 0), yp(0, 1);
     
     // outer for loop for number of sweeps
-    for (int sweep = 0; sweep <= num_sweeps; sweep++)
+    for (int sweep = 0; sweep < num_sweeps; sweep++)
     {
-        pout << "At sweep number " << sweep << "\n";
         // loop through all patches on this level
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
@@ -445,7 +440,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     f_us_data_1,
                     f_us_gcw.min(), 
                     thn_ptr_data, 
-                    thn_gcw.min());
+                    thn_gcw.min(),
+                    eta_n, eta_s, nu_n, nu_s, xi);
 
             /*
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
@@ -712,12 +708,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
 
             } // cell centers
             */
-
-        } // patches
-        Pointer<SAMRAIVectorReal<NDIM, double>> r_vec = error.cloneVector("r_vec");
-        r_vec->allocateVectorData();
-        r_vec->setToScalar(0.0);
-        computeResidual(*(r_vec), error, residual, 0, 0);
+        } // patchess
     } // num_sweeps
     IBTK_TIMER_STOP(t_smooth_error);
     return;
@@ -1001,7 +992,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             }
         }
     }
-    pout << "res_norm in main = " << residual.L2Norm() << "\n";
+    // pout << "res_norm in main = " << residual.L2Norm() << "\n";
     // pout << "sol_norm  = " << solution.L2Norm() << "\n";
     // pout << "rhs_norm  = " << rhs.L2Norm() << "\n";
     IBTK_TIMER_STOP(t_compute_residual);
