@@ -316,28 +316,7 @@ CCPointFACPreconditionerStrategy::prolongErrorAndCorrect(const SAMRAIVectorReal<
     {
         d_level_data_ops[dst_ln - 1]->add(dst_idx, dst_idx, src_idx, /*interior_only*/ false);
     }
-    Pointer<PatchLevel<NDIM>> crs_level = d_hierarchy->getPatchLevel(dst_ln - 1);
-    for (PatchLevel<NDIM>::Iterator p(crs_level); p; p++)
-    {
-        Pointer<Patch<NDIM>> patch = crs_level->getPatch(p());
-        Pointer<CellData<NDIM, double>> src_data = patch->getPatchData(src_idx);
-        src_data->fillAll(dst_ln - 1);
-    }
-    Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(dst_ln);
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-    {
-        Pointer<Patch<NDIM>> patch = level->getPatch(p());
-        Pointer<CellData<NDIM, double>> scr_data = patch->getPatchData(d_scratch_idx);
-        Pointer<CellData<NDIM, double>> src_data = patch->getPatchData(src_idx);
-        src_data->fillAll(dst_ln);
-    }
     xeqScheduleProlongation(d_scratch_idx, src_idx, dst_ln);
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-    {
-        Pointer<Patch<NDIM>> patch = level->getPatch(p());
-        Pointer<CellData<NDIM, double>> scr_data = patch->getPatchData(d_scratch_idx);
-        scr_data->print(patch->getBox());
-    }
     d_level_data_ops[dst_ln]->add(dst_idx, dst_idx, d_scratch_idx, /*interior_only*/ false);
 
     IBTK_TIMER_STOP(t_prolong_error_and_correct);
