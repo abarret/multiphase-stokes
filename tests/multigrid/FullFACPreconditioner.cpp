@@ -296,6 +296,9 @@ FullFACPreconditioner::transferToDense(const SAMRAIVectorReal<NDIM, double>& bas
     }
 
     // Now we need to coarsen the data from the dense hierarchy to the dense hierarchy.
+    // TODO: This isn't strictly necessary in multigrid because we will transfer the residual to the coarser grid
+    // anyway. What matters is that we transfer on the levels that are "uncovered" which is done in the above code. We
+    // should implement an option to skip this step.
     Pointer<CoarsenAlgorithm<NDIM>> coarsen_alg = new CoarsenAlgorithm<NDIM>();
     for (int comp = 0; comp < dense_x.getNumberOfComponents(); ++comp)
     {
