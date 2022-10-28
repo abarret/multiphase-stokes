@@ -20,6 +20,8 @@ PoissonPrecondStrategy {
 
 }
 
+multigrid_max_levels = 5
+
 PoissonPrecond {
    cycle_type = "V_CYCLE"
    num_pre_sweeps = 1
@@ -57,27 +59,7 @@ MultigridCartesianGeometry {
    periodic_dimension = 1, 1  
 }
 
-
 MultigridAlg {
-   max_levels = 5                 // Maximum number of levels in hierarchy.
-
-   ratio_to_coarser {
-      level_1 = 2, 2              // vector ratio to next coarser level
-   }
-
-   largest_patch_size {
-      level_0 = 512, 512          // largest patch allowed in hierarchy
-                                  // all finer levels will use same values as level_0...
-   }
-
-   smallest_patch_size {
-      level_0 =   4,   4          // smallest patch allowed in hierarchy
-                                  // all finer levels will use same values as level_0...
-   }
-
-   efficiency_tolerance = 0.70e0  // min % of tag cells in new patch level
-   combine_efficiency   = 0.85e0  // chop box if sum of volumes of smaller
-                                  // boxes < efficiency * vol of large box
 }
 
 GriddingAlgorithm {

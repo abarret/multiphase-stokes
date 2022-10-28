@@ -71,12 +71,6 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
-        Pointer<GriddingAlgorithm<NDIM>> multigrid_gridding_alg =
-            new GriddingAlgorithm<NDIM>("MultigridAlg",
-                                        app_initializer->getComponentDatabase("MultigridAlg"),
-                                        error_detector,
-                                        box_generator,
-                                        load_balancer);
 
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -179,7 +173,7 @@ main(int argc, char* argv[])
             new FullFACPreconditioner("PoissonPrecond",
                                       poisson_strategy,
                                       app_initializer->getComponentDatabase("PoissonPrecond"),
-                                      multigrid_gridding_alg,
+                                      input_db->getInteger("multigrid_max_levels"),
                                       "poisson_precond_");
         if (input_db->getBool("USE_PRECOND")) poisson_solver->setPreconditioner(poisson_precond);
 

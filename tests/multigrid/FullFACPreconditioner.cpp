@@ -42,11 +42,11 @@ namespace IBTK
 FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
                                              Pointer<FACPreconditionerStrategy> fac_strategy,
                                              Pointer<Database> input_db,
-                                             Pointer<GriddingAlgorithm<NDIM>> grid_alg,
+                                             int multigrid_max_levels,
                                              const std::string& default_options_prefix)
-    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix), d_grid_alg(grid_alg)
+    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix)
 {
-    // intentionally blank
+    d_multigrid_max_levels =  multigrid_max_levels;
     return;
 } // FACPreconditioner
 
@@ -238,7 +238,7 @@ void
 FullFACPreconditioner::generateDenseHierarchy(Pointer<PatchHierarchy<NDIM>> base_hierarchy)
 {
     int max_base_levels = base_hierarchy->getFinestLevelNumber() + 1;
-    int max_dense_levels = d_grid_alg->getMaxLevels();
+    int max_dense_levels = d_multigrid_max_levels;
     int num_levels_not_in_base = max_dense_levels - max_base_levels;
     // Build our new grid hierarchy.
     Pointer<GridGeometry<NDIM>> base_geom = base_hierarchy->getGridGeometry();
