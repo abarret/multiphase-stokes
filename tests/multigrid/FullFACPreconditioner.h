@@ -75,7 +75,7 @@ public:
     FullFACPreconditioner(std::string object_name,
                           SAMRAI::tbox::Pointer<FACPreconditionerStrategy> fac_strategy,
                           SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                          SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> dense_gridding_alg,
+                          int multigrid_max_levels,
                           const std::string& default_options_prefix);
 
     /*!
@@ -190,6 +190,7 @@ public:
 
 protected:
 private:
+    int d_multigrid_max_levels = -1;
     void generateDenseHierarchy(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> base_hierarchy);
 
     void transferToDense(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& base_x,
