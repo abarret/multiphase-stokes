@@ -188,6 +188,11 @@ public:
 
     //\}
 
+    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> getDenseHierarchy()
+    {
+        return d_dense_hierarchy;
+    }
+
 protected:
 private:
     int d_multigrid_max_levels = -1;
