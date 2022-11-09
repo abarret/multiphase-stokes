@@ -29,6 +29,4 @@ ADD_EXECUTABLE(fluid_multigrid multigrid.cpp)
 TARGET_SOURCES(fluid_multigrid PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp RBGS.f)
 TARGET_LINK_LIBRARIES(fluid_multigrid IBAMR::IBAMR2d)
 
-CONFIGURE_FILE(input2d_five ${CMAKE_CURRENT_BINARY_DIR}/input2d_five COPYONLY)
-
 ADD_SUBDIRECTORY(tests)
