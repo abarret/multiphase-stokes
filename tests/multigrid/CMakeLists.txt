@@ -1,0 +1,13 @@
+SET(SRCS main.cpp
+    FullFACPreconditioner.cpp
+    CCPointRelaxationFACOperator.cpp
+    CCPointFACPreconditionerStrategy.cpp)
+
+ADD_EXECUTABLE(multigrid EXCLUDE_FROM_ALL ${SRCS})
+SET_TARGET_PROPERTIES(multigrid PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/multigrid" OUTPUT_NAME main2d)
+TARGET_INCLUDE_DIRECTORIES(multigrid PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+
+TARGET_LINK_LIBRARIES(multigrid PRIVATE IBAMR::IBAMR2d)
+
+TARGET_SOURCES(fluid_multigrid PRIVATE FullFACPreconditioner.cpp)
+SET_TARGET_PROPERTIES(fluid_multigrid PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/fluid_multigrid" OUTPUT_NAME main2d)
