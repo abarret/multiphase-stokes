@@ -13,6 +13,8 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
+#include "ibtk/CartCellDoubleCubicCoarsen.h"
+#include "ibtk/CartSideDoubleCubicCoarsen.h"
 #include "ibtk/FACPreconditioner.h"
 #include "ibtk/FACPreconditionerStrategy.h"
 #include "ibtk/LinearSolver.h"
@@ -264,6 +266,10 @@ FullFACPreconditioner::generateDenseHierarchy(Pointer<PatchHierarchy<NDIM>> base
                                              base_level->getProcessorMapping());
         Pointer<PatchLevel<NDIM>> dense_level = d_dense_hierarchy->getPatchLevel(ln);
     }
+
+    Pointer<CartesianGridGeometry<NDIM>> cart_dense_geom = dense_geom;
+    cart_dense_geom->addSpatialCoarsenOperator(new CartCellDoubleCubicCoarsen());
+    cart_dense_geom->addSpatialCoarsenOperator(new CartSideDoubleCubicCoarsen());
 }
 
 void
