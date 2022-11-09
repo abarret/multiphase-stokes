@@ -231,9 +231,17 @@ main(int argc, char* argv[])
         e_vec.setToScalar(0.0);
         r_vec.setToScalar(0.0);
 
-        Pointer<SAMRAIVectorReal<NDIM, double>> null_vec = u_vec.cloneVector("null");
-        null_vec->allocateVectorData();
-        null_vec->setToScalar(0.0);
+        // There is one pressure and two velocity nullspaces (one for each component)
+        std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs(3);
+        null_vecs[0] = u_vec.cloneVector("PressureNull");
+        null_vecs[1] = u_vec.cloneVector("VelNull0");
+        null_vecs[2] = u_vec.cloneVector("VelNull1");
+        null_vecs[0]->allocateVectorData();
+        null_vecs[0]->setToScalar(0.0);
+        null_vecs[1]->allocateVectorData();
+        null_vecs[1]->setToScalar(0.0);
+        null_vecs[2]->allocateVectorData();
+        null_vecs[2]->setToScalar(0.0);
         // Pull out pressure component and set to constant
         {
             for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
@@ -242,11 +250,26 @@ main(int argc, char* argv[])
                 for (PatchLevel<NDIM>::Iterator p(level); p; p++)
                 {
                     Pointer<Patch<NDIM>> patch = level->getPatch(p());
-                    Pointer<SideData<NDIM, double>> un_data = null_vec->getComponentPatchData(0, *patch);
-                    Pointer<SideData<NDIM, double>> us_data = null_vec->getComponentPatchData(1, *patch);
-                    Pointer<CellData<NDIM, double>> p_data = null_vec->getComponentPatchData(2, *patch);
-                    un_data->fillAll(1.0);
-                    us_data->fillAll(1.0);
+                    Pointer<CellData<NDIM, double>> p_data = null_vecs[0]->getComponentPatchData(2, *patch);
+                    p_data->fillAll(1.0);
+
+                    Pointer<SideData<NDIM, double>> un_data = null_vecs[1]->getComponentPatchData(0, *patch);
+                    Pointer<SideData<NDIM, double>> us_data = null_vecs[1]->getComponentPatchData(1, *patch);
+                    for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++)
+                    {
+                        const SideIndex<NDIM>& idx = si();
+                        (*un_data)(idx) = 1.0;
+                        (*us_data)(idx) = 1.0;
+                    }
+
+                    un_data = null_vecs[2]->getComponentPatchData(0, *patch);
+                    us_data = null_vecs[2]->getComponentPatchData(1, *patch);
+                    for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)
+                    {
+                        const SideIndex<NDIM>& idx = si();
+                        (*un_data)(idx) = 1.0;
+                        (*us_data)(idx) = 1.0;
+                    }
                 }
             }
         }
@@ -283,21 +306,49 @@ main(int argc, char* argv[])
         krylov_solver->setOperator(stokes_op);
 
         // Now create a preconditioner
-        Pointer<FACPreconditionerStrategy> Krylov_strategy =
-            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy",
-                                             //app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                                             "Krylov_precond_");
-        Pointer<FACPreconditioner> Krylov_precond =
+        Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
+            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
+                "KrylovPrecondStrategy",
+                // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
+                "Krylov_precond_");
+        fac_precondition_strategy->setThnIdx(thn_cc_idx);
+        Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
-                                      Krylov_strategy,
+                                      fac_precondition_strategy,
                                       app_initializer->getComponentDatabase("KrylovPrecond"),
                                       input_db->getInteger("multigrid_max_levels"),
                                       "Krylov_precond_");
-        if (input_db->getBool("USE_PRECOND")) krylov_solver->setPreconditioner(Krylov_precond);
+        bool use_precond = input_db->getBool("USE_PRECOND");
+        if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
 
-        krylov_solver->setNullspace(false, { null_vec });
+        krylov_solver->setNullspace(false, null_vecs);
         krylov_solver->initializeSolverState(u_vec, f_vec);
+        // We need to set thn_cc_idx on the dense hierarchy.
+        // TODO: find a better way to do this
+        if (use_precond)
+        {
+            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
+            // Allocate data
+            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+                if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
+            }
+            thn_fcn.setDataOnPatchHierarchy(
+                thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
+        }
         krylov_solver->solveSystem(u_vec, f_vec);
+
+        // Deallocate data
+        if (use_precond)
+        {
+            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
+            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+                if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
+            }
+        }
 
         // Compute error and print error norms.
         e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical
