@@ -1069,14 +1069,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     d_p_prolong_op = grid_geom->lookupRefineOperator(p_sol_var, "CONSERVATIVE_LINEAR_REFINE");
     const int un_sol_idx = sol.getComponentDescriptorIndex(0);
     const int us_sol_idx = sol.getComponentDescriptorIndex(1);
-    const int p_sol_idx = sol.getComponentDescriptorIndex(0);
+    const int p_sol_idx = sol.getComponentDescriptorIndex(2);
 
     RefineAlgorithm<NDIM> refine_alg;
     refine_alg.registerRefine(d_un_scr_idx, un_sol_idx, d_un_scr_idx, d_un_prolong_op);
     refine_alg.registerRefine(d_us_scr_idx, us_sol_idx, d_us_scr_idx, d_us_prolong_op);
     refine_alg.registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, d_p_prolong_op);
 
-    d_prolong_scheds.resize(finest_ln - coarsest_ln);
+    d_prolong_scheds.resize(finest_ln - coarsest_ln + 1);
     // Note start from zero because you can't prolong to the coarsest level.
     for (int dst_ln = coarsest_ln + 1; dst_ln <= finest_ln; ++dst_ln)
     {
