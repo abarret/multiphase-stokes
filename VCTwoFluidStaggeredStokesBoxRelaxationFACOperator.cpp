@@ -129,7 +129,7 @@ static const std::string SC_DATA_REFINE_TYPE =
                                   // patch
 static const std::string DATA_REFINE_TYPE = "NONE";
 static const bool USE_CF_INTERPOLATION = true;
-static const std::string DATA_COARSEN_TYPE = "CUBIC_COARSEN";
+static const std::string DATA_COARSEN_TYPE = "NONE";
 
 // Type of extrapolation to use at physical boundaries; used only to evaluate
 // composite grid residuals.
@@ -358,23 +358,23 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef); // defaults to fill corner
 
-    // Initialize the interpolation operators.
-    d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
-    d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy);
-    d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
-    d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
-    d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
-
-    const double eta_n = 1.0;
-    const double eta_s = 1.0;
-    const double xi = 1.0;
-    const double nu_n = 1.0;
-    const double nu_s = 1.0;
-    IntVector<NDIM> xp(1, 0), yp(0, 1);
-    
     // outer for loop for number of sweeps
     for (int sweep = 0; sweep < num_sweeps; sweep++)
     {
+        // Initialize the interpolation operators.
+        d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
+        d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy);
+        d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
+        d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
+        d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
+
+        const double eta_n = 1.0;
+        const double eta_s = 1.0;
+        const double xi = 1.0;
+        const double nu_n = 1.0;
+        const double nu_s = 1.0;
+        IntVector<NDIM> xp(1, 0), yp(0, 1);
+
         // loop through all patches on this level
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
@@ -992,9 +992,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             }
         }
     }
-    // pout << "res_norm in main = " << residual.L2Norm() << "\n";
-    // pout << "sol_norm  = " << solution.L2Norm() << "\n";
-    // pout << "rhs_norm  = " << rhs.L2Norm() << "\n";
     IBTK_TIMER_STOP(t_compute_residual);
     return;
 }
@@ -1083,7 +1080,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         // TODO: The last argument should be the refine patch strategies. These should be, e.g. physical boundary
         // routines and fix-ups related to coarse fine interfaces.
         d_prolong_scheds[dst_ln] = refine_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln),
-                                                             nullptr,
+                                                             Pointer<PatchLevel<NDIM>>(),
                                                              dst_ln - 1,
                                                              d_hierarchy,
                                                              nullptr /* Refine patch strategy*/);
