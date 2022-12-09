@@ -336,7 +336,22 @@ main(int argc, char* argv[])
             }
             thn_fcn.setDataOnPatchHierarchy(
                 thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
+            // Also fill in theta ghost cells
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comp(1);
+            ghost_cell_comp[0] = ITC(thn_cc_idx,
+                                     "CONSERVATIVE_LINEAR_REFINE",
+                                     false,
+                                     "NONE",
+                                     "LINEAR",
+                                     true,
+                                     nullptr); // defaults to fill corner
+            HierarchyGhostCellInterpolation ghost_cell_fill;
+            ghost_cell_fill.initializeOperatorState(
+                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+            ghost_cell_fill.fillData(0.0);
         }
+
         krylov_solver->solveSystem(u_vec, f_vec);
 
         // Deallocate data
