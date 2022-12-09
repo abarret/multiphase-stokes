@@ -317,56 +317,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     d_hierarchy = error.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
 
-    // Setup the interpolation transaction information.
-    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
-    // Simultaneously fill ghost cell values for all components.
-    using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    std::vector<InterpolationTransactionComponent> transaction_comps(4);
-    transaction_comps[0] = InterpolationTransactionComponent(un_idx,
-                                                             un_idx,
-                                                             SC_DATA_REFINE_TYPE,
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
-                                                             BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
-                                                             d_un_bc_coefs, // modifiy?
-                                                             d_un_fill_pattern);
-    transaction_comps[1] = InterpolationTransactionComponent(us_idx,
-                                                             us_idx,
-                                                             SC_DATA_REFINE_TYPE,
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
-                                                             BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
-                                                             d_us_bc_coefs, // modify?
-                                                             d_us_fill_pattern);
-    transaction_comps[2] = InterpolationTransactionComponent(P_idx,
-                                                             CC_DATA_REFINE_TYPE,
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
-                                                             BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
-                                                             d_P_bc_coef,
-                                                             d_P_fill_pattern);
-    transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                             CC_DATA_REFINE_TYPE,
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
-                                                             BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
-                                                             d_P_bc_coef); // defaults to fill corner
-
     // outer for loop for number of sweeps
     for (int sweep = 0; sweep < num_sweeps; sweep++)
     {
-        // Initialize the interpolation operators.
-        d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
-        d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy);
-        d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
-        d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
-        d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
+        // Fill in ghost cells. We only want to use values on our current level to fill in ghost cells.
+        // TODO: d_ghostfill_no_restrict_scheds does not fill in ghost cells in at coarse fine interfaces. We need to
+        // set that up. One way of doing that is using the existing operators in IBAMR to compute the "normal
+        // extension."
+        performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
 
         const double eta_n = 1.0;
         const double eta_s = 1.0;
@@ -442,272 +400,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     thn_ptr_data, 
                     thn_gcw.min(),
                     eta_n, eta_s, nu_n, nu_s, xi);
-
-            /*
-            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
-            {
-                MatrixXd A_box(9, 9);    // 9 x 9 Matrix
-                VectorXd b(9);           // 9 x 1 RHS vector
-                VectorXd sol(9);         // 9 x 1 solution vector
-
-                const CellIndex<NDIM>& idx = ci(); // (i,j)
-                VectorNd x;                        // <- Eigen3 vector
-                for (int d = 0; d < NDIM; ++d)
-                    x[d] = xlow[d] + dx[d] * (idx(d) - idx_low(d) + 0.5); // Get's physical location of idx.
-
-                // Jacobi-type solve: We want to solve for Un, Us and P at step k+1 using data from step k
-                // un_scr_data = un_data;
-                // us_scr_data = us_data;
-                // p_scr_data = p_data;
-
-                SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
-                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-                
-                // thn at sidess
-                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
-                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
-                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
-                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-
-                // thn at corners
-                double thn_imhalf_jphalf = 0.25 * ((*thn_data)(idx - xp) + (*thn_data)(idx) + (*thn_data)(idx + yp) +
-                                                   (*thn_data)(idx - xp + yp)); // thn(i-1/2,j+1/2)
-                double thn_imhalf_jmhalf = 0.25 * ((*thn_data)(idx) + (*thn_data)(idx - xp) + (*thn_data)(idx - yp) +
-                                                   (*thn_data)(idx - xp - yp)); // thn(i-1/2,j-1/2)
-                double thn_iphalf_jphalf = 0.25 * ((*thn_data)(idx + xp) + (*thn_data)(idx) + (*thn_data)(idx + yp) +
-                                                   (*thn_data)(idx + xp + yp)); // thn(i+1/2,j+1/2)
-                double thn_iphalf_jmhalf = 0.25 * ((*thn_data)(idx + xp) + (*thn_data)(idx) + (*thn_data)(idx - yp) +
-                                                   (*thn_data)(idx + xp - yp)); // thn(i+1/2,j-1/2)
-
-                // network at west edge
-                A_box(0, 0) = eta_n / (dx[0] * dx[0]) * (-(*thn_data)(idx) - (*thn_data)(idx - xp)) -
-                              eta_n / (dx[1] * dx[1]) * (thn_imhalf_jmhalf + thn_imhalf_jphalf) -
-                              (xi / nu_n) * thn_lower_x * convertToThs(thn_lower_x);
-                A_box(0, 1) = eta_n / (dx[0] * dx[0]) * ((*thn_data)(idx));
-                A_box(0, 2) = eta_n / (dx[0] * dx[1]) * ((*thn_data)(idx)-thn_imhalf_jmhalf);
-                A_box(0, 3) = eta_n / (dx[0] * dx[1]) * (thn_imhalf_jphalf - (*thn_data)(idx));
-                A_box(0, 4) = (xi / nu_n) * thn_lower_x * convertToThs(thn_lower_x);
-                A_box(0, 5) = 0.0;
-                A_box(0, 6) = 0.0;
-                A_box(0, 7) = 0.0;
-                A_box(0, 8) = -thn_lower_x / dx[0];
-
-                A_box(4, 4) =
-                    eta_s / (dx[0] * dx[0]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx - xp))) -
-                    eta_s / (dx[1] * dx[1]) * (convertToThs(thn_imhalf_jmhalf) + convertToThs(thn_imhalf_jphalf)) -
-                    (xi / nu_s) * thn_lower_x * convertToThs(thn_lower_x);
-                A_box(4, 5) = eta_s / (dx[0] * dx[0]) * (convertToThs((*thn_data)(idx)));
-                A_box(4, 6) =
-                    eta_s / (dx[0] * dx[1]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_imhalf_jmhalf));
-                A_box(4, 7) =
-                    eta_s / (dx[0] * dx[1]) * (convertToThs(thn_imhalf_jphalf) - convertToThs((*thn_data)(idx)));
-                A_box(4, 0) = (xi / nu_s) * thn_lower_x * convertToThs(thn_lower_x);
-                A_box(4, 1) = 0.0;
-                A_box(4, 2) = 0.0;
-                A_box(4, 3) = 0.0;
-                A_box(4, 8) = -convertToThs(thn_lower_x) / dx[0];
-
-                // network at east edge
-                A_box(1, 0) = eta_n / (dx[0] * dx[0]) * (*thn_data)(idx);
-                A_box(1, 1) = eta_n / (dx[0] * dx[0]) * (-(*thn_data)(idx + xp) - (*thn_data)(idx)) -
-                              eta_n / (dx[1] * dx[1]) * (thn_iphalf_jphalf + thn_iphalf_jmhalf) -
-                              (xi / nu_n) * thn_upper_x * convertToThs(thn_upper_x);
-                A_box(1, 2) = eta_n / (dx[1] * dx[0]) * (thn_iphalf_jmhalf - (*thn_data)(idx));
-                A_box(1, 3) = eta_n / (dx[1] * dx[0]) * ((*thn_data)(idx)-thn_iphalf_jphalf);
-                A_box(1, 4) = 0.0;
-                A_box(1, 6) = 0.0;
-                A_box(1, 7) = 0.0;
-                A_box(1, 5) = (xi / nu_n) * thn_upper_x * convertToThs(thn_upper_x);
-                A_box(1, 8) = thn_upper_x / dx[0];
-
-                A_box(5, 4) = eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx));
-                A_box(5, 5) =
-                    eta_s / (dx[0] * dx[0]) * (-convertToThs((*thn_data)(idx + xp)) - convertToThs((*thn_data)(idx))) -
-                    eta_s / (dx[1] * dx[1]) * (convertToThs(thn_iphalf_jphalf) + convertToThs(thn_iphalf_jmhalf)) -
-                    (xi / nu_s) * thn_upper_x * convertToThs(thn_upper_x);
-                A_box(5, 6) =
-                    eta_s / (dx[1] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) - convertToThs((*thn_data)(idx)));
-                A_box(5, 7) =
-                    eta_s / (dx[1] * dx[0]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_iphalf_jphalf));
-                A_box(5, 0) = 0.0;
-                A_box(5, 2) = 0.0;
-                A_box(5, 3) = 0.0;
-                A_box(5, 1) = (xi / nu_s) * thn_upper_x * convertToThs(thn_upper_x);
-                A_box(5, 8) = convertToThs(thn_upper_x) / dx[0];
-
-                // network at south edge
-                A_box(2, 0) = eta_n / (dx[0] * dx[1]) * ((*thn_data)(idx)-thn_imhalf_jmhalf);
-                A_box(2, 1) = eta_n / (dx[0] * dx[1]) * (thn_iphalf_jmhalf - (*thn_data)(idx));
-                A_box(2, 2) = eta_n / (dx[1] * dx[1]) * (-(*thn_data)(idx) - (*thn_data)(idx - yp)) -
-                              eta_n / (dx[0] * dx[0]) * (thn_iphalf_jmhalf + thn_imhalf_jmhalf) -
-                              (xi / nu_n) * thn_lower_y * convertToThs(thn_lower_y);
-                A_box(2, 3) = eta_n / (dx[1] * dx[1]) * ((*thn_data)(idx));
-                A_box(2, 4) = 0.0;
-                A_box(2, 5) = 0.0;
-                A_box(2, 7) = 0.0;
-                A_box(2, 6) = (xi / nu_n) * thn_lower_y * convertToThs(thn_lower_y);
-                A_box(2, 8) = -thn_lower_y / dx[1];
-
-                A_box(6, 4) =
-                    eta_s / (dx[0] * dx[1]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_imhalf_jmhalf));
-                A_box(6, 5) =
-                    eta_s / (dx[0] * dx[1]) * (convertToThs(thn_iphalf_jmhalf) - convertToThs((*thn_data)(idx)));
-                A_box(6, 6) =
-                    eta_s / (dx[1] * dx[1]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx - yp))) -
-                    eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jmhalf) + convertToThs(thn_imhalf_jmhalf)) -
-                    (xi / nu_s) * thn_lower_y * convertToThs(thn_lower_y);
-                A_box(6, 7) = eta_s / (dx[1] * dx[1]) * (convertToThs((*thn_data)(idx)));
-                A_box(6, 0) = 0.0;
-                A_box(6, 1) = 0.0;
-                A_box(6, 3) = 0.0;
-                A_box(6, 2) = (xi / nu_s) * thn_lower_y * convertToThs(thn_lower_y);
-                A_box(6, 8) = -convertToThs(thn_lower_y) / dx[1];
-
-                // network at north edge
-                A_box(3, 0) = eta_n / (dx[0] * dx[1]) * (thn_imhalf_jphalf - (*thn_data)(idx));
-                A_box(3, 1) = eta_n / (dx[0] * dx[1]) * ((*thn_data)(idx)-thn_iphalf_jphalf);
-                A_box(3, 2) = eta_n / (dx[1] * dx[1]) * ((*thn_data)(idx));
-                A_box(3, 3) = eta_n / (dx[1] * dx[1]) * (-(*thn_data)(idx) - (*thn_data)(idx + yp)) -
-                              eta_n / (dx[0] * dx[0]) * (thn_iphalf_jphalf + thn_imhalf_jphalf) -
-                              (xi / nu_n) * thn_upper_y * convertToThs(thn_upper_y);
-                A_box(3, 4) = 0.0;
-                A_box(3, 5) = 0.0;
-                A_box(3, 6) = 0.0;
-                A_box(3, 7) = (xi / nu_n) * thn_upper_y * convertToThs(thn_upper_y);
-                A_box(3, 8) = thn_upper_y / dx[1];
-
-                A_box(7, 4) =
-                    eta_s / (dx[0] * dx[1]) * (convertToThs(thn_imhalf_jphalf) - convertToThs((*thn_data)(idx)));
-                A_box(7, 5) =
-                    eta_s / (dx[0] * dx[1]) * (convertToThs((*thn_data)(idx)) - convertToThs(thn_iphalf_jphalf));
-                A_box(7, 6) = eta_s / (dx[1] * dx[1]) * (convertToThs((*thn_data)(idx)));
-                A_box(7, 7) =
-                    eta_s / (dx[1] * dx[1]) * (-convertToThs((*thn_data)(idx)) - convertToThs((*thn_data)(idx + yp))) -
-                    eta_s / (dx[0] * dx[0]) * (convertToThs(thn_iphalf_jphalf) + convertToThs(thn_imhalf_jphalf)) -
-                    (xi / nu_s) * thn_upper_y * convertToThs(thn_upper_y);
-                A_box(7, 0) = 0.0;
-                A_box(7, 1) = 0.0;
-                A_box(7, 2) = 0.0;
-                A_box(7, 3) = (xi / nu_s) * thn_upper_y * convertToThs(thn_upper_y);
-                A_box(7, 8) = convertToThs(thn_upper_y) / dx[1];
-
-                // incompressible constrain term at center
-                A_box(8, 0) = -thn_lower_x / dx[0];
-                A_box(8, 1) = thn_upper_x / dx[0];
-                A_box(8, 2) = -thn_lower_y / dx[1];
-                A_box(8, 3) = thn_upper_y / dx[1];
-                A_box(8, 4) = -convertToThs(thn_lower_x) / dx[0];
-                A_box(8, 5) = convertToThs(thn_upper_x) / dx[0];
-                A_box(8, 6) = -convertToThs(thn_lower_y) / dx[1];
-                A_box(8, 7) = convertToThs(thn_upper_y) / dx[1];
-                A_box(8, 8) = 0.0;
-
-                // set-up RHS vector (include terms from residual (f_un,f_us,f_p))
-                // should be populated with the values from the previous iteration
-
-                // network at west edge
-                b(0) = (*f_un_data)(lower_x_idx)-thn_lower_x / dx[0] * (*p_data)(idx - xp) -
-                       eta_n / (dx[0] * dx[0]) * (*thn_data)(idx - xp) * (*un_data)(lower_x_idx - xp) -
-                       eta_n / (dx[1] * dx[1]) * thn_imhalf_jphalf * (*un_data)(lower_x_idx + yp) -
-                       eta_n / (dx[1] * dx[1]) * thn_imhalf_jmhalf * (*un_data)(lower_x_idx - yp) +
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jphalf * (*un_data)(upper_y_idx - xp) -
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jmhalf * (*un_data)(lower_y_idx - xp) -
-                       eta_n / (dx[0] * dx[1]) * (*thn_data)(idx - xp) *
-                           ((*un_data)(upper_y_idx - xp) - (*un_data)(lower_y_idx - xp));
-
-                // solvent at west edge
-                b(4) =
-                    (*f_us_data)(lower_x_idx)-convertToThs(thn_lower_x) / dx[0] * (*p_data)(idx - xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx - xp)) * (*us_data)(lower_x_idx - xp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(lower_x_idx + yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_x_idx - yp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(upper_y_idx - xp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_y_idx - xp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx - xp)) *
-                        ((*us_data)(upper_y_idx - xp) - (*us_data)(lower_y_idx - xp));
-
-                // network at east edge
-                b(1) = (*f_un_data)(upper_x_idx) + thn_upper_x / dx[0] * (*p_data)(idx + xp) -
-                       eta_n / (dx[0] * dx[0]) * (*thn_data)(idx + xp) * (*un_data)(upper_x_idx + xp) -
-                       eta_n / (dx[1] * dx[1]) * thn_iphalf_jphalf * (*un_data)(upper_x_idx + yp) -
-                       eta_n / (dx[1] * dx[1]) * thn_iphalf_jmhalf * (*un_data)(upper_x_idx - yp) -
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jphalf * (*un_data)(upper_y_idx + xp) +
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jmhalf * (*un_data)(lower_y_idx + xp) +
-                       eta_n / (dx[0] * dx[1]) * (*thn_data)(idx + xp) *
-                           ((*un_data)(upper_y_idx + xp) - (*un_data)(lower_y_idx + xp));
-
-                // solvent at east edge
-                b(5) =
-                    (*f_us_data)(upper_x_idx) + convertToThs(thn_upper_x) / dx[0] * (*p_data)(idx + xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs((*thn_data)(idx + xp)) * (*us_data)(upper_x_idx + xp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_x_idx + yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(upper_x_idx - yp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_y_idx + xp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(lower_y_idx + xp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx + xp)) *
-                        ((*us_data)(upper_y_idx + xp) - (*us_data)(lower_y_idx + xp));
-
-                // network at south edge
-                b(2) = (*f_un_data)(lower_y_idx)-thn_lower_y / dx[1] * (*p_data)(idx - yp) -
-                       eta_n / (dx[1] * dx[1]) * (*thn_data)(idx - yp) * (*un_data)(lower_y_idx - yp) -
-                       eta_n / (dx[0] * dx[0]) * thn_iphalf_jmhalf * (*un_data)(lower_y_idx + xp) -
-                       eta_n / (dx[0] * dx[0]) * thn_imhalf_jmhalf * (*un_data)(lower_y_idx - xp) +
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jmhalf * (*un_data)(upper_x_idx - yp) -
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jmhalf * (*un_data)(lower_x_idx - yp) -
-                       eta_n / (dx[0] * dx[1]) * (*thn_data)(idx - yp) *
-                           ((*un_data)(upper_x_idx - yp) - (*un_data)(lower_x_idx - yp));
-
-                // solvent at south edge
-                b(6) =
-                    (*f_us_data)(lower_y_idx)-convertToThs(thn_lower_y) / dx[1] * (*p_data)(idx - yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs((*thn_data)(idx - yp)) * (*us_data)(lower_y_idx - yp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(lower_y_idx + xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_y_idx - xp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jmhalf) * (*us_data)(upper_x_idx - yp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jmhalf) * (*us_data)(lower_x_idx - yp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx - yp)) *
-                        ((*us_data)(upper_x_idx - yp) - (*us_data)(lower_x_idx - yp));
-
-                // network at north edge
-                b(3) = (*f_un_data)(upper_y_idx) + thn_upper_y / dx[1] * (*p_data)(idx + yp) -
-                       eta_n / (dx[1] * dx[1]) * (*thn_data)(idx + yp) * (*un_data)(upper_y_idx + yp) -
-                       eta_n / (dx[0] * dx[0]) * thn_iphalf_jphalf * (*un_data)(upper_y_idx + xp) -
-                       eta_n / (dx[0] * dx[0]) * thn_imhalf_jphalf * (*un_data)(upper_y_idx - xp) -
-                       eta_n / (dx[0] * dx[1]) * thn_iphalf_jphalf * (*un_data)(upper_x_idx + yp) +
-                       eta_n / (dx[0] * dx[1]) * thn_imhalf_jphalf * (*un_data)(lower_x_idx + yp) +
-                       eta_n / (dx[0] * dx[1]) * (*thn_data)(idx + yp) *
-                           ((*un_data)(upper_x_idx + yp) - (*un_data)(lower_x_idx + yp));
-
-                // solvent at north edge
-                b(7) =
-                    (*f_us_data)(upper_y_idx) + convertToThs(thn_upper_y) / dx[1] * (*p_data)(idx + yp) -
-                    eta_s / (dx[1] * dx[1]) * convertToThs((*thn_data)(idx + yp)) * (*us_data)(upper_y_idx + yp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_y_idx + xp) -
-                    eta_s / (dx[0] * dx[0]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(upper_y_idx - xp) -
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_iphalf_jphalf) * (*us_data)(upper_x_idx + yp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs(thn_imhalf_jphalf) * (*us_data)(lower_x_idx + yp) +
-                    eta_s / (dx[0] * dx[1]) * convertToThs((*thn_data)(idx + yp)) *
-                        ((*us_data)(upper_x_idx + yp) - (*us_data)(lower_x_idx + yp));
-
-                // pressure at cell center
-                b(8) = (*f_p_data)(idx);
-
-                sol = A_box.lu().solve(b); // solve Ax = b per cell
-                // sol = A_box.partialPivLu().solve(b);
-                (*un_data)(lower_x_idx) = sol(0);
-                (*un_data)(upper_x_idx) = sol(1);
-                (*un_data)(lower_y_idx) = sol(2);
-                (*un_data)(upper_y_idx) = sol(3);
-                (*us_data)(lower_x_idx) = sol(4);
-                (*us_data)(upper_x_idx) = sol(5);
-                (*us_data)(lower_y_idx) = sol(6);
-                (*us_data)(upper_y_idx) = sol(7);
-                (*p_data)(idx) = sol(8);
-
-            } // cell centers
-            */
         } // patchess
     } // num_sweeps
     IBTK_TIMER_STOP(t_smooth_error);
@@ -721,7 +413,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVect
 {
     IBTK_TIMER_START(t_solve_coarsest_level);
 
-    smoothError(error, residual, coarsest_ln, 3, false, false);
+    smoothError(error, residual, coarsest_ln, 10, false, false);
 
     IBTK_TIMER_STOP(t_solve_coarsest_level);
     return true;
@@ -748,13 +440,12 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     const int res_P_idx = residual.getComponentDescriptorIndex(2);
     const int thn_idx = d_thn_idx;
     
-    // Setup the interpolation transaction information.
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    std::vector<InterpolationTransactionComponent> transaction_comps(4);
+    std::vector<InterpolationTransactionComponent> transaction_comps(3);
     transaction_comps[0] = InterpolationTransactionComponent(un_idx,
                                                              un_idx,
                                                              SC_DATA_REFINE_TYPE,
@@ -781,15 +472,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef,
                                                              d_P_fill_pattern);
-    transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                             CC_DATA_REFINE_TYPE,
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
-                                                             BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
-                                                             d_P_bc_coef); // defaults to fill corner
 
-    d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
+    d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
+    d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy, coarsest_level_num, finest_level_num);
     d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
     const double eta_n = 1.0;
@@ -1104,6 +789,21 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         d_restrict_scheds[dst_ln] =
             coarsen_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_hierarchy->getPatchLevel(dst_ln + 1));
     }
+
+    // Create operators for only filling ghost cels.
+    RefineAlgorithm<NDIM> ghostfill_alg;
+    ghostfill_alg.registerRefine(d_un_scr_idx, un_sol_idx, d_un_scr_idx, Pointer<RefineOperator<NDIM>>());
+    ghostfill_alg.registerRefine(d_us_scr_idx, us_sol_idx, d_us_scr_idx, Pointer<RefineOperator<NDIM>>());
+    ghostfill_alg.registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, Pointer<RefineOperator<NDIM>>());
+    d_ghostfill_no_restrict_scheds.resize(finest_ln - coarsest_ln + 1);
+    for (int dst_ln = coarsest_ln; dst_ln <= finest_ln; ++dst_ln)
+    {
+        // We only want to fill in ghost cells from the current level
+        // TODO: the second argument here should fill in physical boundary conditions. This only works for periodic
+        // conditions.
+        d_ghostfill_no_restrict_scheds[dst_ln] =
+            ghostfill_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), nullptr);
+    }
     return;
 }
 
@@ -1150,6 +850,19 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std:
 
     coarsen_alg.resetSchedule(d_restrict_scheds[dst_ln]);
     d_restrict_scheds[dst_ln]->coarsenData();
+}
+
+void
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std::array<int, 3>& dst_idxs,
+                                                                       const int dst_ln)
+{
+    RefineAlgorithm<NDIM> refine_alg;
+    refine_alg.registerRefine(dst_idxs[0], dst_idxs[0], dst_idxs[0], Pointer<RefineOperator<NDIM>>());
+    refine_alg.registerRefine(dst_idxs[1], dst_idxs[1], dst_idxs[1], Pointer<RefineOperator<NDIM>>());
+    refine_alg.registerRefine(dst_idxs[2], dst_idxs[2], dst_idxs[2], Pointer<RefineOperator<NDIM>>());
+
+    refine_alg.resetSchedule(d_ghostfill_no_restrict_scheds[dst_ln]);
+    d_ghostfill_no_restrict_scheds[dst_ln]->fillData(d_new_time);
 }
 
 /////////////////////////////// PRIVATE //////////////////////////////////////
