@@ -112,6 +112,15 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
 
     transferToBase(u, *d_u);
 
+    // Inform preconditioner of the nullspace. 
+    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
+    for (const auto& null_vec : null_vecs)
+    {
+        const double dot_prod = u.dot(null_vec);
+        // Removes the projection of the solution onto the nullspace
+        u.linearSum(1.0, Pointer<SAMRAIVectorReal<NDIM, double>>(&u, false), -dot_prod, null_vec);
+    }
+
     // Deallocate the solver, when necessary.
     if (deallocate_after_solve) deallocateSolverState();
     return true;
