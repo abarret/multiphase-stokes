@@ -319,6 +319,7 @@ main(int argc, char* argv[])
                                       input_db->getInteger("multigrid_max_levels"),
                                       "Krylov_precond_");
         bool use_precond = input_db->getBool("USE_PRECOND");
+        Krylov_precond->setNullspace(false, null_vecs);
         if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
 
         krylov_solver->setNullspace(false, null_vecs);
