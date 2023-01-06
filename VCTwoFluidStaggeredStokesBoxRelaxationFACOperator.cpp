@@ -30,6 +30,8 @@
 #include "ibtk/SideNoCornersFillPattern.h"
 #include "ibtk/ibtk_utilities.h"
 #include "ibtk/namespaces.h" // IWYU pragma: keep
+#include <ibtk/CartCellDoubleQuadraticCFInterpolation.h>
+#include <ibtk/CartSideDoubleQuadraticCFInterpolation.h>
 
 #include "Box.h"
 #include "BoxList.h"
@@ -325,6 +327,23 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
         // set that up. One way of doing that is using the existing operators in IBAMR to compute the "normal
         // extension."
         performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
+
+        // Compute the normal extension of the solution at coarse fine interfaces if we are not on the coarsest level
+        // TODO: 0 here is coarsest level number, we should set this to a variable.
+        if (level_num > 0)
+        {
+            d_cc_bdry_op->setPatchDataIndex(P_idx);
+            d_sc_bdry_op->setPatchDataIndices({ un_idx, us_idx });
+            const IntVector<NDIM>& ratio = level->getRatioToCoarserLevel();
+            for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+            {
+                Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                // TODO: 1 here is the ghost width to fill, this should be variable.
+                const IntVector<NDIM>& gcw_to_fill = 1;
+                d_sc_bdry_op->computeNormalExtension(*patch, ratio, gcw_to_fill);
+                d_cc_bdry_op->computeNormalExtension(*patch, ratio, gcw_to_fill);
+            }
+        }
 
         const double eta_n = 1.0;
         const double eta_s = 1.0;
@@ -804,6 +823,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         d_ghostfill_no_restrict_scheds[dst_ln] =
             ghostfill_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), nullptr);
     }
+
+    // Coarse-fine boundary operators
+    d_sc_bdry_op = new CartSideDoubleQuadraticCFInterpolation();
+    d_sc_bdry_op->setConsistentInterpolationScheme(false);
+    d_sc_bdry_op->setPatchHierarchy(d_hierarchy);
+    d_cc_bdry_op = new CartCellDoubleQuadraticCFInterpolation();
+    d_cc_bdry_op->setConsistentInterpolationScheme(false);
+    d_cc_bdry_op->setPatchHierarchy(d_hierarchy);
     return;
 }
 
