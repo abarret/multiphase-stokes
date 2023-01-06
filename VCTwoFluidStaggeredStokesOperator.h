@@ -275,4 +275,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif //#ifndef included_IBAMR_TwoFluidStaggeredStokesOperator
+#endif // #ifndef included_IBAMR_TwoFluidStaggeredStokesOperator

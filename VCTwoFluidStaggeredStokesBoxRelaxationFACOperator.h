@@ -282,4 +282,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif //#ifndef included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#endif // #ifndef included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator

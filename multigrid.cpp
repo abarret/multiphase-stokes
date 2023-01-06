@@ -34,8 +34,8 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "VCTwoFluidStaggeredStokesOperator.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "VCTwoFluidStaggeredStokesOperator.h"
 #include "tests/multigrid/FullFACPreconditioner.h"
 
 /*******************************************************************************
