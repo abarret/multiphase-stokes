@@ -30,6 +30,8 @@
 #include "ibtk/SideNoCornersFillPattern.h"
 #include "ibtk/ibtk_utilities.h"
 #include "ibtk/namespaces.h" // IWYU pragma: keep
+#include <ibtk/CartCellDoubleQuadraticCFInterpolation.h>
+#include <ibtk/CartSideDoubleQuadraticCFInterpolation.h>
 
 #include "Box.h"
 #include "BoxList.h"
@@ -71,35 +73,34 @@
 
 extern "C"
 {
-    void R_B_G_S(const double*, // dx
-                const int&,  // ilower0
-                const int&,  // iupper0
-                const int&,  // ilower1
-                const int&,  // iupper1
-                double* const, // un_data_0
-                double* const, // un_data_1
-                const int&,  // un_gcw
-                double* const, // us_data_0
-                double* const, // us_data_0
-                const int&, // us_gcw
-                double* const, // p_data_
-                const int&, // p_gcw
-                double* const, // f_p_data
-                const int&, // f_p_gcw
-                double* const, // f_un_data_0
-                double* const, // f_un_data_1
-                const int&,  // f_un_gcw
-                double* const, // f_us_data_0
-                double* const, // f_us_data_1
-                const int&, // f_us_gcw
-                double* const, // thn_data
-                const int&, // thn_gcw
-                const double&,  // eta_n    // whatever will be passed in will be treated as a reference to a double
-                const double&,  // eta_s    // telling the compiler that the function is expecting a reference
-                const double&,  // nu_n
-                const double&,  // nu_s 
-                const double&);  // xi
-                         
+    void R_B_G_S(const double*,  // dx
+                 const int&,     // ilower0
+                 const int&,     // iupper0
+                 const int&,     // ilower1
+                 const int&,     // iupper1
+                 double* const,  // un_data_0
+                 double* const,  // un_data_1
+                 const int&,     // un_gcw
+                 double* const,  // us_data_0
+                 double* const,  // us_data_0
+                 const int&,     // us_gcw
+                 double* const,  // p_data_
+                 const int&,     // p_gcw
+                 double* const,  // f_p_data
+                 const int&,     // f_p_gcw
+                 double* const,  // f_un_data_0
+                 double* const,  // f_un_data_1
+                 const int&,     // f_un_gcw
+                 double* const,  // f_us_data_0
+                 double* const,  // f_us_data_1
+                 const int&,     // f_us_gcw
+                 double* const,  // thn_data
+                 const int&,     // thn_gcw
+                 const double&,  // eta_n    // whatever will be passed in will be treated as a reference to a double
+                 const double&,  // eta_s    // telling the compiler that the function is expecting a reference
+                 const double&,  // nu_n
+                 const double&,  // nu_s
+                 const double&); // xi
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
@@ -144,7 +145,7 @@ double convertToThs(double Thn);
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    //const Pointer<Database> input_db,
+    // const Pointer<Database> input_db,
     const std::string& default_options_prefix)
     : FACPreconditionerStrategy(object_name)
 {
@@ -326,6 +327,23 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
         // extension."
         performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
 
+        // Compute the normal extension of the solution at coarse fine interfaces if we are not on the coarsest level
+        // TODO: 0 here is coarsest level number, we should set this to a variable.
+        if (level_num > 0)
+        {
+            d_cc_bdry_op->setPatchDataIndex(P_idx);
+            d_sc_bdry_op->setPatchDataIndices({ un_idx, us_idx });
+            const IntVector<NDIM>& ratio = level->getRatioToCoarserLevel();
+            for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+            {
+                Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                // TODO: 1 here is the ghost width to fill, this should be variable.
+                const IntVector<NDIM>& gcw_to_fill = 1;
+                d_sc_bdry_op->computeNormalExtension(*patch, ratio, gcw_to_fill);
+                d_cc_bdry_op->computeNormalExtension(*patch, ratio, gcw_to_fill);
+            }
+        }
+
         const double eta_n = 1.0;
         const double eta_s = 1.0;
         const double xi = 1.0;
@@ -366,8 +384,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             double* const f_p_ptr_data = f_p_data->getPointer(0);
 
             const Box<NDIM>& patch_box = patch->getBox();
-            const IntVector<NDIM>& patch_lower = patch_box.lower();  // patch_lower(0), patch_lower(1) are min indices in x and y-dir
-            const IntVector<NDIM>& patch_upper = patch_box.upper();  // patch_upper(0), patch_upper(1) are max indices in x and y-dir
+            const IntVector<NDIM>& patch_lower =
+                patch_box.lower(); // patch_lower(0), patch_lower(1) are min indices in x and y-dir
+            const IntVector<NDIM>& patch_upper =
+                patch_box.upper(); // patch_upper(0), patch_upper(1) are max indices in x and y-dir
 
             const IntVector<NDIM>& thn_gcw = thn_data->getGhostCellWidth();
             const IntVector<NDIM>& un_gcw = un_data->getGhostCellWidth();
@@ -376,32 +396,36 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
             const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
             const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
-            R_B_G_S(dx,  
-                    patch_lower(0),  // ilower0
-                    patch_upper(0),  // iupper0
-                    patch_lower(1),  // ilower1
-                    patch_upper(1),  // iupper1
-                    un_data_0, 
-                    un_data_1, 
-                    un_gcw.min(),  
-                    us_data_0, 
-                    us_data_1, 
-                    us_gcw.min(), 
-                    p_ptr_data, 
-                    p_gcw.min(), 
-                    f_p_ptr_data, 
+            R_B_G_S(dx,
+                    patch_lower(0), // ilower0
+                    patch_upper(0), // iupper0
+                    patch_lower(1), // ilower1
+                    patch_upper(1), // iupper1
+                    un_data_0,
+                    un_data_1,
+                    un_gcw.min(),
+                    us_data_0,
+                    us_data_1,
+                    us_gcw.min(),
+                    p_ptr_data,
+                    p_gcw.min(),
+                    f_p_ptr_data,
                     f_p_gcw.min(),
-                    f_un_data_0, 
-                    f_un_data_1, 
-                    f_un_gcw.min(),  
-                    f_us_data_0, 
+                    f_un_data_0,
+                    f_un_data_1,
+                    f_un_gcw.min(),
+                    f_us_data_0,
                     f_us_data_1,
-                    f_us_gcw.min(), 
-                    thn_ptr_data, 
+                    f_us_gcw.min(),
+                    thn_ptr_data,
                     thn_gcw.min(),
-                    eta_n, eta_s, nu_n, nu_s, xi);
+                    eta_n,
+                    eta_s,
+                    nu_n,
+                    nu_s,
+                    xi);
         } // patchess
-    } // num_sweeps
+    }     // num_sweeps
     IBTK_TIMER_STOP(t_smooth_error);
     return;
 }
@@ -439,7 +463,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     const int res_us_idx = residual.getComponentDescriptorIndex(1);
     const int res_P_idx = residual.getComponentDescriptorIndex(2);
     const int thn_idx = d_thn_idx;
-    
+
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
@@ -697,7 +721,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
     for (PatchLevel<NDIM>::Iterator p(level); p; p++)
     {
-        Pointer<Patch<NDIM>> patch = level->getPatch(p()); 
+        Pointer<Patch<NDIM>> patch = level->getPatch(p());
         Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
         Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
         Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
@@ -804,6 +828,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         d_ghostfill_no_restrict_scheds[dst_ln] =
             ghostfill_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), nullptr);
     }
+
+    // Coarse-fine boundary operators
+    d_sc_bdry_op = new CartSideDoubleQuadraticCFInterpolation();
+    d_sc_bdry_op->setConsistentInterpolationScheme(false);
+    d_sc_bdry_op->setPatchHierarchy(d_hierarchy);
+    d_cc_bdry_op = new CartCellDoubleQuadraticCFInterpolation();
+    d_cc_bdry_op->setConsistentInterpolationScheme(false);
+    d_cc_bdry_op->setPatchHierarchy(d_hierarchy);
     return;
 }
 

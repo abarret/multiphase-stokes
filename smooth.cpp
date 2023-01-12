@@ -270,31 +270,31 @@ main(int argc, char* argv[])
         un_fcn.setDataOnPatchHierarchy(un_sc_idx, un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(us_sc_idx, us_sc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
-        
+
         // Setup the box relaxation FAC operator
 
         VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
         box_relax.setThnIdx(thn_cc_idx);
-        //box_relax.initializeOperatorState(u_vec,f_vec);
+        // box_relax.initializeOperatorState(u_vec,f_vec);
         box_relax.setToZero(u_vec, 0);
 
-        for (int i = 0; i <= 680; i++){
-            box_relax.smoothError(u_vec, f_vec, 0, 1, false, false); 
+        for (int i = 0; i <= 680; i++)
+        {
+            box_relax.smoothError(u_vec, f_vec, 0, 1, false, false);
             box_relax.computeResidual(e_vec, u_vec, f_vec, 0, 0);
             pout << "Sweep = " << i << "\n";
             pout << "|r|_2  = " << e_vec.L2Norm() << "\n";
         }
-        
-        
+
         // Setup the stokes operator
         // VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
         // stokes_op.setThnIdx(thn_cc_idx);
         // stokes_op.initializeOperatorState(u_vec, e_vec);
         // stokes_op.apply(u_vec, e_vec); // e_vec is A*u
-       
+
         // calculate residual norm: b - A*u
         // f_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),  // RHS
-                       //Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // A*u
+        // Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // A*u
         // pout << "|r|_oo = " << e_vec.maxNorm() << "\n";
         // pout << "|r|_2  = " << e_vec.L2Norm() << "\n";
         // pout << "|r|_1  = " << e_vec.L1Norm() << "\n";

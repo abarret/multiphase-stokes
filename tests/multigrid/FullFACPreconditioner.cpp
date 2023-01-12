@@ -46,7 +46,8 @@ FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
                                              Pointer<Database> input_db,
                                              int multigrid_max_levels,
                                              const std::string& default_options_prefix)
-    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix), d_multigrid_max_levels(multigrid_max_levels)
+    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix),
+      d_multigrid_max_levels(multigrid_max_levels)
 {
     return;
 } // FACPreconditioner
@@ -112,7 +113,7 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
 
     transferToBase(u, *d_u);
 
-    // Inform preconditioner of the nullspace. 
+    // Inform preconditioner of the nullspace.
     const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
     for (const auto& null_vec : null_vecs)
     {

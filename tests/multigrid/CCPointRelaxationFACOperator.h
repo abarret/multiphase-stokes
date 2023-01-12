@@ -256,4 +256,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif //#ifndef included_IBTK_CCPointRelaxationFACOperator
+#endif // #ifndef included_IBTK_CCPointRelaxationFACOperator
