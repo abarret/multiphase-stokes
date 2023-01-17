@@ -82,7 +82,7 @@ c
       double precisionthn_iphalf_jphalf, thn_iphalf_jmhalf
 c    
       double precision A_box(9,9)
-      double precision b(9)
+      double precision b(9), w
       integer ipiv(9), info
 c
       integer i0, i1
@@ -394,15 +394,16 @@ c
             print *, info
           endif
 c
-          un_data_0(i0,i1) = b(1);
-          un_data_0(i0+1,i1) = b(2);
-          un_data_1(i0,i1) = b(3);
-          un_data_1(i0,i1+1) = b(4);
-          us_data_0(i0,i1) = b(5);
-          us_data_0(i0+1,i1) = b(6);
-          us_data_1(i0,i1) = b(7);
-          us_data_1(i0,i1+1) = b(8);
-          p_data(i0,i1) = b(9);
+          w = 0.75d0  
+          un_data_0(i0,i1) = (1.d0-w)*un_data_0(i0,i1) + w*b(1);
+          un_data_0(i0+1,i1) = (1.d0-w)*un_data_0(i0+1,i1) + w*b(2);
+          un_data_1(i0,i1) = (1.d0-w)*un_data_1(i0,i1) + w*b(3);
+          un_data_1(i0,i1+1) = (1.d0-w)*un_data_1(i0,i1+1) + w*b(4);
+          us_data_0(i0,i1) = (1.d0-w)*us_data_0(i0,i1) + w*b(5);
+          us_data_0(i0+1,i1) = (1.d0-w)*us_data_0(i0+1,i1) + w*b(6);
+          us_data_1(i0,i1) = (1.d0-w)*us_data_1(i0,i1) + w*b(7);
+          us_data_1(i0,i1+1) = (1.d0-w)*us_data_1(i0,i1+1) + w*b(8);
+          p_data(i0,i1) = (1.d0-w)*p_data(i0,i1) + w*b(9);
 c
         enddo
       enddo
