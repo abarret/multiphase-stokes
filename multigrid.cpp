@@ -310,7 +310,7 @@ main(int argc, char* argv[])
             new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_");
+                "Krylov_precond_", input_db->getDouble("w"));
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",

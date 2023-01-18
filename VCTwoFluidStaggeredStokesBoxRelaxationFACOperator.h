@@ -72,10 +72,11 @@ class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public FACPrecondition
 public:
     /*!
      * \brief Constructor.
+     * \param w under relaxation factor in box relaxation scheme
      */
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
                                                       // SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                                      const std::string& default_options_prefix);
+                                                      const std::string& default_options_prefix, const double w);
 
     /*!
      * \brief Destructor.
@@ -196,6 +197,7 @@ public:
 protected:
     int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
+    double d_w = std::numeric_limits<double>::quiet_NaN(); // under relaxation factor
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
