@@ -148,7 +148,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
     const std::string& object_name,
     // const Pointer<Database> input_db,
     const std::string& default_options_prefix, const double w)
-    : FACPreconditionerStrategy(object_name)
+    : FACPreconditionerStrategy(object_name), d_w(w)
 {
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
