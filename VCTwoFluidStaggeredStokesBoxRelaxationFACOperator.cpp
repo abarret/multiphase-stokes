@@ -153,7 +153,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     Pointer<VariableContext> d_ctx = var_db->getContext("context");
-    d_w = w;
 
     // State scratch variables: Velocity and pressure.
     // Prepend with d_object_name to ensure there are no conflicts.
