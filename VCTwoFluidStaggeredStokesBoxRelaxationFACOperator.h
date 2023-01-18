@@ -197,7 +197,7 @@ public:
 protected:
     int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
-    double d_w = IBTK::invalid_index; // under relaxation factor
+    double d_w = std::numeric_limits<double>::quiet_NaN(); // under relaxation factor
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
