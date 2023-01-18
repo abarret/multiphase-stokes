@@ -100,7 +100,8 @@ extern "C"
                  const double&,  // eta_s    // telling the compiler that the function is expecting a reference
                  const double&,  // nu_n
                  const double&,  // nu_s
-                 const double&); // xi
+                 const double&,  // xi
+                 const double&); // w = under relaxation factor
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
@@ -146,12 +147,13 @@ double convertToThs(double Thn);
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
     // const Pointer<Database> input_db,
-    const std::string& default_options_prefix)
+    const std::string& default_options_prefix, const double w)
     : FACPreconditionerStrategy(object_name)
 {
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     Pointer<VariableContext> d_ctx = var_db->getContext("context");
+    d_w = w;
 
     // State scratch variables: Velocity and pressure.
     // Prepend with d_object_name to ensure there are no conflicts.
@@ -396,6 +398,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
             const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
             const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
+
             R_B_G_S(dx,
                     patch_lower(0), // ilower0
                     patch_upper(0), // iupper0
@@ -423,7 +426,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     eta_s,
                     nu_n,
                     nu_s,
-                    xi);
+                    xi,
+                    d_w);
+
         } // patchess
     }     // num_sweeps
     IBTK_TIMER_STOP(t_smooth_error);

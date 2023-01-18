@@ -1,5 +1,7 @@
 USE_PRECOND = TRUE
 
+w = 0.75  // under relaxation factor for box relaxation scheme
+
 un {
    function_0 = "cos(2*PI*X_0)"
    function_1 = "cos(2*PI*X_1)"

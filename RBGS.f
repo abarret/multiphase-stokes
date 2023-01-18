@@ -35,7 +35,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        f_un_data_0, f_un_data_1, f_un_gcw,
      &        f_us_data_0, f_us_data_1, f_us_gcw,
      &        thn_data, thn_gcw, eta_n, eta_s,
-     &        nu_n, nu_s, xi)
+     &        nu_n, nu_s, xi, w)
 c
       use my_subs
       implicit none
@@ -45,7 +45,7 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
       integer ilow1,  iup1
       integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
       integer f_p_gcw, thn_gcw
-      double precision eta_n, eta_s, nu_n, nu_s, xi
+      double precision eta_n, eta_s, nu_n, nu_s, xi, w
 c      
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
      &          ilow1-thn_gcw:iup1+thn_gcw) 
@@ -82,7 +82,7 @@ c
       double precisionthn_iphalf_jphalf, thn_iphalf_jmhalf
 c    
       double precision A_box(9,9)
-      double precision b(9), w
+      double precision b(9)
       integer ipiv(9), info
 c
       integer i0, i1
@@ -393,8 +393,7 @@ c
             print *, 'ERROR IN DGESV'
             print *, info
           endif
-c
-          w = 0.75d0  
+c 
           un_data_0(i0,i1) = (1.d0-w)*un_data_0(i0,i1) + w*b(1);
           un_data_0(i0+1,i1) = (1.d0-w)*un_data_0(i0+1,i1) + w*b(2);
           un_data_1(i0,i1) = (1.d0-w)*un_data_1(i0,i1) + w*b(3);
