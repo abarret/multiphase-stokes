@@ -368,7 +368,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 // pout << "thn_lower is " << thn_lower << "\n";
                 // thn at corners
                 double thn_imhalf_jphalf =
-                    0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + yp) +
+                    0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
                             (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
                 double thn_imhalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
@@ -488,7 +488,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 double
 convertToThs(double Thn)
 {
-    return 1 - Thn; // Thn+Ths = 1
+    return 1.0 - Thn; // Thn+Ths = 1
 }
 
 void
