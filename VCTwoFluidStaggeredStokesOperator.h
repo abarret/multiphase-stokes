@@ -63,10 +63,11 @@ public:
     /*!
      * \brief Class constructor.
      */
-    VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc = true);
+    VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc, const double C);
 
     /*!
      * \brief Destructor.
+     * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     ~VCTwoFluidStaggeredStokesOperator();
 
@@ -226,6 +227,7 @@ protected:
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
+    double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;

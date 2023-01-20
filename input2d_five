@@ -1,6 +1,7 @@
 USE_PRECOND = TRUE
 
 w = 0.75  // under relaxation factor for box relaxation scheme
+C = 0.001 // C in C*u
 
 un {
    function_0 = "cos(2*PI*X_0)"
@@ -9,7 +10,7 @@ un {
 
 us {
    function_0 = "-cos(2*PI*X_0)"
-   function_1 = "-cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_1)" 
 } // so that average of un + us is 0
 
 p {
@@ -17,13 +18,13 @@ p {
 } // pressure has mean 0
 
 f_un {
-   function_0 = "-0.5*cos(2*PI*X_0) - PI*cos(2*PI*X_0) - 2*PI*PI*cos(2*PI*X_0)"
-   function_1 = "-0.5*cos(2*PI*X_1) - 2*PI*PI*cos(2*PI*X_1)"
+   function_0 = "-0.5*cos(2*PI*X_0) - PI*cos(2*PI*X_0) - 2*PI*PI*cos(2*PI*X_0) + 0.001*cos(2*PI*X_0)"  // C*u term
+   function_1 = "-0.5*cos(2*PI*X_1) - 2*PI*PI*cos(2*PI*X_1)  + 0.001*cos(2*PI*X_1)"  // C*u term
 }
 
 f_us {
-   function_0 = "0.5*cos(2*PI*X_0) - PI*cos(2*PI*X_0) + 2*PI*PI*cos(2*PI*X_0)"
-   function_1 = "0.5*cos(2*PI*X_1) + 2*PI*PI*cos(2*PI*X_1)"
+   function_0 = "0.5*cos(2*PI*X_0) - PI*cos(2*PI*X_0) + 2*PI*PI*cos(2*PI*X_0) - 0.001*cos(2*PI*X_0)"  // C*u term
+   function_1 = "0.5*cos(2*PI*X_1) + 2*PI*PI*cos(2*PI*X_1) - 0.001*cos(2*PI*X_1)"   // C*u term
 }
 
 f_p {

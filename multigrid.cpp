@@ -297,7 +297,7 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true, input_db->getDouble("C"));
 
         stokes_op->setThnIdx(thn_cc_idx);
 
@@ -310,7 +310,7 @@ main(int argc, char* argv[])
             new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_", input_db->getDouble("w"));
+                "Krylov_precond_", input_db->getDouble("w"), input_db->getDouble("C"));
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",

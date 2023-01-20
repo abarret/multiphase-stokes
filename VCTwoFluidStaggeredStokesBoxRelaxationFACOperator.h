@@ -73,10 +73,11 @@ public:
     /*!
      * \brief Constructor.
      * \param w under relaxation factor in box relaxation scheme
+     * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
                                                       // SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                                      const std::string& default_options_prefix, const double w);
+                                                      const std::string& default_options_prefix, const double w, const double C);
 
     /*!
      * \brief Destructor.
@@ -198,6 +199,7 @@ protected:
     int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
     double d_w = std::numeric_limits<double>::quiet_NaN(); // under relaxation factor
+    double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
