@@ -24,12 +24,15 @@
 
 #include "ibtk/HierarchyGhostCellInterpolation.h"
 #include "ibtk/LinearOperator.h"
+#include <ibtk/CartGridFunction.h>
 
 #include "IntVector.h"
 #include "PoissonSpecifications.h"
 #include "SAMRAIVectorReal.h"
 #include "VariableFillPattern.h"
 #include "tbox/Pointer.h"
+
+#include <OutersideVariable.h>
 
 #include <string>
 #include <vector>
@@ -272,6 +275,13 @@ private:
      * \return A reference to this object.
      */
     VCTwoFluidStaggeredStokesOperator& operator=(const VCTwoFluidStaggeredStokesOperator& that) = delete;
+
+    // Synchronization variable
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::OutersideVariable<NDIM, double>> d_os_var;
+    int d_os_idx = IBTK::invalid_index;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenOperator<NDIM>> d_os_coarsen_op;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenAlgorithm<NDIM>> d_os_coarsen_alg;
+    std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
 };
 } // namespace IBAMR
 

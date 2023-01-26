@@ -45,6 +45,9 @@
 // Local includes
 #include "VCTwoFluidStaggeredStokesOperator.h"
 
+#include <math.h>
+
+#include <string>
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
 namespace IBAMR
@@ -62,9 +65,8 @@ static const int SIDEG = 1;
 static const std::string CC_DATA_REFINE_TYPE =
     "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
                                   // patch
-static const std::string SC_DATA_REFINE_TYPE =
-    "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
-                                  // patch
+static const std::string SC_DATA_REFINE_TYPE = "NONE"; // how to fill in fine cells from coarse cells, how to fill ghost
+                                                       // cells on refine patch
 static const bool USE_CF_INTERPOLATION = true;
 static const std::string DATA_COARSEN_TYPE =
     "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
@@ -75,18 +77,75 @@ static const std::string BDRY_EXTRAP_TYPE = "LINEAR"; // these operations are al
 
 // Whether to enforce consistent interpolated values at Type 2 coarse-fine
 // interface ghost cells.
-static const bool CONSISTENT_TYPE_2_BDRY = true;
+static const bool CONSISTENT_TYPE_2_BDRY = false;
 
 // Timers.
 static Timer* t_apply;
 static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
+
+/// Functions with exact solutions for error checking.
+VectorNd
+un_fcn(const VectorNd& x)
+{
+    VectorNd vel;
+    vel(0) = std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x(1));
+    vel(1) = std::cos(2.0 * M_PI * x(1)) * std::cos(2.0 * M_PI * x(0));
+    return vel;
+}
+VectorNd
+us_fcn(const VectorNd& x)
+{
+    VectorNd vel;
+    vel(0) = -std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x(1));
+    vel(1) = -std::cos(2.0 * M_PI * x(1)) * std::cos(2.0 * M_PI * x(0));
+    return vel;
+}
+double
+thetan(const VectorNd& x)
+{
+    return 0.25 * std::sin(2.0 * M_PI * x(0)) * std::sin(2.0 * M_PI * x(1)) + 0.5;
+}
+
+double
+p_fcn(const VectorNd& x)
+{
+    return 0.0;
+}
+
+double
+dy_ths_dus_dy(const VectorNd& x)
+{
+    return -2.0 * M_PI * M_PI * std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x[1]) *
+           (-1.0 + std::sin(2.0 * M_PI * x(0)) * std::sin(2.0 * M_PI * x(1)));
+}
+double
+dx_ths_dus_dx(const VectorNd& x)
+{
+    return -2.0 * M_PI * M_PI * std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x(1)) *
+           (-1.0 + std::sin(2.0 * M_PI * x(0)) * std::sin(2.0 * M_PI * x(1)));
+}
+double
+dx_ths_dus_dy(const VectorNd& x)
+{
+    return -0.5 * M_PI * M_PI * std::sin(2.0 * M_PI * x(1)) *
+           (4.0 * std::sin(2.0 * M_PI * x(0)) + std::sin(2.0 * M_PI * (2.0 * x(0) + x(1))) -
+            std::sin(2.0 * M_PI * (2.0 * x(0) - x(1))));
+}
+double
+dy_ths_dus_dx(const VectorNd& x)
+{
+    return -0.5 * M_PI * M_PI * std::sin(2.0 * M_PI * x(0)) *
+           (4.0 * std::sin(2.0 * M_PI * x(1)) + std::sin(2.0 * M_PI * (x(0) - 2.0 * x(1))) +
+            std::sin(2.0 * M_PI * (x(0) + 2.0 * x(1))));
+}
 } // namespace
 
 double convertToThs(double Thn);
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
-                                                                     bool homogeneous_bc, const double C)
+                                                                     bool homogeneous_bc,
+                                                                     const double C)
     : LinearOperator(object_name, homogeneous_bc),
       d_un_problem_coefs(d_object_name + "::un_problem_coefs"),
       d_us_problem_coefs(d_object_name + "::us_problem_coefs"),
@@ -98,7 +157,9 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef)),
       d_default_P_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_P_bc_coef", Pointer<Database>(nullptr))),
-      d_P_bc_coef(d_default_P_bc_coef), d_C(C)
+      d_P_bc_coef(d_default_P_bc_coef),
+      d_C(C),
+      d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable"))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -115,6 +176,9 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
         p_default_P_bc_coef->setBoundarySlope(2 * d, 0.0);
         p_default_P_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
     }
+
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    d_os_idx = var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"));
 
     // Initialize the boundary conditions objects.
     setPhysicalBcCoefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef),
@@ -246,37 +310,32 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(4);
     transaction_comps[0] = InterpolationTransactionComponent(un_idx,
-                                                             un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
-                                                             d_un_bc_coefs,
-                                                             d_un_fill_pattern);
+                                                             d_un_bc_coefs);
     transaction_comps[1] = InterpolationTransactionComponent(us_idx,
-                                                             us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
-                                                             d_us_bc_coefs,
-                                                             d_us_fill_pattern);
+                                                             d_us_bc_coefs);
     transaction_comps[2] = InterpolationTransactionComponent(P_idx,
                                                              CC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
-                                                             d_P_bc_coef,
-                                                             d_P_fill_pattern);
+                                                             d_P_bc_coef);
     transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                             CC_DATA_REFINE_TYPE,
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
+                                                             "CONSERVATIVE_LINEAR_REFINE",
+                                                             false,
+                                                             "CONSERVATIVE_COARSEN",
                                                              BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
+                                                             false,
                                                              d_P_bc_coef); // defaults to fill corner
 
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
@@ -314,6 +373,41 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             Pointer<SideData<NDIM, double>> A_us_data =
                 patch->getPatchData(A_us_idx); // result of applying operator (eqn 2)
             IntVector<NDIM> xp(1, 0), yp(0, 1);
+
+            // Fill ghost cells by hand
+#if (0)
+            for (int axis = 0; axis < NDIM; ++axis)
+            {
+                for (SideIterator<NDIM> si(us_data->getGhostBox(), axis); si; si++)
+                {
+                    const SideIndex<NDIM>& idx = si();
+                    if (!SideGeometry<NDIM>::toSideBox(patch->getBox(), axis).contains(idx))
+                    {
+                        VectorNd x;
+                        for (int d = 0; d < NDIM; ++d)
+                            x[d] =
+                                xlow[d] + dx[d] * (static_cast<double>(idx(d) - idx_low(d)) + (d == axis ? 0.0 : 0.5));
+
+                        VectorNd un_vel = un_fcn(x);
+                        (*un_data)(idx) = un_vel(axis);
+                        VectorNd us_vel = us_fcn(x);
+                        (*us_data)(idx) = us_vel(axis);
+                    }
+                }
+            }
+            for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
+            {
+                const CellIndex<NDIM>& idx = ci();
+                if (!patch->getBox().contains(idx))
+                {
+                    VectorNd x;
+                    for (int d = 0; d < NDIM; ++d)
+                        x[d] = xlow[d] + dx[d] * (static_cast<double>(idx(d) - idx_low(d)) + 0.5);
+                    (*thn_data)(idx) = thetan(x);
+                    (*p_data)(idx) = p_fcn(x);
+                }
+            }
+#endif
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
@@ -354,7 +448,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
                 const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
-                // pout << "\n At idx " << idx << " \n ";
 
                 CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
                 CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
@@ -365,7 +458,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
-                // pout << "thn_lower is " << thn_lower << "\n";
                 // thn at corners
                 double thn_imhalf_jphalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
@@ -408,13 +500,10 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                     -eta_s / (dx[0] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
-
                 double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) = ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s + d_C*(*us_data)(idx);
             }
-
-            // pout << "\n\n Looping over y-dir side-centers \n\n";
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
             {
@@ -472,7 +561,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                     -eta_s / (dx[0] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
-
                 double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) = ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s + d_C*(*us_data)(idx);
@@ -480,6 +568,28 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
         }
     }
     if (d_bc_helper) d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
+
+    auto sync_fcn = [&](const int dst_idx) -> void {
+        for (int ln = d_hierarchy->getFinestLevelNumber(); ln > 0; --ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+            for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+            {
+                Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                Pointer<SideData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
+                Pointer<OutersideData<NDIM, double>> os_data = patch->getPatchData(d_os_idx);
+                os_data->copy(*dst_data);
+            }
+            Pointer<CoarsenAlgorithm<NDIM>> coarsen_alg = new CoarsenAlgorithm<NDIM>();
+            coarsen_alg->registerCoarsen(dst_idx, d_os_idx, d_os_coarsen_op);
+            coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
+            d_os_coarsen_scheds[ln - 1]->coarsenData();
+            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
+        }
+    };
+
+    sync_fcn(A_us_idx);
+    sync_fcn(A_un_idx);
 
     IBAMR_TIMER_STOP(t_apply);
     return;
@@ -511,10 +621,28 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     d_x->allocateVectorData();
     const int thn_idx = d_thn_idx;
 
+    // Allocate synchronization variable
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        if (!level->checkAllocated(d_os_idx)) level->allocatePatchData(d_os_idx);
+    }
+
+    Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
+    d_os_coarsen_op = grid_geom->lookupCoarsenOperator(d_os_var, "CONSERVATIVE_COARSEN");
+    d_os_coarsen_alg = new CoarsenAlgorithm<NDIM>();
+    d_os_coarsen_alg->registerCoarsen(d_b->getComponentDescriptorIndex(0), d_os_idx, d_os_coarsen_op);
+    d_os_coarsen_scheds.resize(finest_ln - coarsest_ln);
+    for (int dst_ln = coarsest_ln; dst_ln < finest_ln; ++dst_ln)
+    {
+        Pointer<PatchLevel<NDIM>> src_level = d_hierarchy->getPatchLevel(dst_ln + 1);
+        Pointer<PatchLevel<NDIM>> dst_level = d_hierarchy->getPatchLevel(dst_ln);
+        d_os_coarsen_scheds[dst_ln] = d_os_coarsen_alg->createSchedule(dst_level, src_level);
+    }
+
     // Setup the interpolation transaction information.
-    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     d_transaction_comps.resize(4);
     d_transaction_comps[0] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(0),
@@ -524,8 +652,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
-                                                               d_un_bc_coefs,
-                                                               d_un_fill_pattern);
+                                                               d_un_bc_coefs);
     d_transaction_comps[1] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(1),
                                                                in.getComponentDescriptorIndex(1),
                                                                SC_DATA_REFINE_TYPE,
@@ -533,16 +660,14 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
-                                                               d_us_bc_coefs,
-                                                               d_us_fill_pattern);
+                                                               d_us_bc_coefs);
     d_transaction_comps[2] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(2),
                                                                CC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
-                                                               d_P_bc_coef,
-                                                               d_P_fill_pattern); // noFillCorners
+                                                               d_P_bc_coef); // noFillCorners
     d_transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
                                                                CC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
@@ -609,6 +734,17 @@ VCTwoFluidStaggeredStokesOperator::deallocateOperatorState()
 
     d_x.setNull();
     d_b.setNull();
+
+    // Deallocate synchronization variable
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        if (level->checkAllocated(d_os_idx)) level->deallocatePatchData(d_os_idx);
+    }
+    d_os_coarsen_scheds.clear();
+    d_os_coarsen_alg = nullptr;
 
     // Indicate that the operator is NOT initialized.
     d_is_initialized = false;

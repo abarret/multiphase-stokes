@@ -120,6 +120,13 @@ main(int argc, char* argv[])
         const int draw_fs_idx = var_db->registerVariableAndContext(draw_fs_var, ctx);
         const int draw_es_idx = var_db->registerVariableAndContext(draw_es_var, ctx);
 
+        Pointer<CellVariable<NDIM, double>> exact_cc_un_var = new CellVariable<NDIM, double>("exact_un", NDIM);
+        Pointer<CellVariable<NDIM, double>> exact_cc_us_var = new CellVariable<NDIM, double>("exact_us", NDIM);
+        Pointer<CellVariable<NDIM, double>> exact_cc_p_var = new CellVariable<NDIM, double>("exact_p");
+        const int exact_cc_un_idx = var_db->registerVariableAndContext(exact_cc_un_var, ctx);
+        const int exact_cc_us_idx = var_db->registerVariableAndContext(exact_cc_us_var, ctx);
+        const int exact_cc_p_idx = var_db->registerVariableAndContext(exact_cc_p_var, ctx);
+
         // Register variables for plotting.
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
         TBOX_ASSERT(visit_data_writer);
@@ -165,6 +172,15 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("error_RHS_us_" + std::to_string(d), "SCALAR", draw_es_idx, d);
         }
 
+        visit_data_writer->registerPlotQuantity("exact_RHS_un", "VECTOR", exact_cc_un_idx);
+        visit_data_writer->registerPlotQuantity("exact_RHS_us", "VECTOR", exact_cc_us_idx);
+        visit_data_writer->registerPlotQuantity("exact_RHS_p", "SCALAR", exact_cc_p_idx);
+        for (unsigned int d = 0; d < NDIM; ++d)
+        {
+            visit_data_writer->registerPlotQuantity("exact_RHS_un_" + std::to_string(d), "SCALAR", exact_cc_un_idx, d);
+            visit_data_writer->registerPlotQuantity("exact_RHS_us_" + std::to_string(d), "SCALAR", exact_cc_us_idx, d);
+        }
+
         gridding_algorithm->makeCoarsestLevel(patch_hierarchy, 0.0);
         int tag_buffer = 1;
         int level_number = 0;
@@ -196,6 +212,9 @@ main(int argc, char* argv[])
             level->allocatePatchData(draw_us_idx, 0.0);
             level->allocatePatchData(draw_fs_idx, 0.0);
             level->allocatePatchData(draw_es_idx, 0.0);
+            level->allocatePatchData(exact_cc_un_idx, 0.0);
+            level->allocatePatchData(exact_cc_us_idx, 0.0);
+            level->allocatePatchData(exact_cc_p_idx, 0.0);
         }
 
         // Setup vector objects.
@@ -246,7 +265,8 @@ main(int argc, char* argv[])
         f_p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
+        const double C = input_db->getDouble("C");
+        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true, C);
 
         stokes_op.setThnIdx(thn_cc_idx);
         stokes_op.initializeOperatorState(u_vec, f_vec);
@@ -296,6 +316,10 @@ main(int argc, char* argv[])
         hier_math_ops.interp(draw_fs_idx, draw_fs_var, f_us_sc_idx, f_us_sc_var, nullptr, 0.0, synch_cf_interface);
         hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
 
+        f_un_fcn.setDataOnPatchHierarchy(exact_cc_un_idx, exact_cc_un_var, patch_hierarchy, 0.0, false);
+        f_us_fcn.setDataOnPatchHierarchy(exact_cc_us_idx, exact_cc_us_var, patch_hierarchy, 0.0, false);
+        f_p_fcn.setDataOnPatchHierarchy(exact_cc_p_idx, exact_cc_p_var, patch_hierarchy, 0.0, false);
+
         // Output data for plotting.
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
 
@@ -320,6 +344,9 @@ main(int argc, char* argv[])
             level->deallocatePatchData(draw_us_idx);
             level->deallocatePatchData(draw_fs_idx);
             level->deallocatePatchData(draw_es_idx);
+            level->deallocatePatchData(exact_cc_un_idx);
+            level->deallocatePatchData(exact_cc_us_idx);
+            level->deallocatePatchData(exact_cc_p_idx);
         }
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
