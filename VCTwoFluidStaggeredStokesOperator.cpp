@@ -65,9 +65,9 @@ static const int SIDEG = 1;
 static const std::string CC_DATA_REFINE_TYPE =
     "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
                                   // patch
-static const std::string SC_DATA_REFINE_TYPE = "NONE"; // how to fill in fine cells from coarse cells, how to fill ghost
+static const std::string SC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost
                                                        // cells on refine patch
-static const bool USE_CF_INTERPOLATION = true;
+static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation. With AMR, weird results
 static const std::string DATA_COARSEN_TYPE =
     "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
                      // the hierarchies
@@ -309,14 +309,16 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(4);
-    transaction_comps[0] = InterpolationTransactionComponent(un_idx,
+    transaction_comps[0] = InterpolationTransactionComponent(un_scratch_idx,
+                                                             un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_un_bc_coefs);
-    transaction_comps[1] = InterpolationTransactionComponent(us_idx,
+    transaction_comps[1] = InterpolationTransactionComponent(us_scratch_idx,
+                                                             us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
@@ -366,10 +368,10 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             Pointer<CellData<NDIM, double>> A_P_data =
                 patch->getPatchData(A_P_idx); // result of applying operator (eqn 3)
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_scratch_idx);
             Pointer<SideData<NDIM, double>> A_un_data =
                 patch->getPatchData(A_un_idx); // result of applying operator (eqn 1)
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_scratch_idx);
             Pointer<SideData<NDIM, double>> A_us_data =
                 patch->getPatchData(A_us_idx); // result of applying operator (eqn 2)
             IntVector<NDIM> xp(1, 0), yp(0, 1);
@@ -584,7 +586,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             coarsen_alg->registerCoarsen(dst_idx, d_os_idx, d_os_coarsen_op);
             coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
             d_os_coarsen_scheds[ln - 1]->coarsenData();
-            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
+            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]); 
         }
     };
 
