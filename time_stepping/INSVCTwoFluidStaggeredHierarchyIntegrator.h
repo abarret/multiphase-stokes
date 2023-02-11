@@ -13,8 +13,8 @@
 
 /////////////////////////////// INCLUDE GUARD ////////////////////////////////
 
-#ifndef included_IBAMR_INSStaggeredHierarchyIntegrator
-#define included_IBAMR_INSStaggeredHierarchyIntegrator
+#ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
+#define included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -75,28 +75,28 @@ class GriddingAlgorithm;
 namespace IBAMR
 {
 /*!
- * \brief Class INSStaggeredHierarchyIntegrator provides a staggered-grid solver
+ * \brief Class INSVCTwoFluidStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
  */
-class INSStaggeredHierarchyIntegrator : public INSHierarchyIntegrator
+class INSVCTwoFluidStaggeredHierarchyIntegrator : public INSHierarchyIntegrator
 {
 public:
     /*!
-     * The constructor for class INSStaggeredHierarchyIntegrator sets some
+     * The constructor for class INSVCTwoFluidStaggeredHierarchyIntegrator sets some
      * default values, reads in configuration information from input and restart
      * databases, and registers the integrator object with the restart manager
      * when requested.
      */
-    INSStaggeredHierarchyIntegrator(std::string object_name,
+    INSVCTwoFluidStaggeredHierarchyIntegrator(std::string object_name,
                                     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
                                     bool register_for_restart = true);
 
     /*!
-     * The destructor for class INSStaggeredHierarchyIntegrator unregisters the
+     * The destructor for class INSVCTwoFluidStaggeredHierarchyIntegrator unregisters the
      * integrator object with the restart manager when the object is so
      * registered.
      */
-    ~INSStaggeredHierarchyIntegrator();
+    ~INSVCTwoFluidStaggeredHierarchyIntegrator();
 
     /*!
      * Get the convective operator being used by this solver class.
@@ -320,7 +320,7 @@ private:
      *
      * \note This constructor is not implemented and should not be used.
      */
-    INSStaggeredHierarchyIntegrator() = delete;
+    INSVCTwoFluidStaggeredHierarchyIntegrator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -329,7 +329,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    INSStaggeredHierarchyIntegrator(const INSStaggeredHierarchyIntegrator& from) = delete;
+    INSVCTwoFluidStaggeredHierarchyIntegrator(const INSVCTwoFluidStaggeredHierarchyIntegrator& from) = delete;
 
     /*!
      * \brief Assignment operator.
@@ -340,7 +340,7 @@ private:
      *
      * \return A reference to this object.
      */
-    INSStaggeredHierarchyIntegrator& operator=(const INSStaggeredHierarchyIntegrator& that) = delete;
+    INSVCTwoFluidStaggeredHierarchyIntegrator& operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
 
     /*!
      * Compute the appropriate source term that must be added to the momentum
@@ -465,4 +465,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif //#ifndef included_IBAMR_INSStaggeredHierarchyIntegrator
+#endif //#ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
