@@ -67,7 +67,7 @@ static const std::string CC_DATA_REFINE_TYPE =
                                   // patch
 static const std::string SC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost
                                                        // cells on refine patch
-static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation. With AMR, weird results
+static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation. 
 static const std::string DATA_COARSEN_TYPE =
     "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
                      // the hierarchies
