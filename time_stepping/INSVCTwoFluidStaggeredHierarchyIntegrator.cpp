@@ -1241,9 +1241,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                                                               const int cycle_num)
 {
     // Allocate data on each level of the patch hierarchy.
-    for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
+    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
-        Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         level->allocatePatchData(un_sc_idx, 0.0);
         level->allocatePatchData(us_sc_idx, 0.0);
         level->allocatePatchData(f_un_sc_idx, 0.0);
@@ -1254,13 +1254,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     }
 
     // Setup un(n), us(n), p(n) and right-hand-side vectors.
-    HierarchyMathOps hier_math_ops("hier_math_ops", patch_hierarchy);
+    HierarchyMathOps hier_math_ops("hier_math_ops", d_hierarchy);
     const int h_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
     const int h_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
 
-    SAMRAIVectorReal<NDIM, double> u_vec("u", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-    SAMRAIVectorReal<NDIM, double> f_vec("f", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-    SAMRAIVectorReal<NDIM, double> e_vec("e", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+    SAMRAIVectorReal<NDIM, double> u_vec("u", d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+    SAMRAIVectorReal<NDIM, double> f_vec("f", d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+    SAMRAIVectorReal<NDIM, double> e_vec("e", d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
 
     u_vec.addComponent(un_sc_var, un_sc_idx, h_sc_idx);
     u_vec.addComponent(us_sc_var, us_sc_idx, h_sc_idx);
@@ -1288,10 +1288,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     muParserCartGridFunction f_us_fcn("f_us", app_initializer->getComponentDatabase("f_us"), grid_geometry);
     muParserCartGridFunction f_p_fcn("f_p", app_initializer->getComponentDatabase("f_p"), grid_geometry);
 
-    f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, patch_hierarchy, 0.0);
-    f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
-    f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
-    thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
+    f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, d_hierarchy, 0.0);
+    f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, d_hierarchy, 0.0);
+    f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, d_hierarchy, 0.0);
+    thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, d_hierarchy, 0.0);
 
     // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
     double C = input_db->getDouble("C");
