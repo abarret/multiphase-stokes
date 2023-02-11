@@ -66,8 +66,12 @@ public:
     /*!
      * \brief Class constructor.
      * \param C scaler-valued C in C*u term used to add diagonal dominance
+     * \param D scalar-valued D for time-dependent stokes
      */
-    VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc, const double C);
+    VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
+                                      bool homogeneous_bc,
+                                      const double C,
+                                      const double D);
 
     /*!
      * \brief Destructor.
@@ -231,6 +235,7 @@ protected:
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
     double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
+    double d_D = std::numeric_limits<double>::quiet_NaN();
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
