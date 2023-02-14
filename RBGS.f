@@ -35,7 +35,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        f_un_data_0, f_un_data_1, f_un_gcw,
      &        f_us_data_0, f_us_data_1, f_us_gcw,
      &        thn_data, thn_gcw, eta_n, eta_s,
-     &        nu_n, nu_s, xi, w)
+     &        nu_n, nu_s, xi, w, C)
 c
       use my_subs
       implicit none
@@ -45,7 +45,7 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
       integer ilow1,  iup1
       integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
       integer f_p_gcw, thn_gcw
-      double precision eta_n, eta_s, nu_n, nu_s, xi, w
+      double precision eta_n, eta_s, nu_n, nu_s, xi, w, C
 c      
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
      &          ilow1-thn_gcw:iup1+thn_gcw) 
@@ -110,7 +110,7 @@ c
           A_box(1, 1) = eta_n / (dx(0)*dx(0)) * 
      &    (-thn_data(i0,i1)-thn_data(i0-1,i1))-eta_n/(dx(1)*dx(1))*    
      &    (thn_imhalf_jmhalf + thn_imhalf_jphalf)
-     &    - (xi / nu_n) * thn_lower_x*toThs(thn_lower_x)
+     &    - (xi / nu_n) * thn_lower_x*toThs(thn_lower_x) + C
           A_box(1, 2) = eta_n / (dx(0)*dx(0))*thn_data(i0,i1)
           A_box(1, 3) = eta_n / (dx(0) * dx(1)) * 
      &               (thn_data(i0,i1)-thn_imhalf_jmhalf)
@@ -126,7 +126,7 @@ c
      &    (-toThs(thn_data(i0,i1))-toThs(thn_data(i0-1,i1))) 
      &    - eta_s/(dx(1)*dx(1)) *
      &    (toThs(thn_imhalf_jmhalf)+toThs(thn_imhalf_jphalf)) 
-     &    -(xi / nu_s)*thn_lower_x*toThs(thn_lower_x)
+     &    -(xi / nu_s)*thn_lower_x*toThs(thn_lower_x) + C
           A_box(5, 6) = eta_s/(dx(0)*dx(0)) * toThs(thn_data(i0,i1))
           A_box(5, 7) =  eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_data(i0,i1))-toThs(thn_imhalf_jmhalf))
@@ -143,7 +143,7 @@ c
           A_box(2, 2) = eta_n / (dx(0) * dx(0)) * 
      &    (-thn_data(i0+1,i1) - thn_data(i0,i1)) -
      &    eta_n/(dx(1)*dx(1))*(thn_iphalf_jphalf+thn_iphalf_jmhalf) 
-     &    -(xi / nu_n) * thn_upper_x * toThs(thn_upper_x)
+     &    -(xi / nu_n) * thn_upper_x * toThs(thn_upper_x) + C
           A_box(2, 3) = eta_n / (dx(1) * dx(0)) * 
      &    (thn_iphalf_jmhalf - thn_data(i0,i1))
           A_box(2, 4) = eta_n / (dx(1) * dx(0)) * 
@@ -159,7 +159,7 @@ c
      &    (-toThs(thn_data(i0+1,i1))-toThs(thn_data(i0,i1))) 
      &    - eta_s/(dx(1)*dx(1)) * 
      &    (toThs(thn_iphalf_jphalf)+toThs(thn_iphalf_jmhalf)) 
-     &    - xi/nu_s * thn_upper_x * toThs(thn_upper_x)
+     &    - xi/nu_s * thn_upper_x * toThs(thn_upper_x) + C
           A_box(6, 7) = eta_s / (dx(1)*dx(0)) * 
      &    (toThs(thn_iphalf_jmhalf)-toThs(thn_data(i0,i1)))
           A_box(6, 8) = eta_s/(dx(1)*dx(0)) *
@@ -178,7 +178,7 @@ c
           A_box(3, 3) = eta_n / (dx(1) * dx(1)) * 
      &    (-thn_data(i0,i1) - thn_data(i0,i1-1)) 
      &    -eta_n/(dx(0)*dx(0))*(thn_iphalf_jmhalf + thn_imhalf_jmhalf) 
-     &    -xi/nu_n * thn_lower_y * toThs(thn_lower_y)
+     &    -xi/nu_n * thn_lower_y * toThs(thn_lower_y) + C
           A_box(3, 4) = eta_n / (dx(1) * dx(1)) * (thn_data(i0,i1))
           A_box(3, 5) = 0.0
           A_box(3, 6) = 0.0
@@ -194,7 +194,7 @@ c
      &    (-toThs(thn_data(i0,i1)) - toThs(thn_data(i0,i1-1))) 
      &    - eta_s / (dx(0) * dx(0)) * 
      &    (toThs(thn_iphalf_jmhalf) + toThs(thn_imhalf_jmhalf)) 
-     &    - xi/nu_s * thn_lower_y * toThs(thn_lower_y)
+     &    - xi/nu_s * thn_lower_y * toThs(thn_lower_y) + C
           A_box(7, 8) = eta_s /(dx(1)*dx(1))*toThs(thn_data(i0,i1))
           A_box(7, 1) = 0.0
           A_box(7, 2) = 0.0
@@ -211,7 +211,7 @@ c
           A_box(4, 4) = eta_n / (dx(1) * dx(1)) * 
      &    (-thn_data(i0,i1) - thn_data(i0,i1+1)) 
      &    - eta_n/(dx(0)*dx(0))*(thn_iphalf_jphalf+thn_imhalf_jphalf) 
-     &    - xi/nu_n * thn_upper_y * toThs(thn_upper_y);
+     &    - xi/nu_n * thn_upper_y * toThs(thn_upper_y) + C
           A_box(4, 5) = 0.0
           A_box(4, 6) = 0.0
           A_box(4, 7) = 0.0
@@ -227,7 +227,7 @@ c
      &    (-toThs(thn_data(i0,i1))-toThs(thn_data(i0,i1+1))) 
      &    - eta_s / (dx(0) * dx(0)) * 
      &    (toThs(thn_iphalf_jphalf)+toThs(thn_imhalf_jphalf)) 
-     &    - xi/nu_s * thn_upper_y * toThs(thn_upper_y)
+     &    - xi/nu_s * thn_upper_y * toThs(thn_upper_y) + C
           A_box(8, 1) = 0.0
           A_box(8, 2) = 0.0
           A_box(8, 3) = 0.0

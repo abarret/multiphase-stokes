@@ -24,12 +24,15 @@
 
 #include "ibtk/HierarchyGhostCellInterpolation.h"
 #include "ibtk/LinearOperator.h"
+#include <ibtk/CartGridFunction.h>
 
 #include "IntVector.h"
 #include "PoissonSpecifications.h"
 #include "SAMRAIVectorReal.h"
 #include "VariableFillPattern.h"
 #include "tbox/Pointer.h"
+
+#include <OutersideVariable.h>
 
 #include <string>
 #include <vector>
@@ -62,8 +65,9 @@ class VCTwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
 public:
     /*!
      * \brief Class constructor.
+     * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
-    VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc = true);
+    VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc, const double C);
 
     /*!
      * \brief Destructor.
@@ -226,6 +230,7 @@ protected:
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
+    double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
@@ -270,6 +275,13 @@ private:
      * \return A reference to this object.
      */
     VCTwoFluidStaggeredStokesOperator& operator=(const VCTwoFluidStaggeredStokesOperator& that) = delete;
+
+    // Synchronization variable
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::OutersideVariable<NDIM, double>> d_os_var;
+    int d_os_idx = IBTK::invalid_index;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenOperator<NDIM>> d_os_coarsen_op;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenAlgorithm<NDIM>> d_os_coarsen_alg;
+    std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
 };
 } // namespace IBAMR
 

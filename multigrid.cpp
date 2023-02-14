@@ -232,16 +232,20 @@ main(int argc, char* argv[])
         r_vec.setToScalar(0.0);
 
         // There is one pressure and two velocity nullspaces (one for each component)
-        std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs(3);
+        bool is_vel_nullspace = input_db->getBool("IS_VEL_NULLSPACE");
+        std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs(1 + (is_vel_nullspace ? NDIM : 0));
         null_vecs[0] = u_vec.cloneVector("PressureNull");
-        null_vecs[1] = u_vec.cloneVector("VelNull0");
-        null_vecs[2] = u_vec.cloneVector("VelNull1");
         null_vecs[0]->allocateVectorData();
         null_vecs[0]->setToScalar(0.0);
-        null_vecs[1]->allocateVectorData();
-        null_vecs[1]->setToScalar(0.0);
-        null_vecs[2]->allocateVectorData();
-        null_vecs[2]->setToScalar(0.0);
+        if (is_vel_nullspace)
+        {
+            null_vecs[1] = u_vec.cloneVector("VelNull0");
+            null_vecs[2] = u_vec.cloneVector("VelNull1");
+            null_vecs[1]->allocateVectorData();
+            null_vecs[1]->setToScalar(0.0);
+            null_vecs[2]->allocateVectorData();
+            null_vecs[2]->setToScalar(0.0);
+        }
         // Pull out pressure component and set to constant
         {
             for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
@@ -253,22 +257,25 @@ main(int argc, char* argv[])
                     Pointer<CellData<NDIM, double>> p_data = null_vecs[0]->getComponentPatchData(2, *patch);
                     p_data->fillAll(1.0);
 
-                    Pointer<SideData<NDIM, double>> un_data = null_vecs[1]->getComponentPatchData(0, *patch);
-                    Pointer<SideData<NDIM, double>> us_data = null_vecs[1]->getComponentPatchData(1, *patch);
-                    for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++)
+                    if (is_vel_nullspace)
                     {
-                        const SideIndex<NDIM>& idx = si();
-                        (*un_data)(idx) = 1.0;
-                        (*us_data)(idx) = 1.0;
-                    }
+                        Pointer<SideData<NDIM, double>> un_data = null_vecs[1]->getComponentPatchData(0, *patch);
+                        Pointer<SideData<NDIM, double>> us_data = null_vecs[1]->getComponentPatchData(1, *patch);
+                        for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++)
+                        {
+                            const SideIndex<NDIM>& idx = si();
+                            (*un_data)(idx) = 1.0;
+                            (*us_data)(idx) = 1.0;
+                        }
 
-                    un_data = null_vecs[2]->getComponentPatchData(0, *patch);
-                    us_data = null_vecs[2]->getComponentPatchData(1, *patch);
-                    for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)
-                    {
-                        const SideIndex<NDIM>& idx = si();
-                        (*un_data)(idx) = 1.0;
-                        (*us_data)(idx) = 1.0;
+                        un_data = null_vecs[2]->getComponentPatchData(0, *patch);
+                        us_data = null_vecs[2]->getComponentPatchData(1, *patch);
+                        for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)
+                        {
+                            const SideIndex<NDIM>& idx = si();
+                            (*un_data)(idx) = 1.0;
+                            (*us_data)(idx) = 1.0;
+                        }
                     }
                 }
             }
@@ -297,7 +304,8 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op =
+            new VCTwoFluidStaggeredStokesOperator("stokes_op", true, input_db->getDouble("C"));
 
         stokes_op->setThnIdx(thn_cc_idx);
 
@@ -310,7 +318,9 @@ main(int argc, char* argv[])
             new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_", input_db->getDouble("w"));
+                "Krylov_precond_",
+                input_db->getDouble("w"),
+                input_db->getDouble("C"));
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
