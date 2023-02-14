@@ -320,41 +320,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 patch->getPatchData(A_us_idx); // result of applying operator (eqn 2)
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
-            // Fill ghost cells by hand
-#if (0)
-            for (int axis = 0; axis < NDIM; ++axis)
-            {
-                for (SideIterator<NDIM> si(us_data->getGhostBox(), axis); si; si++)
-                {
-                    const SideIndex<NDIM>& idx = si();
-                    if (!SideGeometry<NDIM>::toSideBox(patch->getBox(), axis).contains(idx))
-                    {
-                        VectorNd x;
-                        for (int d = 0; d < NDIM; ++d)
-                            x[d] =
-                                xlow[d] + dx[d] * (static_cast<double>(idx(d) - idx_low(d)) + (d == axis ? 0.0 : 0.5));
-
-                        VectorNd un_vel = un_fcn(x);
-                        (*un_data)(idx) = un_vel(axis);
-                        VectorNd us_vel = us_fcn(x);
-                        (*us_data)(idx) = us_vel(axis);
-                    }
-                }
-            }
-            for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
-            {
-                const CellIndex<NDIM>& idx = ci();
-                if (!patch->getBox().contains(idx))
-                {
-                    VectorNd x;
-                    for (int d = 0; d < NDIM; ++d)
-                        x[d] = xlow[d] + dx[d] * (static_cast<double>(idx(d) - idx_low(d)) + 0.5);
-                    (*thn_data)(idx) = thetan(x);
-                    (*p_data)(idx) = p_fcn(x);
-                }
-            }
-#endif
-
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 const CellIndex<NDIM>& idx = ci();
