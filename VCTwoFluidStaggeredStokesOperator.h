@@ -70,7 +70,6 @@ public:
 
     /*!
      * \brief Destructor.
-     * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     ~VCTwoFluidStaggeredStokesOperator();
 
