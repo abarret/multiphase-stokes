@@ -18,7 +18,8 @@ p {
 } // pressure has mean 0
 
 f_un {
-   function_0 = "-0.5*cos(2*PI*X_0) - PI*cos(2*PI*X_0) - 2*PI*PI*cos(2*PI*X_0) + 0.001*cos(2*PI*X_0)"  // C*u term
+   c = C
+   function_0 = "-0.5*cos(2*PI*X_0) - PI*cos(2*PI*X_0) - 2*PI*PI*cos(2*PI*X_0) + c*cos(2*PI*X_0)"  // C*u term
    function_1 = "-0.5*cos(2*PI*X_1) - 2*PI*PI*cos(2*PI*X_1)  + 0.001*cos(2*PI*X_1)"  // C*u term
 }
 
