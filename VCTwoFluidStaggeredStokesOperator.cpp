@@ -83,62 +83,6 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 static Timer* t_apply;
 static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
-
-/// Functions with exact solutions for error checking.
-VectorNd
-un_fcn(const VectorNd& x)
-{
-    VectorNd vel;
-    vel(0) = std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x(1));
-    vel(1) = std::cos(2.0 * M_PI * x(1)) * std::cos(2.0 * M_PI * x(0));
-    return vel;
-}
-VectorNd
-us_fcn(const VectorNd& x)
-{
-    VectorNd vel;
-    vel(0) = -std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x(1));
-    vel(1) = -std::cos(2.0 * M_PI * x(1)) * std::cos(2.0 * M_PI * x(0));
-    return vel;
-}
-double
-thetan(const VectorNd& x)
-{
-    return 0.25 * std::sin(2.0 * M_PI * x(0)) * std::sin(2.0 * M_PI * x(1)) + 0.5;
-}
-
-double
-p_fcn(const VectorNd& x)
-{
-    return 0.0;
-}
-
-double
-dy_ths_dus_dy(const VectorNd& x)
-{
-    return -2.0 * M_PI * M_PI * std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x[1]) *
-           (-1.0 + std::sin(2.0 * M_PI * x(0)) * std::sin(2.0 * M_PI * x(1)));
-}
-double
-dx_ths_dus_dx(const VectorNd& x)
-{
-    return -2.0 * M_PI * M_PI * std::cos(2.0 * M_PI * x(0)) * std::cos(2.0 * M_PI * x(1)) *
-           (-1.0 + std::sin(2.0 * M_PI * x(0)) * std::sin(2.0 * M_PI * x(1)));
-}
-double
-dx_ths_dus_dy(const VectorNd& x)
-{
-    return -0.5 * M_PI * M_PI * std::sin(2.0 * M_PI * x(1)) *
-           (4.0 * std::sin(2.0 * M_PI * x(0)) + std::sin(2.0 * M_PI * (2.0 * x(0) + x(1))) -
-            std::sin(2.0 * M_PI * (2.0 * x(0) - x(1))));
-}
-double
-dy_ths_dus_dx(const VectorNd& x)
-{
-    return -0.5 * M_PI * M_PI * std::sin(2.0 * M_PI * x(0)) *
-           (4.0 * std::sin(2.0 * M_PI * x(1)) + std::sin(2.0 * M_PI * (x(0) - 2.0 * x(1))) +
-            std::sin(2.0 * M_PI * (x(0) + 2.0 * x(1))));
-}
 } // namespace
 
 double convertToThs(double Thn);
