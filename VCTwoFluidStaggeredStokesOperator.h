@@ -65,6 +65,7 @@ class VCTwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
 public:
     /*!
      * \brief Class constructor.
+     * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     VCTwoFluidStaggeredStokesOperator(const std::string& object_name, bool homogeneous_bc, const double C);
 
