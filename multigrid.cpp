@@ -363,7 +363,79 @@ main(int argc, char* argv[])
             ghost_cell_fill.fillData(0.0);
         }
 
-        krylov_solver->solveSystem(u_vec, f_vec);
+        double time = 0.0;
+        double dt = 0.01;
+        double T = 1.0;
+        double C = input_db->getDouble("C");
+
+        // u^(n+1). how to create this and allocate data?
+        Pointer<SAMRAIVectorReal<NDIM, double>> u_new_vec;
+        u_new_vec = u_vec.cloneVector("u_new_vec");
+        u_new_vec->allocateVectorData();
+        // SAMRAIVectorReal<NDIM, double> u_new_vec("u_new", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        // u_new_vec = u_vec;
+
+        while (time < T)
+        {
+            // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
+            const int un_idx = u_vec.getComponentDescriptorIndex(0); 
+            const int us_idx = u_vec.getComponentDescriptorIndex(1); 
+            const int f_un_idx = f_vec.getComponentDescriptorIndex(0); 
+            const int f_us_idx = f_vec.getComponentDescriptorIndex(1); 
+
+            for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
+                for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+                {
+                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                    Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+                    Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx); 
+                    Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx); 
+                    Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx); 
+                    Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx); 
+                    IntVector<NDIM> xp(1, 0), yp(0, 1);
+
+                    for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
+                    {
+                        const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
+                        (*f_un_data)(idx) = (*f_un_data)(idx) + C*(*un_data)(idx);
+                        (*f_us_data)(idx) = (*f_us_data)(idx) + C*(*us_data)(idx);
+                    }
+
+                    for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
+                    {
+                        const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
+                        (*f_un_data)(idx) = (*f_un_data)(idx) + C*(*un_data)(idx);
+                        (*f_us_data)(idx) = (*f_us_data)(idx) + C*(*us_data)(idx);
+                    }
+
+                } // patches
+            } // levels
+
+            // solve system to get u^n+1 from u^n
+            krylov_solver->solveSystem(u_new_vec, f_vec);
+
+            // update u^n to be equal to u^(n+1)
+            u_vec = u_new_vec;
+
+            // next time step
+            time t += dt;
+
+            // how to write the output files?
+            // Interpolate the side-centered data to cell centers for output.
+            static const bool synch_cf_interface = true;
+            hier_math_ops.interp(draw_un_idx, draw_un_var, un_sc_idx, un_sc_var, nullptr, 0.0, synch_cf_interface);
+            hier_math_ops.interp(draw_fn_idx, draw_fn_var, f_un_sc_idx, f_un_sc_var, nullptr, 0.0, synch_cf_interface);
+            hier_math_ops.interp(draw_en_idx, draw_en_var, e_un_sc_idx, e_un_sc_var, nullptr, 0.0, synch_cf_interface);
+            hier_math_ops.interp(draw_us_idx, draw_us_var, us_sc_idx, us_sc_var, nullptr, 0.0, synch_cf_interface);
+            hier_math_ops.interp(draw_fs_idx, draw_fs_var, f_us_sc_idx, f_us_sc_var, nullptr, 0.0, synch_cf_interface);
+            hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
+
+            // Output data for plotting.
+            visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+
+        } // end time stepping
 
         // Deallocate data
         if (use_precond)
@@ -421,7 +493,6 @@ main(int argc, char* argv[])
         // Output data for plotting.
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
         // Deallocate level data
-        // Allocate data on each level of the patch hierarchy.
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
             Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
