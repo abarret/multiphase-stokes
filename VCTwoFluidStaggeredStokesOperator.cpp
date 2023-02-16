@@ -409,7 +409,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_un_data)(idx) =
                     d_D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n + pressure_n) +
-                    d_C * (*un_data)(idx);
+                    d_C * thn_lower * (*un_data)(idx);
 
                 // solvent equation
                 double ddx_Ths_dx_us =
@@ -432,7 +432,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) =
                     d_D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s) +
-                    d_C * (*us_data)(idx);
+                    d_C * convertToThs(thn_lower) * (*us_data)(idx);
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
@@ -476,7 +476,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_un_data)(idx) =
                     d_D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n) +
-                    d_C * (*un_data)(idx);
+                    d_C * thn_lower * (*un_data)(idx);
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
@@ -499,7 +499,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) =
                     d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s) +
-                    d_C * (*us_data)(idx);
+                    d_C * convertToThs(thn_lower) * (*us_data)(idx);
             }
         }
     }
