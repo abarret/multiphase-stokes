@@ -304,9 +304,12 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op =
-            new VCTwoFluidStaggeredStokesOperator("stokes_op", true, input_db->getDouble("C"));
-
+        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+        const double C = input_db->getDouble("C");
+        const double D = input_db->getDouble("D");
+        stokes_op->setCandDCoefficients(C, D);
+        stokes_op->setDragCoefficient(1.0, 1.0, 1.0);
+        stokes_op->setViscosityCoefficient(1.0, 1.0);
         stokes_op->setThnIdx(thn_cc_idx);
 
         Pointer<PETScKrylovLinearSolver> krylov_solver =
