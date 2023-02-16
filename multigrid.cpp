@@ -378,11 +378,6 @@ main(int argc, char* argv[])
         while (time < T)
         {
             // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
-            const int un_idx = u_vec.getComponentDescriptorIndex(0); 
-            const int us_idx = u_vec.getComponentDescriptorIndex(1); 
-            const int f_un_idx = f_vec.getComponentDescriptorIndex(0); 
-            const int f_us_idx = f_vec.getComponentDescriptorIndex(1); 
-
             for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
@@ -390,11 +385,11 @@ main(int argc, char* argv[])
                 {
                     Pointer<Patch<NDIM>> patch = level->getPatch(p());
                     Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-                    Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx); 
-                    Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx); 
-                    Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx); 
-                    Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx); 
-                    IntVector<NDIM> xp(1, 0), yp(0, 1);
+                    Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_sc_idx); 
+                    Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_sc_idx); 
+                    Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_sc_idx); 
+                    Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_sc_idx); 
+                    Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx); 
 
                     for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
                     {
