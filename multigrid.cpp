@@ -369,14 +369,11 @@ main(int argc, char* argv[])
         double time = 0.0;
         double dt = 0.01;
         double T = 1.0;
-        double C = input_db->getDouble("C");
 
         // u^(n+1). how to create this and allocate data?
         Pointer<SAMRAIVectorReal<NDIM, double>> u_new_vec;
-        u_new_vec = u_vec.cloneVector("u_new_vec");
+        u_new_vec->copyVector(u_vec, false);
         u_new_vec->allocateVectorData();
-        // SAMRAIVectorReal<NDIM, double> u_new_vec("u_new", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        // u_new_vec = u_vec;
 
         while (time < T)
         {
@@ -401,16 +398,22 @@ main(int argc, char* argv[])
 
                     for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
                     {
-                        const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
-                        (*f_un_data)(idx) = (*f_un_data)(idx) + C*(*un_data)(idx);
-                        (*f_us_data)(idx) = (*f_us_data)(idx) + C*(*us_data)(idx);
+                        const SideIndex<NDIM>& idx = si();           // axis = 0, (i-1/2,j)
+                        CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+                        CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+                        double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
+                        (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower *(*un_data)(idx);
+                        (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0-thn_lower) * (*us_data)(idx);
                     }
 
                     for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
                     {
                         const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
-                        (*f_un_data)(idx) = (*f_un_data)(idx) + C*(*un_data)(idx);
-                        (*f_us_data)(idx) = (*f_us_data)(idx) + C*(*us_data)(idx);
+                        CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+                        CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+                        double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
+                        (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
+                        (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0-thn_lower) * (*us_data)(idx);
                     }
 
                 } // patches
@@ -423,7 +426,7 @@ main(int argc, char* argv[])
             u_vec = u_new_vec;
 
             // next time step
-            time t += dt;
+            time += dt;
 
             // how to write the output files?
             // Interpolate the side-centered data to cell centers for output.
