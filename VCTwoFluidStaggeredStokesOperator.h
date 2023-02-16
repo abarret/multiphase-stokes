@@ -59,9 +59,9 @@ namespace IBAMR
  * incompressible flow solver.
  *
  * This class knows how to apply the following operator:
- * [ C*thn + A_n + D*xi/nu_n*thn*ths            D*xi/nu_n*thn*ths        thn*grad ][un]
- * [         D*xi/nu_s*thn*ths         C*ths + A_s + D*xi/nu_s*thn*ths   ths*grad ][us]
- * [         div(thn)                           div(ths)                    0     ][p ]
+ * [ C*thn + A_n + D*xi/nu_n*thn*ths   -D*xi/nu_n*thn*ths                 thn*grad ][un]
+ * [ -D*xi/nu_s*thn*ths                 C*ths + A_s + D*xi/nu_s*thn*ths   ths*grad ][us]
+ * [ div(thn)                          div(ths)                          0         ][p ]
  * in which
  * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
  *
