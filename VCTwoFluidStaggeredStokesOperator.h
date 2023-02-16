@@ -58,6 +58,26 @@ namespace IBAMR
  * This class is intended to be used with an iterative (Krylov or Newton-Krylov)
  * incompressible flow solver.
  *
+ * This class knows how to apply the following operator:
+ * [ C*thn + A_n + D*xi/nu_n*thn*ths            D*xi/nu_n*thn*ths        thn*grad ][un]
+ * [         D*xi/nu_s*thn*ths         C*ths + A_s + D*xi/nu_s*thn*ths   ths*grad ][us]
+ * [         div(thn)                           div(ths)                    0     ][p ]
+ * in which
+ * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
+ *
+ * The following parameters must be supplied before the operator can be applied:
+ *   -- C: Constant, set via setVelocityPoissonSpecifications().
+ *   -- D: Constant, set via setVelocityPoissonSpecifications().
+ *   -- thn: Cell centered patch index for volume fraction, set via setThnIdx().
+ *   -- xi: Constant drag coefficient, set via setDragCoefficient().
+ *   -- eta_n: Constant viscosity, set via setViscosityCoefficient().
+ *   -- eta_s: Constant viscosity, set via setViscosityCoefficient().
+ *   -- nu_n: Constant, set via setDragCoefficient().
+ *   -- nu_s: Constant, set via setDragCoefficient().
+ *
+ * Note that unlike StaggeredStokesOperator, xi, eta, and mu MUST be provided separately from C and D. C and D values
+ * are typically set by the time stepping scheme.
+ *
  * \see INSStaggeredHierarchyIntegrator
  */
 class VCTwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
@@ -65,13 +85,19 @@ class VCTwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
 public:
     /*!
      * \brief Class constructor.
-     * \param C scaler-valued C in C*u term used to add diagonal dominance
-     * \param D scalar-valued D for time-dependent stokes
+     *
+     * The optional database will search for the following strings:
+     *  -- "c" - double
+     *  -- "d" - double
+     *  -- "xi" - double
+     *  -- "eta_n" - double
+     *  -- "eta_s" - double
+     *  -- "nu_n" - double
+     *  -- "nu_s" - double
      */
     VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
                                       bool homogeneous_bc,
-                                      const double C,
-                                      const double D);
+                                      SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db = nullptr);
 
     /*!
      * \brief Destructor.
@@ -79,27 +105,28 @@ public:
     ~VCTwoFluidStaggeredStokesOperator();
 
     /*!
-     * \brief Set the PoissonSpecifications object used to specify the
-     * coefficients for the momentum equation in the incompressible Stokes
-     * operator.
+     * \brief Set the PoissonSpecifications object used to specify the C and D values for the momentum equations
+     *
+     * \note Must be constant values at this time.
      */
-    virtual void
-    setVelocityPoissonSpecifications(const SAMRAI::solv::PoissonSpecifications& un_problem_coefs,
-                                     const SAMRAI::solv::PoissonSpecifications& us_problem_coefs); // might be modified
+    void setVelocityPoissonSpecifications(const SAMRAI::solv::PoissonSpecifications& coefs); // might be modified
+
+    void setCandDCoefficients(double C, double D);
 
     /*!
-     * \brief Get the PoissonSpecifications object used to specify the
-     * coefficients for the network momentum equation in the incompressible Stokes
-     * operator.
+     * \brief Set the viscosity coefficients for the viscous stresses.
      */
-    virtual const SAMRAI::solv::PoissonSpecifications& getNetworkVelocityPoissonSpecifications() const;
+    void setViscosityCoefficient(double eta_n, double eta_s);
 
     /*!
-     * \brief Get the PoissonSpecifications object used to specify the
-     * coefficients for the solvent momentum equation in the incompressible Stokes
-     * operator.
+     * \brief Set the drag coefficients for each phase.
      */
-    virtual const SAMRAI::solv::PoissonSpecifications& getSolventVelocityPoissonSpecifications() const;
+    void setDragCoefficient(double xi, double nu_n, double nu_s);
+
+    /*!
+     * \brief Set the cell centered patch index for the volume fraction.
+     */
+    void setThnIdx(int thn_idx);
 
     /*!
      * \brief Set the SAMRAI::solv::RobinBcCoefStrategy objects used to specify
@@ -160,10 +187,6 @@ public:
      * \param x input
      * \param y output: y=Ax
      */
-
-    void setThnIdx(int thn_idx);
-    // brief This method sets up the patch data indices for Thn variable
-
     void apply(SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& x,
                SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& y) override;
 
@@ -226,16 +249,12 @@ public:
 
 protected:
     // Problem specification.
-    SAMRAI::solv::PoissonSpecifications d_un_problem_coefs; // might create a different set for second fluid equation
-    SAMRAI::solv::PoissonSpecifications d_us_problem_coefs; // might create a different set for second fluid equation
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_un_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_us_bc_coef;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
-    double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
-    double d_D = std::numeric_limits<double>::quiet_NaN();
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
@@ -251,7 +270,6 @@ protected:
 
     // Scratch data.
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
-    int d_thn_idx;
 
 private:
     /*!
@@ -287,6 +305,13 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenOperator<NDIM>> d_os_coarsen_op;
     SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenAlgorithm<NDIM>> d_os_coarsen_alg;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
+
+    /// Parameters
+    double d_C = std::numeric_limits<double>::quiet_NaN(), d_D = std::numeric_limits<double>::quiet_NaN();
+    int d_thn_idx = IBTK::invalid_index;
+    double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
+           d_nu_s = std::numeric_limits<double>::quiet_NaN();
+    double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
 };
 } // namespace IBAMR
 

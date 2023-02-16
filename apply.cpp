@@ -266,7 +266,11 @@ main(int argc, char* argv[])
 
         // Setup the stokes operator
         const double C = input_db->getDouble("C");
-        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true, C);
+        const double D = input_db->getDouble("D");
+        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
+        stokes_op.setCandDCoefficients(C, D);
+        stokes_op.setDragCoefficient(1.0, 1.0, 1.0);
+        stokes_op.setViscosityCoefficient(1.0, 1.0);
 
         stokes_op.setThnIdx(thn_cc_idx);
         stokes_op.initializeOperatorState(u_vec, f_vec);
