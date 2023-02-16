@@ -145,10 +145,8 @@ double convertToThs(double Thn);
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
                                                                      bool homogeneous_bc,
-                                                                     const double C, const double D)
+                                                                     Pointer<Database> input_db)
     : LinearOperator(object_name, homogeneous_bc),
-      d_un_problem_coefs(d_object_name + "::un_problem_coefs"),
-      d_us_problem_coefs(d_object_name + "::us_problem_coefs"),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
       d_default_us_bc_coef(
@@ -158,7 +156,6 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
       d_default_P_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_P_bc_coef", Pointer<Database>(nullptr))),
       d_P_bc_coef(d_default_P_bc_coef),
-      d_C(C), d_D(D)
       d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable"))
 {
     // Setup a default boundary condition object that specifies homogeneous
@@ -185,6 +182,17 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
                        std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef),
                        d_default_P_bc_coef);
 
+    if (input_db)
+    {
+        if (input_db->keyExists("c")) d_C = input_db->getDouble("c");
+        if (input_db->keyExists("d")) d_D = input_db->getDouble("d");
+        if (input_db->keyExists("xi")) d_xi = input_db->getDouble("xi");
+        if (input_db->keyExists("eta_n")) d_eta_n = input_db->getDouble("eta_n");
+        if (input_db->keyExists("eta_s")) d_eta_s = input_db->getDouble("eta_s");
+        if (input_db->keyExists("nu_n")) d_nu_n = input_db->getDouble("nu_n");
+        if (input_db->keyExists("nu_s")) d_nu_s = input_db->getDouble("nu_s");
+    }
+
     // Setup Timers.
     IBAMR_DO_ONCE(t_apply = TimerManager::getManager()->getTimer("IBAMR::TwoFluidStaggeredStokesOperator::apply()");
                   t_initialize_operator_state = TimerManager::getManager()->getTimer(
@@ -208,25 +216,43 @@ VCTwoFluidStaggeredStokesOperator::~VCTwoFluidStaggeredStokesOperator()
 
 // Probably need another one for second fluid equation
 void
-VCTwoFluidStaggeredStokesOperator::setVelocityPoissonSpecifications(const PoissonSpecifications& un_problem_coefs,
-                                                                    const PoissonSpecifications& us_problem_coefs)
+VCTwoFluidStaggeredStokesOperator::setVelocityPoissonSpecifications(const PoissonSpecifications& coefs)
 {
-    d_un_problem_coefs = un_problem_coefs;
-    d_us_problem_coefs = us_problem_coefs;
+    // Make sure things are constant
+#if !defined(NDEBUG)
+    TBOX_ASSERT(coefs.cIsConstant() && coefs.dIsConstant());
+#endif
+    setCandDCoefficients(coefs.getCConstant(), coefs.getDConstant());
     return;
 } // setVelocityPoissonSpecifications
 
-const PoissonSpecifications&
-VCTwoFluidStaggeredStokesOperator::getNetworkVelocityPoissonSpecifications() const
+void
+VCTwoFluidStaggeredStokesOperator::setCandDCoefficients(const double C, const double D)
 {
-    return d_un_problem_coefs;
-} // getNetworkVelocityPoissonSpecifications
+    d_C = C;
+    d_D = D;
+}
 
-const PoissonSpecifications&
-VCTwoFluidStaggeredStokesOperator::getSolventVelocityPoissonSpecifications() const
+void
+VCTwoFluidStaggeredStokesOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
-    return d_us_problem_coefs;
-} // getSolventVelocityPoissonSpecifications
+    d_eta_n = eta_n;
+    d_eta_s = eta_s;
+}
+
+void
+VCTwoFluidStaggeredStokesOperator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
+{
+    d_xi = xi;
+    d_nu_n = nu_n;
+    d_nu_s = nu_s;
+}
+
+void
+VCTwoFluidStaggeredStokesOperator::setThnIdx(const int thn_idx)
+{
+    d_thn_idx = thn_idx;
+}
 
 void
 VCTwoFluidStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
@@ -281,14 +307,6 @@ VCTwoFluidStaggeredStokesOperator::setPhysicalBoundaryHelper(Pointer<StaggeredSt
     d_bc_helper = bc_helper;
     return;
 } // setPhysicalBoundaryHelper
-
-// create another member function to set-up Thn
-// Thn is defined in the input file and read in using muParserCartGridFunction
-void
-VCTwoFluidStaggeredStokesOperator::setThnIdx(int thn_idx)
-{
-    d_thn_idx = thn_idx;
-}
 
 void
 VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMRAIVectorReal<NDIM, double>& y)
@@ -347,11 +365,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
     StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     d_hier_bdry_fill->resetTransactionComponents(d_transaction_comps);
-    const double eta_n = 1.0;
-    const double eta_s = 1.0;
-    const double xi = 1.0;
-    const double nu_n = 1.0;
-    const double nu_s = 1.0;
 
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
@@ -469,40 +482,42 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                             (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
 
                 // components of first row (x-component of network vel) of network equation
-                double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+                double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+                double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
                                        (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddy_Thn_dx_vn = eta_n / (dx[1] * dx[0]) *
+                double ddy_Thn_dx_vn = d_eta_n / (dx[1] * dx[0]) *
                                        (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
-                double ddx_Thn_dy_vn = -eta_n / (dx[0] * dx[1]) *
+                double ddx_Thn_dy_vn = -d_eta_n / (dx[0] * dx[1]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
 
-                double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+                double drag_n =
+                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_un_data)(idx) = d_D*(ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n + pressure_n) + d_C*(*un_data)(idx);
 
                 // solvent equation
                 double ddx_Ths_dx_us =
-                    eta_s / (dx[0] * dx[0]) *
+                    d_eta_s / (dx[0] * dx[0]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-                double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+                double ddy_Ths_dy_us = d_eta_s / (dx[1] * dx[1]) *
                                        (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                         convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
                 double ddy_Ths_dx_vs =
-                    eta_s / (dx[1] * dx[0]) *
+                    d_eta_s / (dx[1] * dx[0]) *
                     (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
                      convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
                 double ddx_Ths_dy_vs =
-                    -eta_s / (dx[0] * dx[1]) *
+                    -d_eta_s / (dx[0] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
-                double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
+                double drag_s =
+                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) = d_D*(ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s) + d_C*(*us_data)(idx);
             }
@@ -530,40 +545,42 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                             (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
 
                 // components of second row (y-component of network vel) of network equation
-                double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+                double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+                double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
                                        (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
+                double ddx_Thn_dy_vn = d_eta_n / (dx[1] * dx[0]) *
                                        (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
                                         thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
-                double ddy_Thn_dx_vn = -eta_n / (dx[0] * dx[1]) *
+                double ddy_Thn_dx_vn = -d_eta_n / (dx[0] * dx[1]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
 
-                double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+                double drag_n =
+                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_un_data)(idx) = d_D*(ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n) + d_C*(*un_data)(idx);
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
-                    eta_s / (dx[1] * dx[1]) *
+                    d_eta_s / (dx[1] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+                double ddx_Ths_dx_us = d_eta_s / (dx[0] * dx[0]) *
                                        (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                         convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
                 double ddx_Ths_dy_vs =
-                    eta_s / (dx[1] * dx[0]) *
+                    d_eta_s / (dx[1] * dx[0]) *
                     (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
                      convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
                 double ddy_Ths_dx_vs =
-                    -eta_s / (dx[0] * dx[1]) *
+                    -d_eta_s / (dx[0] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
-                double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
+                double drag_s =
+                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
                 (*A_us_data)(idx) = d_D*(ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s) + d_C*(*us_data)(idx);
             }
