@@ -404,12 +404,14 @@ copy_side_to_face(const int U_fc_idx, const int U_sc_idx, Pointer<PatchHierarchy
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
-INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(std::string object_name,
-                                                                                     Pointer<Database> input_db,
-                                                                                     bool register_for_restart)
+INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
+    std::string object_name,
+    Pointer<Database> input_db,
+    Pointer<CartesianGridGeometry<NDIM>> grid_geometry,
+    bool register_for_restart)
     : INSHierarchyIntegrator(std::move(object_name),
                              input_db,
-                             new SideVariable<NDIM, double>(object_name + "::U"),
+                             new SideVariable<NDIM, double>(object_name + "::Us"),
                              "CONSERVATIVE_COARSEN",
                              "CONSERVATIVE_LINEAR_REFINE",
                              new CellVariable<NDIM, double>(object_name + "::P"),
@@ -421,168 +423,33 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                              new CellVariable<NDIM, double>(object_name + "::Q"),
                              "CONSERVATIVE_COARSEN",
                              "CONSTANT_REFINE",
-                             register_for_restart)
+                             register_for_restart),
+      d_thn_fcn("thn", input_db->getDatabase("thn"), grid_geometry),
+      d_f_un_fcn("f_un", input_db->getDatabase("f_un"), grid_geometry),
+      d_f_us_fcn("f_us", input_db->getDatabase("f_us"), grid_geometry),
+      d_f_p_fcn("f_p", input_db->getDatabase("f_p"), grid_geometry),
+      d_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "un_sc")),
+      d_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "us_sc")),
+      d_p_cc_var(new SideVariable<NDIM, double>(d_object_name + "p_cc")),
+      d_thn_cc_var(new CellVariable<NDIM, double>(d_object_name + "thn_cc")),
+      d_f_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "f_un_sc")),
+      d_f_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "f_us_sc")),
+      d_f_cc_var(new CellVariable<NDIM, double>(d_object_name + "f_cc"))
 {
-    auto set_timer = [&](const char* name) { return tbox::TimerManager::getManager()->getTimer(name); };
-    IBTK_DO_ONCE(t_setup_plot_data_specialized =
-                     set_timer("IBTK::INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()"););
+    VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
+    Pointer<VariableContext> ctx = var_db->getContext("context");
 
-    // Check to see whether the solver types have been set.
-    if (input_db->keyExists("stokes_solver_type")) d_stokes_solver_type = input_db->getString("stokes_solver_type");
-    if (input_db->keyExists("stokes_precond_type")) d_stokes_precond_type = input_db->getString("stokes_precond_type");
-    if (input_db->keyExists("stokes_sub_precond_type"))
-        d_stokes_precond_type = input_db->getString("stokes_sub_precond_type");
+    // Generate new patch data indices & add the variable-context pair and index to the database
+    var_db->registerVariableAndContext(d_un_sc_var, ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_us_sc_var, ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_p_cc_var, ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_thn_cc_var, ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_f_cc_var, ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_f_un_sc_var, ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_f_us_sc_var, ctx, IntVector<NDIM>(1));
 
-    d_velocity_solver_type = SCPoissonSolverManager::UNDEFINED;
-    d_velocity_precond_type = SCPoissonSolverManager::UNDEFINED;
-    d_velocity_sub_precond_type = SCPoissonSolverManager::UNDEFINED;
-    if (input_db->keyExists("velocity_solver_type"))
-        d_velocity_solver_type = input_db->getString("velocity_solver_type");
-    if (input_db->keyExists("velocity_precond_type"))
-        d_velocity_precond_type = input_db->getString("velocity_precond_type");
-    if (input_db->keyExists("velocity_sub_precond_type"))
-        d_velocity_sub_precond_type = input_db->getString("velocity_sub_precond_type");
+    if (input_db->keyExists("C")) d_C = input_db->getDouble("C");
 
-    d_pressure_solver_type = CCPoissonSolverManager::UNDEFINED;
-    d_pressure_precond_type = CCPoissonSolverManager::UNDEFINED;
-    d_pressure_sub_precond_type = CCPoissonSolverManager::UNDEFINED;
-    if (input_db->keyExists("pressure_solver_type"))
-        d_pressure_solver_type = input_db->getString("pressure_solver_type");
-    if (input_db->keyExists("pressure_precond_type"))
-        d_pressure_precond_type = input_db->getString("pressure_precond_type");
-    if (input_db->keyExists("pressure_sub_precond_type"))
-        d_pressure_sub_precond_type = input_db->getString("pressure_sub_precond_type");
-
-    d_regrid_projection_solver_type = CCPoissonSolverManager::UNDEFINED;
-    d_regrid_projection_precond_type = CCPoissonSolverManager::UNDEFINED;
-    d_regrid_projection_sub_precond_type = CCPoissonSolverManager::UNDEFINED;
-    if (input_db->keyExists("regrid_projection_solver_type"))
-        d_regrid_projection_solver_type = input_db->getString("regrid_projection_solver_type");
-    if (input_db->keyExists("regrid_projection_precond_type"))
-        d_regrid_projection_precond_type = input_db->getString("regrid_projection_precond_type");
-    if (input_db->keyExists("regrid_projection_sub_precond_type"))
-        d_regrid_projection_sub_precond_type = input_db->getString("regrid_projection_sub_precond_type");
-
-    // Check to make sure the time stepping types are supported.
-    switch (d_viscous_time_stepping_type)
-    {
-    case BACKWARD_EULER:
-    case FORWARD_EULER:
-    case TRAPEZOIDAL_RULE:
-        break;
-    default:
-        TBOX_ERROR(d_object_name << "::INSVCTwoFluidStaggeredHierarchyIntegrator():\n"
-                                 << "  unsupported viscous time stepping type: "
-                                 << enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) << " \n"
-                                 << "  valid choices are: BACKWARD_EULER, FORWARD_EULER, "
-                                    "TRAPEZOIDAL_RULE\n");
-    }
-    switch (d_convective_time_stepping_type)
-    {
-    case ADAMS_BASHFORTH:
-    case FORWARD_EULER:
-    case MIDPOINT_RULE:
-    case TRAPEZOIDAL_RULE:
-        break;
-    default:
-        TBOX_ERROR(d_object_name << "::INSVCTwoFluidStaggeredHierarchyIntegrator():\n"
-                                 << "  unsupported convective time stepping type: "
-                                 << enum_to_string<TimeSteppingType>(d_convective_time_stepping_type) << " \n"
-                                 << "  valid choices are: ADAMS_BASHFORTH, FORWARD_EULER, "
-                                    "MIDPOINT_RULE, TRAPEZOIDAL_RULE\n");
-    }
-    if (is_multistep_time_stepping_type(d_convective_time_stepping_type))
-    {
-        switch (d_init_convective_time_stepping_type)
-        {
-        case FORWARD_EULER:
-        case MIDPOINT_RULE:
-        case TRAPEZOIDAL_RULE:
-            break;
-        default:
-            TBOX_ERROR(d_object_name << "::INSVCTwoFluidStaggeredHierarchyIntegrator():\n"
-                                     << "  unsupported initial convective time stepping type: "
-                                     << enum_to_string<TimeSteppingType>(d_init_convective_time_stepping_type) << " \n"
-                                     << "  valid choices are: FORWARD_EULER, MIDPOINT_RULE, "
-                                        "TRAPEZOIDAL_RULE\n");
-        }
-    }
-
-    // Check to see whether the convective operator type has been set.
-    d_convective_op_type = INSStaggeredConvectiveOperatorManager::DEFAULT;
-    if (input_db->keyExists("convective_op_type"))
-        d_convective_op_type = input_db->getString("convective_op_type");
-    else if (input_db->keyExists("convective_operator_type"))
-        d_convective_op_type = input_db->getString("convective_operator_type");
-    else if (input_db->keyExists("default_convective_op_type"))
-        d_convective_op_type = input_db->getString("default_convective_op_type");
-    else if (input_db->keyExists("default_convective_operator_type"))
-        d_convective_op_type = input_db->getString("default_convective_operator_type");
-
-    // Setup Stokes solver options.
-    if (input_db->keyExists("stokes_solver_type"))
-    {
-        d_stokes_solver_type = input_db->getString("stokes_solver_type");
-        if (input_db->keyExists("stokes_solver_db")) d_stokes_solver_db = input_db->getDatabase("stokes_solver_db");
-    }
-    if (!d_stokes_solver_db) d_stokes_solver_db = new MemoryDatabase("stokes_solver_db");
-
-    if (input_db->keyExists("stokes_precond_type"))
-    {
-        d_stokes_precond_type = input_db->getString("stokes_precond_type");
-        if (input_db->keyExists("stokes_precond_db")) d_stokes_precond_db = input_db->getDatabase("stokes_precond_db");
-    }
-    if (!d_stokes_precond_db) d_stokes_precond_db = new MemoryDatabase("stokes_precond_db");
-
-    if (input_db->keyExists("stokes_sub_precond_type"))
-    {
-        d_stokes_sub_precond_type = input_db->getString("stokes_sub_precond_type");
-        if (input_db->keyExists("stokes_sub_precond_db"))
-            d_stokes_sub_precond_db = input_db->getDatabase("stokes_sub_precond_db");
-    }
-    if (!d_stokes_sub_precond_db) d_stokes_sub_precond_db = new MemoryDatabase("stokes_sub_precond_db");
-
-    // Flag to determine whether we explicitly remove any null space components.
-    d_explicitly_remove_nullspace = false;
-    if (input_db->keyExists("explicitly_remove_nullspace"))
-        d_explicitly_remove_nullspace = input_db->getBool("explicitly_remove_nullspace");
-
-    // Setup physical boundary conditions objects.
-    d_bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-    d_U_bc_coefs.resize(NDIM);
-    for (unsigned int d = 0; d < NDIM; ++d)
-    {
-        d_U_bc_coefs[d] = new INSStaggeredVelocityBcCoef(d, this, d_bc_coefs, d_traction_bc_type);
-    }
-    d_P_bc_coef = new INSStaggeredPressureBcCoef(this, d_bc_coefs, d_traction_bc_type);
-    d_U_P_bdry_interp_type = input_db->getStringWithDefault("U_P_bdry_interp_type", d_U_P_bdry_interp_type);
-
-    // Initialize all variables.  The velocity, pressure, body force, and fluid
-    // source variables were created above in the constructor for the
-    // INSHierarchyIntegrator base class.
-    d_U_var = INSHierarchyIntegrator::d_U_var;
-    d_P_var = INSHierarchyIntegrator::d_P_var;
-    d_F_var = INSHierarchyIntegrator::d_F_var;
-    d_Q_var = INSHierarchyIntegrator::d_Q_var;
-    d_N_old_var = new SideVariable<NDIM, double>(d_object_name + "::N_old");
-
-    // with our convention fine_boundary_represents_var = false means that will
-    // use a conforming discretization (the solution, with bilinear/trilinear
-    // nodal data, will be continuous)
-    d_U_nc_var = new NodeVariable<NDIM, double>(d_object_name + "::U_nc", NDIM, /*fine_boundary_represents_var*/ false);
-    d_F_cc_var = new CellVariable<NDIM, double>(d_object_name + "::F_cc", NDIM);
-    d_Omega_var = new CellVariable<NDIM, double>(d_object_name + "::Omega", (NDIM == 2) ? 1 : NDIM);
-    if (d_output_Omega)
-        d_Omega_nc_var = new NodeVariable<NDIM, double>(
-            d_object_name + "::Omega_nc", (NDIM == 2) ? 1 : NDIM, /*fine_boundary_represents_var*/ false);
-    d_Div_U_var = new CellVariable<NDIM, double>(d_object_name + "::Div_U");
-
-    d_Omega_Norm_var = (NDIM == 2) ? nullptr : new CellVariable<NDIM, double>(d_object_name + "::|Omega|_2");
-    d_U_regrid_var = new SideVariable<NDIM, double>(d_object_name + "::U_regrid");
-    d_U_src_var = new SideVariable<NDIM, double>(d_object_name + "::U_src");
-    d_indicator_var = new SideVariable<NDIM, double>(d_object_name + "::indicator");
-    d_F_div_var = new SideVariable<NDIM, double>(d_object_name + "::F_div");
-    d_EE_var = new CellVariable<NDIM, double>(d_object_name + "::EE", NDIM * NDIM);
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -1240,17 +1107,28 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                                                               const double new_time,
                                                               const int cycle_num)
 {
+    VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
+    Pointer<VariableContext> ctx = var_db->getContext("context");
+
+    const int un_sc_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, ctx);
+    const int us_sc_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, ctx);
+    const int p_cc_idx = var_db->mapVariableAndContextToIndex(d_p_cc_var, ctx);
+    const int f_un_sc_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, ctx);
+    const int f_us_sc_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, ctx);
+    const int f_cc_idx = var_db->mapVariableAndContextToIndex(d_f_cc_var, ctx);
+    const int thn_cc_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, ctx);
+
     // Allocate data on each level of the patch hierarchy.
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         level->allocatePatchData(un_sc_idx, 0.0);
         level->allocatePatchData(us_sc_idx, 0.0);
+        level->allocatePatchData(p_cc_idx, 0.0);
         level->allocatePatchData(f_un_sc_idx, 0.0);
         level->allocatePatchData(f_us_sc_idx, 0.0);
-        level->allocatePatchData(p_cc_idx, 0.0);
-        level->allocatePatchData(thn_cc_idx, 0.0);
         level->allocatePatchData(f_cc_idx, 0.0);
+        level->allocatePatchData(thn_cc_idx, 0.0);
     }
 
     // Setup un(n), us(n), p(n) and right-hand-side vectors.
@@ -1258,48 +1136,39 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     const int h_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
     const int h_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
 
+    // not expensive to create these vectors each time
     SAMRAIVectorReal<NDIM, double> u_vec("u", d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
     SAMRAIVectorReal<NDIM, double> f_vec("f", d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-    SAMRAIVectorReal<NDIM, double> e_vec("e", d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
 
-    u_vec.addComponent(un_sc_var, un_sc_idx, h_sc_idx);
-    u_vec.addComponent(us_sc_var, us_sc_idx, h_sc_idx);
-    u_vec.addComponent(p_cc_var, p_cc_idx, h_cc_idx);
-    f_vec.addComponent(f_un_sc_var, f_un_sc_idx, h_sc_idx);
-    f_vec.addComponent(f_us_sc_var, f_us_sc_idx, h_sc_idx);
-    f_vec.addComponent(f_cc_var, f_cc_idx, h_cc_idx);
-    e_vec.addComponent(e_un_sc_var, e_un_sc_idx, h_sc_idx);
-    e_vec.addComponent(e_us_sc_var, e_us_sc_idx, h_sc_idx);
-    e_vec.addComponent(e_cc_var, e_cc_idx, h_cc_idx);
+    u_vec.addComponent(d_un_sc_var, un_sc_idx, h_sc_idx);
+    u_vec.addComponent(d_us_sc_var, us_sc_idx, h_sc_idx);
+    u_vec.addComponent(d_p_cc_var, p_cc_idx, h_cc_idx);
+    f_vec.addComponent(d_f_un_sc_var, f_un_sc_idx, h_sc_idx);
+    f_vec.addComponent(d_f_us_sc_var, f_us_sc_idx, h_sc_idx);
+    f_vec.addComponent(d_f_cc_var, f_cc_idx, h_cc_idx);
 
-    u_vec.setToScalar(0.0);
-    f_vec.setToScalar(0.0);
-    e_vec.setToScalar(0.0);
+    const double init_time = 0.0;
+    const double dt = new_time - current_time;
+    const double tol = 0.25 * dt;
+
+    if (std::abs(current_time - init_time) < tol)
+    {
+        u_vec.setToScalar(0.0);
+        f_vec.setToScalar(0.0);
+    }
 
     Pointer<SAMRAIVectorReal<NDIM, double>> u_new_vec;
-    // u_new_vec = u_vec.cloneVector("u_new_vec");   // correct way of creating u_vec at t = n+1 ??
+    u_new_vec = u_vec.cloneVector("u_new");
+    u_new_vec->allocateVectorData();
+    Pointer<SAMRAIVectorReal<NDIM, double>> u_vec_ptr(&u_vec, false);
+    u_new_vec->copyVector(u_vec_ptr, true);
 
-    // Set up Thn function (to be figured out)
-    // should I be using input_db -> getDatabase("thn"), etc instead of app_initializer?
-    muParserCartGridFunction thn_fcn("thn", app_initializer->getComponentDatabase("thn"), grid_geometry);
-
-    // Setup RHS functions
-    muParserCartGridFunction f_un_fcn("f_un", app_initializer->getComponentDatabase("f_un"), grid_geometry);
-    muParserCartGridFunction f_us_fcn("f_us", app_initializer->getComponentDatabase("f_us"), grid_geometry);
-    muParserCartGridFunction f_p_fcn("f_p", app_initializer->getComponentDatabase("f_p"), grid_geometry);
-
-    f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, d_hierarchy, 0.0);
-    f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, d_hierarchy, 0.0);
-    f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, d_hierarchy, 0.0);
-    thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, d_hierarchy, 0.0);
+    d_f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, d_f_un_sc_var, d_hierarchy, 0.0);
+    d_f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, d_f_us_sc_var, d_hierarchy, 0.0);
+    d_f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, d_f_cc_var, d_hierarchy, 0.0);
+    d_thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, d_thn_cc_var, d_hierarchy, 0.0);
 
     // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
-    double C = input_db->getDouble("C");
-    const int un_idx = u_vec.getComponentDescriptorIndex(0);
-    const int us_idx = u_vec.getComponentDescriptorIndex(1);
-    const int f_un_idx = f_vec.getComponentDescriptorIndex(0);
-    const int f_us_idx = f_vec.getComponentDescriptorIndex(1);
-
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -1307,26 +1176,32 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-            Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
-            Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_sc_idx);
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_sc_idx);
+            Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_sc_idx);
+            Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_sc_idx);
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
                 const SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
-                (*f_un_data)(idx) = (*f_un_data)(idx) + C * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + C * (*us_data)(idx);
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
+                (*f_un_data)(idx) = (*f_un_data)(idx) + d_C * thn_lower * (*un_data)(idx);
+                (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0 - thn_lower) * (*us_data)(idx);
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
             {
                 const SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
-                (*f_un_data)(idx) = (*f_un_data)(idx) + C * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + C * (*us_data)(idx);
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
+                (*f_un_data)(idx) = (*f_un_data)(idx) + d_C * thn_lower * (*un_data)(idx);
+                (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0 - thn_lower) * (*us_data)(idx);
             }
-
         } // patches
     }     // levels
 
@@ -1343,10 +1218,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     // create preconditioner and nullspace (?)
 
     // Solve for un(n+1), us(n+1), p(n+1).
-    krylov_solver->solveSystem(u_vec_new, f_vec);
+    krylov_solver->solveSystem(u_new_vec, f_vec);
 
-    // Reset the solution vector
-    u_vec = u_vec_new;
+    // Reset the solution vector: u^n = u^(n+1)
+    u_vec.copyVector(u_new_vec, true);
 
     return;
 } // integrateHierarchy
