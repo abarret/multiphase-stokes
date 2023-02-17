@@ -131,6 +131,21 @@ public:
                                   SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> gridding_alg) override;
 
     /*!
+     * Virtual method to perform implementation-specific data initialization on
+     * a new level after it is inserted into an AMR patch hierarchy by the
+     * gridding algorithm.
+     *
+     * An empty default implementation is provided.
+     */
+    void initializeLevelDataSpecialized(SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
+                                        int level_number,
+                                        double init_data_time,
+                                        bool can_be_refined,
+                                        bool initial_time,
+                                        SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchLevel<NDIM>> old_level,
+                                        bool allocate_data) override;
+
+    /*!
      * Prepare to advance the data from current_time to new_time.
      */
     void preprocessIntegrateHierarchy(double current_time, double new_time, int num_cycles = 1) override;
@@ -180,6 +195,9 @@ private:
 
     IBTK::muParserCartGridFunction d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
 
+    // CartGridFunctions that set the initial values for state variables.
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn;
+
     /*!
      * Fluid solver variables.
      */
@@ -190,6 +208,11 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_us_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_f_cc_var;
+
+    /*
+     * Variable context
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_ctx;
 };
 } // namespace IBAMR
 

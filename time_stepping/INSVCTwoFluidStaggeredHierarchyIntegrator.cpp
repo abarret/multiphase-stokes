@@ -148,27 +148,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
       d_thn_fcn("thn", input_db->getDatabase("thn"), grid_geometry),
       d_f_un_fcn("f_un", input_db->getDatabase("f_un"), grid_geometry),
       d_f_us_fcn("f_us", input_db->getDatabase("f_us"), grid_geometry),
-      d_f_p_fcn("f_p", input_db->getDatabase("f_p"), grid_geometry),
-      d_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "un_sc")),
-      d_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "us_sc")),
-      d_p_cc_var(new CellVariable<NDIM, double>(d_object_name + "p_cc")),
-      d_thn_cc_var(new CellVariable<NDIM, double>(d_object_name + "thn_cc")),
-      d_f_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "f_un_sc")),
-      d_f_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "f_us_sc")),
-      d_f_cc_var(new CellVariable<NDIM, double>(d_object_name + "f_cc"))
+      d_f_p_fcn("f_p", input_db->getDatabase("f_p"), grid_geometry)
 {
-    VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
-    Pointer<VariableContext> ctx = var_db->getContext("context");
-
-    // Generate new patch data indices & add the variable-context pair and index to the database
-    var_db->registerVariableAndContext(d_un_sc_var, ctx, IntVector<NDIM>(1));
-    var_db->registerVariableAndContext(d_us_sc_var, ctx, IntVector<NDIM>(1));
-    var_db->registerVariableAndContext(d_p_cc_var, ctx, IntVector<NDIM>(1));
-    var_db->registerVariableAndContext(d_thn_cc_var, ctx, IntVector<NDIM>(1));
-    var_db->registerVariableAndContext(d_f_cc_var, ctx, IntVector<NDIM>(1));
-    var_db->registerVariableAndContext(d_f_un_sc_var, ctx, IntVector<NDIM>(1));
-    var_db->registerVariableAndContext(d_f_us_sc_var, ctx, IntVector<NDIM>(1));
-
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -210,10 +191,66 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     if (d_integrator_is_initialized) return;
 
     // Here we do all we need to ensure that calls to advanceHierarchy() or integrateHierarchy() are valid.
+    // NOTE: This function is called before the patch hierarchy has valid patch levels.
+    // To set initial data, we should do this in initializeLevelDataSpecialized().
+
+    // First create the variables we need.
+    d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "un_sc");
+    d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "us_sc");
+    d_p_cc_var = new CellVariable<NDIM, double>(d_object_name + "p_cc");
+    d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "thn_cc");
+    d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_un_sc");
+    d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_us_sc");
+    d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "f_cc");
+
+    // Now register patch indices to store data.
+    // Note: We can retreive the data using the variable database along with the member variable from above and the
+    // member context.
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    d_ctx = var_db->getContext(d_object_name + "::context");
+    var_db->registerVariableAndContext(d_un_sc_var, d_ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_us_sc_var, d_ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_p_cc_var, d_ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_thn_cc_var, d_ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_f_cc_var, d_ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_f_un_sc_var, d_ctx, IntVector<NDIM>(1));
+    var_db->registerVariableAndContext(d_f_us_sc_var, d_ctx, IntVector<NDIM>(1));
 
     d_integrator_is_initialized = true;
     return;
 } // initializeHierarchyIntegrator
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointer<BasePatchHierarchy<NDIM>> hierarchy,
+                                                                          int level_number,
+                                                                          double init_data_time,
+                                                                          bool can_be_refined,
+                                                                          bool initial_time,
+                                                                          Pointer<BasePatchLevel<NDIM>> old_level,
+                                                                          bool allocate_data)
+{
+    // Here is where we set initial data for our state variables.
+    // These are solvent velocity, network velocity, and pressure.
+    // NOTE: Pressure isn't really a "state" variable, but we let the data persist for initial guesses.
+    if (initial_time)
+    {
+        VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
+        const int un_sc_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, d_ctx);
+        const int us_sc_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, d_ctx);
+        const int p_cc_idx = var_db->mapVariableAndContextToIndex(d_p_cc_var, d_ctx);
+        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(level_number);
+        if (!level->checkAllocated(un_sc_idx)) level->allocatePatchData(un_sc_idx, init_data_time);
+        if (!level->checkAllocated(us_sc_idx)) level->allocatePatchData(us_sc_idx, init_data_time);
+        if (!level->checkAllocated(p_cc_idx)) level->allocatePatchData(p_cc_idx, init_data_time);
+
+        // Now let's set the initial data.
+        d_un_init_fcn->setDataOnPatchLevel(un_sc_idx, d_un_sc_var, level, init_data_time, true);
+        d_us_init_fcn->setDataOnPatchLevel(us_sc_idx, d_us_sc_var, level, init_data_time, true);
+        d_p_init_fcn->setDataOnPatchLevel(p_cc_idx, d_p_cc_var, level, init_data_time, true);
+    }
+
+    // TODO: When a regrid operation occurs, we will have to copy data from the "old level" to the new hierarchy.
+}
 
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const double current_time,
@@ -238,23 +275,19 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                                                               const int cycle_num)
 {
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
-    Pointer<VariableContext> ctx = var_db->getContext("context");
+    const int un_sc_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, d_ctx);
+    const int us_sc_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, d_ctx);
+    const int p_cc_idx = var_db->mapVariableAndContextToIndex(d_p_cc_var, d_ctx);
+    const int f_un_sc_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, d_ctx);
+    const int f_us_sc_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, d_ctx);
+    const int f_cc_idx = var_db->mapVariableAndContextToIndex(d_f_cc_var, d_ctx);
+    const int thn_cc_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_ctx);
 
-    const int un_sc_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, ctx);
-    const int us_sc_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, ctx);
-    const int p_cc_idx = var_db->mapVariableAndContextToIndex(d_p_cc_var, ctx);
-    const int f_un_sc_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, ctx);
-    const int f_us_sc_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, ctx);
-    const int f_cc_idx = var_db->mapVariableAndContextToIndex(d_f_cc_var, ctx);
-    const int thn_cc_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, ctx);
-
-    // Allocate data on each level of the patch hierarchy.
+    // Allocate scratch data on each level of the patch hierarchy.
+    // NOTE: State data (velocity and pressure) has already been allocated.
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        level->allocatePatchData(un_sc_idx, 0.0);
-        level->allocatePatchData(us_sc_idx, 0.0);
-        level->allocatePatchData(p_cc_idx, 0.0);
         level->allocatePatchData(f_un_sc_idx, 0.0);
         level->allocatePatchData(f_us_sc_idx, 0.0);
         level->allocatePatchData(f_cc_idx, 0.0);
