@@ -147,8 +147,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
       d_f_un_fcn("f_un", input_db->getDatabase("f_un"), grid_geometry),
       d_f_us_fcn("f_us", input_db->getDatabase("f_us"), grid_geometry),
       d_f_p_fcn("f_p", input_db->getDatabase("f_p"), grid_geometry)
-{  
-        VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
+{
+    VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
 
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
@@ -185,8 +185,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureSubdomainSolver()
 } // getPressureSubdomainSolver
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHierarchy<NDIM> > hierarchy,
-                                                               Pointer<GriddingAlgorithm<NDIM> > gridding_alg)
+INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                                                         Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
 {
     if (d_integrator_is_initialized) return;
 
@@ -254,8 +254,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointe
 
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const double current_time,
-                                                              const double new_time,
-                                                              const int num_cycles)
+                                                                        const double new_time,
+                                                                        const int num_cycles)
 {
     INSHierarchyIntegrator::preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
 
@@ -271,8 +271,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double current_time,
-                                                    const double new_time,
-                                                    const int cycle_num)
+                                                              const double new_time,
+                                                              const int cycle_num)
 {
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_sc_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, d_ctx);
@@ -312,9 +312,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     const double init_time = 0.0;
     const double dt = new_time - current_time;
-    const double tol = 0.25*dt;
+    const double tol = 0.25 * dt;
 
-    if(std::abs(current_time - init_time) < tol){
+    if (std::abs(current_time - init_time) < tol)
+    {
         u_vec.setToScalar(0.0);
         f_vec.setToScalar(0.0);
     }
@@ -338,45 +339,45 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_sc_idx); 
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_sc_idx); 
-            Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_sc_idx); 
-            Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_sc_idx); 
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx); 
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_sc_idx);
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_sc_idx);
+            Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_sc_idx);
+            Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_sc_idx);
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
-                const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+                const SideIndex<NDIM>& idx = si();                                         // axis = 0, (i-1/2,j)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);                                 // (i-1,j)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                 // NEED TO DETERMINE THE CORRECT VALUE OF C!!
-                (*f_un_data)(idx) = (*f_un_data)(idx) + d_C * thn_lower *(*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0-thn_lower) * (*us_data)(idx);
+                (*f_un_data)(idx) = (*f_un_data)(idx) + d_C * thn_lower * (*un_data)(idx);
+                (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0 - thn_lower) * (*us_data)(idx);
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
             {
-                const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+                const SideIndex<NDIM>& idx = si();                                         // axis = 1, (i,j-1/2)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);                                 // (i,j-1)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
                 // NEED TO DETERMINE THE CORRECT VALUE OF C!!
                 (*f_un_data)(idx) = (*f_un_data)(idx) + d_C * thn_lower * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0-thn_lower) * (*us_data)(idx);
+                (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0 - thn_lower) * (*us_data)(idx);
             }
         } // patches
-    } // levels
+    }     // levels
 
     // Setup the stokes operator
     Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op =
-            new VCTwoFluidStaggeredStokesOperator("stokes_op", true, input_db->getDouble("C"), input_db->getDouble("D"));
+        new VCTwoFluidStaggeredStokesOperator("stokes_op", true, input_db->getDouble("C"), input_db->getDouble("D"));
     stokes_op->setThnIdx(thn_cc_idx);
 
     // should I be using input_db -> getDatabase("KrylovSolver") instead of app_initializer?
     Pointer<PETScKrylovLinearSolver> krylov_solver =
-            new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
+        new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
     krylov_solver->setOperator(stokes_op);
 
     // create preconditioner and nullspace (?)
@@ -385,16 +386,16 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     krylov_solver->solveSystem(u_new_vec, f_vec);
 
     // Reset the solution vector: u^n = u^(n+1)
-    u_vec.copyVector(u_new_vec, true); 
+    u_vec.copyVector(u_new_vec, true);
 
     return;
 } // integrateHierarchy
 
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const double current_time,
-                                                               const double new_time,
-                                                               const bool skip_synchronize_new_state_data,
-                                                               const int num_cycles)
+                                                                         const double new_time,
+                                                                         const bool skip_synchronize_new_state_data,
+                                                                         const int num_cycles)
 {
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
