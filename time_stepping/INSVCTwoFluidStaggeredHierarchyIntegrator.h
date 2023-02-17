@@ -27,6 +27,7 @@
 #include "ibamr/ibamr_enums.h"
 
 #include "ibtk/SideDataSynchronization.h"
+#include <ibtk/muParserCartGridFunction.h>
 
 #include "CellVariable.h"
 #include "HierarchyCellDataOpsReal.h"
@@ -101,46 +102,20 @@ public:
     ~INSVCTwoFluidStaggeredHierarchyIntegrator();
 
     /*!
-     * Get the convective operator being used by this solver class.
-     *
-     * If the time integrator is configured to solve the time-dependent
-     * (creeping) Stokes equations, then the returned pointer will be NULL.
-     *
-     * If the convective operator has not already been constructed, and if the
-     * time integrator is not configured to solve the time-dependent (creeping)
-     * Stokes equations, then this function will initialize the default type of
-     * convective operator, which may be set in the class input database.
+     * Non-zero Reynolds numbers are not implemented. Returns nullptr.
      */
     SAMRAI::tbox::Pointer<ConvectiveOperator> getConvectiveOperator() override;
 
     /*!
-     * Get the subdomain solver for the velocity subsystem.  Such solvers can be
-     * useful in constructing block preconditioners.
+     * Not in use. Returns nullptr.
      */
     SAMRAI::tbox::Pointer<IBTK::PoissonSolver> getVelocitySubdomainSolver() override;
 
     /*!
-     * Get the subdomain solver for the pressure subsystem.  Such solvers can be
-     * useful in constructing block preconditioners.
+     * Not in use. Returns nullptr.
      */
     SAMRAI::tbox::Pointer<IBTK::PoissonSolver> getPressureSubdomainSolver() override;
 
-    /*!
-     * Register a solver for the time-dependent incompressible Stokes equations.
-     */
-    void setStokesSolver(SAMRAI::tbox::Pointer<StaggeredStokesSolver> stokes_solver);
-
-    /*!
-     * Get the solver for the time-dependent incompressible Stokes equations
-     * used by this solver class.
-     */
-    SAMRAI::tbox::Pointer<StaggeredStokesSolver> getStokesSolver();
-
-    /*!
-     * Indicate that the Stokes solver should be (re-)initialized before the
-     * next time step.
-     */
-    void setStokesSolverNeedsInit();
 
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
@@ -153,22 +128,6 @@ public:
      */
     void
     initializeHierarchyIntegrator(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                                  SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> gridding_alg) override;
-
-    /*!
-     * Initialize the AMR patch hierarchy and data defined on the hierarchy at
-     * the start of a computation.  If the computation is begun from a restart
-     * file, the patch hierarchy and patch data are read from the hierarchy
-     * database.  Otherwise, the patch hierarchy and patch data are initialized
-     * by the gridding algorithm associated with the integrator object.
-     *
-     * The implementation of this function assumes that the hierarchy exists
-     * upon entry to the function, but that it contains no patch levels.  On
-     * return from this function, the state of the integrator object will be
-     * such that it is possible to step through time via the advanceHierarchy()
-     * function.
-     */
-    void initializePatchHierarchy(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
                                   SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> gridding_alg) override;
 
     /*!
@@ -189,131 +148,6 @@ public:
                                        double new_time,
                                        bool skip_synchronize_new_state_data,
                                        int num_cycles = 1) override;
-
-    /*!
-     * Setup solution and RHS vectors using state data maintained by the
-     * integrator.
-     */
-    void setupSolverVectors(const SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& sol_vec,
-                            const SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& rhs_vec,
-                            double current_time,
-                            double new_time,
-                            int cycle_num);
-
-    /*!
-     * Reset solution and RHS vectors using state data maintained by the
-     * integrator, and copy the solution data into the state data maintained by
-     * the integrator.
-     */
-    void resetSolverVectors(const SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& sol_vec,
-                            const SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& rhs_vec,
-                            double current_time,
-                            double new_time,
-                            int cycle_num);
-
-    /*!
-     * Explicitly remove nullspace components from a solution vector.
-     */
-    void removeNullSpace(const SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& sol_vec);
-
-protected:
-    /*!
-     * L1 norm of the discrete divergence of the fluid velocity before regridding.
-     */
-    double d_div_U_norm_1_pre = 0.0;
-
-    /*!
-     * L2 norm of the discrete divergence of the fluid velocity before regridding.
-     */
-    double d_div_U_norm_2_pre = 0.0;
-
-    /*!
-     * L-infinity norm of the discrete divergence of the fluid velocity before regridding.
-     */
-    double d_div_U_norm_oo_pre = 0.0;
-
-    /*!
-     * L1 norm of the discrete divergence of the fluid velocity after regridding.
-     */
-    double d_div_U_norm_1_post = 0.0;
-
-    /*!
-     * L2 norm of the discrete divergence of the fluid velocity after regridding.
-     */
-    double d_div_U_norm_2_post = 0.0;
-
-    /*!
-     * L-infinity norm of the discrete divergence of the fluid velocity after regridding.
-     */
-    double d_div_U_norm_oo_post = 0.0;
-
-    /*!
-     * Whether we need to perform a regrid projection when (re-)initializing composite hierarchy data.
-     */
-    bool d_do_regrid_projection = false;
-
-    /*!
-     * Determine the largest stable timestep on an individual patch.
-     */
-    double getStableTimestep(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch) const override;
-
-    /*!
-     * Prepare the current hierarchy for regridding. Here we calculate the divergence.
-     */
-    void regridHierarchyBeginSpecialized() override;
-
-    /*!
-     * Update the current hierarchy data after regridding. Here we recalculate
-     * the divergence and, if it has grown by a factor more than
-     * d_regrid_max_div_growth_factor, we indicate that a regrid projection is needed
-     * to (re)initialize the composite hierarchy data.
-     */
-    void regridHierarchyEndSpecialized() override;
-
-    /*!
-     * Perform data initialization after the entire hierarchy has been constructed.
-     */
-    void initializeCompositeHierarchyDataSpecialized(double init_data_time, bool initial_time) override;
-
-    /*!
-     * Initialize data on a new level after it is inserted into an AMR patch
-     * hierarchy by the gridding algorithm.
-     */
-    void initializeLevelDataSpecialized(SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
-                                        int level_number,
-                                        double init_data_time,
-                                        bool can_be_refined,
-                                        bool initial_time,
-                                        SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchLevel<NDIM>> old_level,
-                                        bool allocate_data) override;
-
-    /*!
-     * Reset cached hierarchy dependent data.
-     */
-    void resetHierarchyConfigurationSpecialized(SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
-                                                int coarsest_level,
-                                                int finest_level) override;
-
-    /*!
-     * Set integer tags to "one" in cells where refinement of the given level
-     * should occur according to the magnitude of the fluid vorticity.
-     */
-    void applyGradientDetectorSpecialized(SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
-                                          int level_number,
-                                          double error_data_time,
-                                          int tag_index,
-                                          bool initial_time,
-                                          bool uses_richardson_extrapolation_too) override;
-
-    /*!
-     * Prepare variables for plotting.
-     */
-    void setupPlotDataSpecialized() override;
-
-    /*!
-     * Project the velocity field following a regridding operation.
-     */
-    void regridProjection() override;
 
 private:
     /*!
@@ -344,61 +178,7 @@ private:
     INSVCTwoFluidStaggeredHierarchyIntegrator&
     operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
 
-    /*!
-     * Compute the appropriate source term that must be added to the momentum
-     * equation when the fluid contains internal sources and sinks.
-     */
-    void computeDivSourceTerm(int F_idx, int Q_idx, int U_idx);
-
-    /*!
-     * Reinitialize the operators and solvers used by the hierarchy integrator.
-     */
-    void reinitializeOperatorsAndSolvers(double current_time, double new_time);
-
-    /*!
-     * Determine the convective time stepping type for the current time step and
-     * cycle number.
-     */
-    TimeSteppingType getConvectiveTimeSteppingType(int cycle_num);
-
-    /*!
-     * Hierarchy operations objects.
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>> d_hier_cc_data_ops;
-    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyFaceDataOpsReal<NDIM, double>> d_hier_fc_data_ops;
-    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>> d_hier_sc_data_ops;
-
-    /*
-     * Boundary condition and data synchronization operators.
-     */
-    SAMRAI::tbox::Pointer<StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;
-    SAMRAI::tbox::Pointer<IBTK::SideDataSynchronization> d_side_synch_op;
-
-    /*
-     * Hierarchy operators and solvers.
-     */
-    int d_coarsest_reset_ln, d_finest_reset_ln;
-
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_U_scratch_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_U_rhs_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_U_adv_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_N_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_P_scratch_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_P_rhs_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
-    std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
-    std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_U_nul_vecs;
-    bool d_vectors_need_init, d_explicitly_remove_nullspace;
-
-    std::string d_stokes_solver_type = StaggeredStokesSolverManager::UNDEFINED,
-                d_stokes_precond_type = StaggeredStokesSolverManager::UNDEFINED,
-                d_stokes_sub_precond_type = StaggeredStokesSolverManager::UNDEFINED;
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_solver_db, d_stokes_precond_db, d_stokes_sub_precond_db;
-    SAMRAI::tbox::Pointer<StaggeredStokesSolver> d_stokes_solver;
-    bool d_stokes_solver_needs_init;
-
-    IBTK::muParserCartGridFunction d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_up_fcn;
+    IBTK::muParserCartGridFunction d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
 
     /*!
      * Fluid solver variables.
@@ -410,52 +190,6 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_us_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_f_cc_var;
-
-    // Parameters
-    double d_C = std::numeric_limits<double>::quiet_NaN()
-
-        std::string d_N_coarsen_type = "CONSERVATIVE_COARSEN";
-    std::string d_N_refine_type = "CONSERVATIVE_LINEAR_REFINE";
-
-    std::string d_U_P_bdry_interp_type = "LINEAR";
-
-    /*!
-     * Variables for graphical output.
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_U_nc_var;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_P_nc_var;
-
-    /*
-     * Patch data descriptor indices for all "state" variables managed by the
-     * integrator.
-     *
-     * State variables have three contexts: current, scratch, and new.
-     */
-    int d_U_current_idx = IBTK::invalid_index, d_U_new_idx = IBTK::invalid_index, d_U_scratch_idx = IBTK::invalid_index;
-    int d_P_current_idx = IBTK::invalid_index, d_P_new_idx = IBTK::invalid_index, d_P_scratch_idx = IBTK::invalid_index;
-    int d_F_current_idx = IBTK::invalid_index, d_F_new_idx = IBTK::invalid_index, d_F_scratch_idx = IBTK::invalid_index;
-    int d_Q_current_idx = IBTK::invalid_index, d_Q_new_idx = IBTK::invalid_index, d_Q_scratch_idx = IBTK::invalid_index;
-    int d_N_old_current_idx = IBTK::invalid_index, d_N_old_new_idx = IBTK::invalid_index,
-        d_N_old_scratch_idx = IBTK::invalid_index;
-
-    /*
-     * Patch data descriptor indices for all "plot" variables managed by the
-     * integrator.
-     *
-     * Plot variables have one context: current.
-     */
-    int d_U_nc_idx = IBTK::invalid_index, d_P_nc_idx = IBTK::invalid_index, d_F_cc_idx = IBTK::invalid_index,
-        d_Omega_idx = IBTK::invalid_index, d_Omega_nc_idx = IBTK::invalid_index, d_Div_U_idx = IBTK::invalid_index,
-        d_EE_idx = IBTK::invalid_index;
-
-    /*
-     * Patch data descriptor indices for all "scratch" variables managed by the
-     * integrator.
-     *
-     * Scratch variables have only one context: scratch.
-     */
-    int d_Omega_Norm_idx = IBTK::invalid_index, d_U_regrid_idx = IBTK::invalid_index, d_U_src_idx = IBTK::invalid_index,
-        d_indicator_idx = IBTK::invalid_index, d_F_div_idx = IBTK::invalid_index;
 };
 } // namespace IBAMR
 
