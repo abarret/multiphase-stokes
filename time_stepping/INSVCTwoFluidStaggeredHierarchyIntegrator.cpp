@@ -124,7 +124,6 @@
 namespace IBAMR
 {
 /////////////////////////////// PUBLIC ///////////////////////////////////////
->>>>>>> af3354e... Remove excess code.
 INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
     std::string object_name,
     Pointer<Database> input_db,
@@ -362,7 +361,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                 CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
                 CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
-                // NEED TO DETERMINE THE CORRECT VALUE OF C!!
                 (*f_un_data)(idx) = (*f_un_data)(idx) + d_C * thn_lower * (*un_data)(idx);
                 (*f_us_data)(idx) = (*f_us_data)(idx) + d_C * (1.0 - thn_lower) * (*us_data)(idx);
             }

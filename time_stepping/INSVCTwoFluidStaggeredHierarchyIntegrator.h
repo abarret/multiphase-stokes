@@ -116,7 +116,6 @@ public:
      */
     SAMRAI::tbox::Pointer<IBTK::PoissonSolver> getPressureSubdomainSolver() override;
 
-
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
      * other data structures used by this time integrator object.
