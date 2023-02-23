@@ -119,9 +119,9 @@ public:
     /*!
      * Set initial conditions for the state variables
      */
-    void setInitialData(SAMRAI::tbox::Pointer<IBTK::muParserCartGridFunction> un_fcn,
-                        SAMRAI::tbox::Pointer<IBTK::muParserCartGridFunction> us_fcn,
-                        SAMRAI::tbox::Pointer<IBTK::muParserCartGridFunction> p_fcn);
+    void setInitialData(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> un_fcn,
+                        SAMRAI::tbox::Pointer<IBTK::CartGridFunction> us_fcn,
+                        SAMRAI::tbox::Pointer<IBTK::CartGridFunction> p_fcn);
 
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
@@ -202,7 +202,7 @@ private:
     IBTK::muParserCartGridFunction d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
 
     // CartGridFunctions that set the initial values for state variables.
-    SAMRAI::tbox::Pointer<IBTK::muParserCartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn;
 
     /*!
      * Fluid solver variables.
@@ -222,6 +222,18 @@ private:
 
     // Density
     double d_rho = std::numeric_limits<double>::quiet_NaN();
+
+    /*!
+     * Solver information
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_solver_db;
+
+    /*!
+     * Preconditioner information
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
+    double d_w = std::numeric_limits<double>::quiet_NaN();
+    int d_max_multigrid_levels = -1;
 };
 } // namespace IBAMR
 
