@@ -45,7 +45,8 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
       integer ilow1,  iup1
       integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
       integer f_p_gcw, thn_gcw
-      double precision eta_n, eta_s, nu_n, nu_s, xi, w, C
+      double precision eta_n, eta_s, nu_n, nu_s, xi, w
+      integer D = -1
 c      
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
      &          ilow1-thn_gcw:iup1+thn_gcw) 
@@ -110,129 +111,137 @@ c
           A_box(1, 1) = eta_n / (dx(0)*dx(0)) * 
      &    (-thn_data(i0,i1)-thn_data(i0-1,i1))-eta_n/(dx(1)*dx(1))*    
      &    (thn_imhalf_jmhalf + thn_imhalf_jphalf)
-     &    - (xi / nu_n) * thn_lower_x*toThs(thn_lower_x) + C
-          A_box(1, 2) = eta_n / (dx(0)*dx(0))*thn_data(i0,i1)
-          A_box(1, 3) = eta_n / (dx(0) * dx(1)) * 
+     &    - (xi / nu_n) * thn_lower_x*toThs(thn_lower_x) 
+          A_box(1,1) = C * thn_lower_x + D * A_box(1, 1)
+          A_box(1, 2) = D * eta_n / (dx(0)*dx(0))*thn_data(i0,i1)
+          A_box(1, 3) = D * eta_n / (dx(0) * dx(1)) * 
      &               (thn_data(i0,i1)-thn_imhalf_jmhalf)
-          A_box(1, 4) = eta_n / (dx(0) * dx(1)) *
+          A_box(1, 4) = D * eta_n / (dx(0) * dx(1)) *
      &               (thn_imhalf_jphalf - thn_data(i0,i1))
-          A_box(1, 5) = (xi / nu_n)*thn_lower_x*toThs(thn_lower_x)
+          A_box(1, 5) = D *(xi / nu_n)*thn_lower_x*toThs(thn_lower_x)
           A_box(1, 6) = 0.0
           A_box(1, 7) = 0.0
           A_box(1, 8) = 0.0
-          A_box(1, 9) = -thn_lower_x / dx(0)
+          A_box(1, 9) = D * -thn_lower_x / dx(0)
 c
           A_box(5, 5) = eta_s / (dx(0) * dx(0)) * 
      &    (-toThs(thn_data(i0,i1))-toThs(thn_data(i0-1,i1))) 
      &    - eta_s/(dx(1)*dx(1)) *
      &    (toThs(thn_imhalf_jmhalf)+toThs(thn_imhalf_jphalf)) 
-     &    -(xi / nu_s)*thn_lower_x*toThs(thn_lower_x) + C
-          A_box(5, 6) = eta_s/(dx(0)*dx(0)) * toThs(thn_data(i0,i1))
-          A_box(5, 7) =  eta_s / (dx(0) * dx(1)) * 
+     &    -(xi / nu_s)*thn_lower_x*toThs(thn_lower_x) 
+          A_box(5, 5) = C * toThs(thn_lower_x) + D * A_box(5, 5)
+          A_box(5, 6) = D * eta_s/(dx(0)*dx(0)) * toThs(thn_data(i0,i1))
+          A_box(5, 7) = D * eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_data(i0,i1))-toThs(thn_imhalf_jmhalf))
-          A_box(5, 8) = eta_s / (dx(0) * dx(1)) * 
+          A_box(5, 8) = D *eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_imhalf_jphalf) - toThs(thn_data(i0,i1)))
-          A_box(5, 1) = xi/nu_s * thn_lower_x * toThs(thn_lower_x)
+          A_box(5, 1) = D * xi/nu_s * thn_lower_x * toThs(thn_lower_x)
           A_box(5, 2) = 0.0
           A_box(5, 3) = 0.0
           A_box(5, 4) = 0.0
-          A_box(5, 9) = -toThs(thn_lower_x) / dx(0)
+          A_box(5, 9) = D * -toThs(thn_lower_x) / dx(0)
 c
           ! network at east edge
-          A_box(2, 1) = eta_n / (dx(0) * dx(0)) * thn_data(i0,i1)
+          A_box(2, 1) = D * eta_n / (dx(0) * dx(0)) * thn_data(i0,i1)
           A_box(2, 2) = eta_n / (dx(0) * dx(0)) * 
      &    (-thn_data(i0+1,i1) - thn_data(i0,i1)) -
      &    eta_n/(dx(1)*dx(1))*(thn_iphalf_jphalf+thn_iphalf_jmhalf) 
-     &    -(xi / nu_n) * thn_upper_x * toThs(thn_upper_x) + C
-          A_box(2, 3) = eta_n / (dx(1) * dx(0)) * 
+     &    -(xi / nu_n) * thn_upper_x * toThs(thn_upper_x) 
+          A_box(2, 2) = C * thn_lower_x + D * A_box(2, 2)
+          A_box(2, 3) = D * eta_n / (dx(1) * dx(0)) * 
      &    (thn_iphalf_jmhalf - thn_data(i0,i1))
-          A_box(2, 4) = eta_n / (dx(1) * dx(0)) * 
+          A_box(2, 4) = D * eta_n / (dx(1) * dx(0)) * 
      &    (thn_data(i0,i1)-thn_iphalf_jphalf)
           A_box(2, 5) = 0.0
           A_box(2, 7) = 0.0
           A_box(2, 8) = 0.0
-          A_box(2, 6) = xi/nu_n * thn_upper_x * toThs(thn_upper_x)
-          A_box(2, 9) = thn_upper_x / dx(0)
+          A_box(2, 6) = D * xi/nu_n * thn_upper_x * toThs(thn_upper_x)
+          A_box(2, 9) = D * thn_upper_x / dx(0)
 c
-          A_box(6, 5) = eta_s/(dx(0)*dx(0)) * toThs(thn_data(i0,i1))
+          A_box(6, 5) = D * eta_s/(dx(0)*dx(0)) * toThs(thn_data(i0,i1))
           A_box(6, 6) = eta_s/(dx(0)*dx(0)) * 
      &    (-toThs(thn_data(i0+1,i1))-toThs(thn_data(i0,i1))) 
      &    - eta_s/(dx(1)*dx(1)) * 
      &    (toThs(thn_iphalf_jphalf)+toThs(thn_iphalf_jmhalf)) 
-     &    - xi/nu_s * thn_upper_x * toThs(thn_upper_x) + C
-          A_box(6, 7) = eta_s / (dx(1)*dx(0)) * 
+     &    - xi/nu_s * thn_upper_x * toThs(thn_upper_x) 
+          A_box(6, 6) = C * toThs(thn_lower_x) + D * A_box(6, 6)
+          A_box(6, 7) = D * eta_s / (dx(1)*dx(0)) * 
      &    (toThs(thn_iphalf_jmhalf)-toThs(thn_data(i0,i1)))
-          A_box(6, 8) = eta_s/(dx(1)*dx(0)) *
+          A_box(6, 8) = D * eta_s/(dx(1)*dx(0)) *
      &    (toThs(thn_data(i0,i1))-toThs(thn_iphalf_jphalf))
           A_box(6, 1) = 0.0
           A_box(6, 3) = 0.0
           A_box(6, 4) = 0.0
-          A_box(6, 2) = xi/nu_s * thn_upper_x * toThs(thn_upper_x)
-          A_box(6, 9) = toThs(thn_upper_x) / dx(0)
+          A_box(6, 2) = D * xi/nu_s * thn_upper_x * toThs(thn_upper_x)
+          A_box(6, 9) = D * toThs(thn_upper_x) / dx(0)
 c
           ! network at south edge
-          A_box(3, 1) = eta_n / (dx(0) * dx(1)) * 
+          A_box(3, 1) = D * eta_n / (dx(0) * dx(1)) * 
      &    (thn_data(i0,i1)-thn_imhalf_jmhalf)
-          A_box(3, 2) = eta_n / (dx(0) * dx(1)) * 
+          A_box(3, 2) = D * eta_n / (dx(0) * dx(1)) * 
      &    (thn_iphalf_jmhalf - thn_data(i0,i1))
           A_box(3, 3) = eta_n / (dx(1) * dx(1)) * 
      &    (-thn_data(i0,i1) - thn_data(i0,i1-1)) 
      &    -eta_n/(dx(0)*dx(0))*(thn_iphalf_jmhalf + thn_imhalf_jmhalf) 
-     &    -xi/nu_n * thn_lower_y * toThs(thn_lower_y) + C
-          A_box(3, 4) = eta_n / (dx(1) * dx(1)) * (thn_data(i0,i1))
+     &    -xi/nu_n * thn_lower_y * toThs(thn_lower_y) 
+          A_box(3, 3) = C * thn_lower_x + D * A_box(3, 3)
+          A_box(3, 4) = D * eta_n / (dx(1) * dx(1)) * (thn_data(i0,i1))
           A_box(3, 5) = 0.0
           A_box(3, 6) = 0.0
           A_box(3, 8) = 0.0
-          A_box(3, 7) = xi/nu_n * thn_lower_y * toThs(thn_lower_y)
-          A_box(3, 9) = -thn_lower_y / dx(1)
+          A_box(3, 7) = D * xi/nu_n * thn_lower_y * toThs(thn_lower_y)
+          A_box(3, 9) = D * -thn_lower_y / dx(1)
 c
-          A_box(7, 5) = eta_s / (dx(0) * dx(1)) * 
+          A_box(7, 5) = D * eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_data(i0,i1)) - toThs(thn_imhalf_jmhalf))
-          A_box(7, 6) = eta_s / (dx(0) * dx(1)) * 
+          A_box(7, 6) = D * eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_iphalf_jmhalf) - toThs(thn_data(i0,i1)))
           A_box(7, 7) = eta_s / (dx(1) * dx(1)) * 
      &    (-toThs(thn_data(i0,i1)) - toThs(thn_data(i0,i1-1))) 
      &    - eta_s / (dx(0) * dx(0)) * 
      &    (toThs(thn_iphalf_jmhalf) + toThs(thn_imhalf_jmhalf)) 
-     &    - xi/nu_s * thn_lower_y * toThs(thn_lower_y) + C
-          A_box(7, 8) = eta_s /(dx(1)*dx(1))*toThs(thn_data(i0,i1))
+     &    - xi/nu_s * thn_lower_y * toThs(thn_lower_y) 
+          A_box(7, 7) = C * toThs(thn_lower_x) + D * A_box(7, 7)
+          A_box(7, 8) = D * eta_s /(dx(1)*dx(1))*toThs(thn_data(i0,i1))
           A_box(7, 1) = 0.0
           A_box(7, 2) = 0.0
           A_box(7, 4) = 0.0
-          A_box(7, 3) = xi/nu_s * thn_lower_y * toThs(thn_lower_y)
-          A_box(7, 9) = -toThs(thn_lower_y) / dx(1)
+          A_box(7, 3) = D * xi/nu_s * thn_lower_y * toThs(thn_lower_y)
+          A_box(7, 9) = D * -toThs(thn_lower_y) / dx(1)
 c
           ! network at north edge
-          A_box(4, 1) = eta_n / (dx(0) * dx(1)) * 
+          A_box(4, 1) = D * eta_n / (dx(0) * dx(1)) * 
      &    (thn_imhalf_jphalf - thn_data(i0,i1))
-          A_box(4, 2) = eta_n / (dx(0) * dx(1)) * 
+          A_box(4, 2) = D * eta_n / (dx(0) * dx(1)) * 
      &    (thn_data(i0,i1)-thn_iphalf_jphalf)
-          A_box(4, 3) = eta_n / (dx(1) * dx(1)) * (thn_data(i0,i1))
+          A_box(4, 3) = D * eta_n / (dx(1) * dx(1)) * (thn_data(i0,i1))
           A_box(4, 4) = eta_n / (dx(1) * dx(1)) * 
      &    (-thn_data(i0,i1) - thn_data(i0,i1+1)) 
      &    - eta_n/(dx(0)*dx(0))*(thn_iphalf_jphalf+thn_imhalf_jphalf) 
-     &    - xi/nu_n * thn_upper_y * toThs(thn_upper_y) + C
+     &    - xi/nu_n * thn_upper_y * toThs(thn_upper_y) 
+          A_box(4, 4) = C * thn_lower_x + D * A_box(4, 4)
           A_box(4, 5) = 0.0
           A_box(4, 6) = 0.0
           A_box(4, 7) = 0.0
-          A_box(4, 8) = xi/nu_n * thn_upper_y * toThs(thn_upper_y)
-          A_box(4, 9) = thn_upper_y / dx(1)
+          A_box(4, 8) = D * xi/nu_n * thn_upper_y * toThs(thn_upper_y)
+          A_box(4, 9) = D * thn_upper_y / dx(1)
 c
-          A_box(8, 5) = eta_s / (dx(0) * dx(1)) * 
+          A_box(8, 5) = D * eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_imhalf_jphalf)-toThs(thn_data(i0,i1)))
-          A_box(8, 6) = eta_s / (dx(0) * dx(1)) * 
+          A_box(8, 6) = D * eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_data(i0,i1))-toThs(thn_iphalf_jphalf))
-          A_box(8, 7) = eta_s/(dx(1)*dx(1))*toThs(thn_data(i0,i1))
+          A_box(8, 7) = D * eta_s/(dx(1)*dx(1))*toThs(thn_data(i0,i1))
           A_box(8, 8) = eta_s / (dx(1) * dx(1)) * 
      &    (-toThs(thn_data(i0,i1))-toThs(thn_data(i0,i1+1))) 
      &    - eta_s / (dx(0) * dx(0)) * 
      &    (toThs(thn_iphalf_jphalf)+toThs(thn_imhalf_jphalf)) 
-     &    - xi/nu_s * thn_upper_y * toThs(thn_upper_y) + C
+     &    - xi/nu_s * thn_upper_y * toThs(thn_upper_y) 
+          A_box(8, 8) = C * toThs(thn_lower_x) + D * A_box(8, 8)
           A_box(8, 1) = 0.0
           A_box(8, 2) = 0.0
           A_box(8, 3) = 0.0
-          A_box(8, 4) = xi/nu_s * thn_upper_y * toThs(thn_upper_y)
-          A_box(8, 9) = toThs(thn_upper_y) / dx(1)
+          A_box(8, 4) = D * xi/nu_s * thn_upper_y * toThs(thn_upper_y)
+          A_box(8, 9) = D * toThs(thn_upper_y) / dx(1)
 c
           ! incompressible constrain term at center
           A_box(9, 1) = -thn_lower_x / dx(0)
