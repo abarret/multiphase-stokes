@@ -116,6 +116,7 @@
 // Local includes
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "VCTwoFluidStaggeredStokesOperator.h"
+#include "tests/multigrid/FullFACPreconditioner.h"
 #include "time_stepping/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
@@ -148,9 +149,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
       d_f_us_fcn("f_us", input_db->getDatabase("f_us"), grid_geometry),
       d_f_p_fcn("f_p", input_db->getDatabase("f_p"), grid_geometry)
 {
-    VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
-
+    if (input_db->keyExists("solver")) d_solver_db = input_db->getDatabase("solver");
+    if (input_db->keyExists("precond")) d_precond_db = input_db->getDatabase("precond");
+    if (input_db->keyExists("w")) d_w = input_db->getDouble("w");
+    if (input_db->keyExists("max_multigrid_levels"))
+        d_max_multigrid_levels = input_db->getInteger("max_multigrid_levels");
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -185,13 +189,14 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureSubdomainSolver()
     return nullptr;
 } // getPressureSubdomainSolver
 
-void INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<muParserCartGridFunction> un_fcn, 
-                                                               Pointer<muParserCartGridFunction> us_fcn,
-                                                               Pointer<muParserCartGridFunction> p_fcn)
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
+                                                          Pointer<CartGridFunction> us_fcn,
+                                                          Pointer<CartGridFunction> p_fcn)
 {
     d_un_init_fcn = un_fcn;
     d_us_init_fcn = us_fcn;
-    d_up_init_fcn = p_fcn;
+    d_p_init_fcn = p_fcn;
     return;
 }
 
@@ -321,18 +326,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     f_vec.addComponent(d_f_us_sc_var, f_us_sc_idx, h_sc_idx);
     f_vec.addComponent(d_f_cc_var, f_cc_idx, h_cc_idx);
 
-    /* 
-    const double init_time = 0.0;
-    const double dt = new_time - current_time;
-    const double tol = 0.25 * dt;
-
-    if (std::abs(current_time - init_time) < tol)
-    {
-        u_vec.setToScalar(0.0);
-        f_vec.setToScalar(0.0);
-    } 
-    */
-
     Pointer<SAMRAIVectorReal<NDIM, double>> u_new_vec;
     u_new_vec = u_vec.cloneVector("u_new");      // should delete the vector at the end
     u_new_vec->allocateVectorData();
@@ -340,10 +333,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     u_new_vec->copyVector(u_vec_ptr, true);
 
     // Only pressure nullspace
-    Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs;
-    null_vec = u_vec.cloneVector("PressureNull");    // should delete the vector at the end
-    null_vec->allocateVectorData();
-    null_vec->setToScalar(0.0);
+    std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs(1, nullptr);
+    null_vecs[0] = u_vec.cloneVector("PressureNull"); // should delete the vector at the end
+    null_vecs[0]->allocateVectorData();
+    null_vecs[0]->setToScalar(0.0);
     // Pull out pressure component and set to constant
     {
         for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
@@ -352,7 +345,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
             for (PatchLevel<NDIM>::Iterator p(level); p; p++)
             {
                 Pointer<Patch<NDIM>> patch = level->getPatch(p());
-                Pointer<CellData<NDIM, double>> p_data = null_vec->getComponentPatchData(2, *patch);
+                Pointer<CellData<NDIM, double>> p_data = null_vecs[0]->getComponentPatchData(2, *patch);
                 p_data->fillAll(1.0);
             }
         }
@@ -405,84 +398,77 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Setup the stokes operator
     Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
-    const double C = input_db->getDouble("C");
-    const double D = input_db->getDouble("D");
+    const double D = -1.0; // This will depend on the time stepping scheme.
     stokes_op->setCandDCoefficients(C, D);
     stokes_op->setDragCoefficient(1.0, 1.0, 1.0);
     stokes_op->setViscosityCoefficient(1.0, 1.0);
     stokes_op->setThnIdx(thn_cc_idx);
 
-    Pointer<PETScKrylovLinearSolver> krylov_solver =
-        new PETScKrylovLinearSolver("solver", input_db->getDatabase("KrylovSolver"), "solver_");
+    Pointer<PETScKrylovLinearSolver> krylov_solver = new PETScKrylovLinearSolver("solver", d_solver_db, "solver_");
     krylov_solver->setOperator(stokes_op);
 
     // Now create a preconditioner
     Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-            "KrylovPrecondStrategy",
-            "Krylov_precond_",
-            input_db->getDouble("w"),
-            input_db->getDouble("C"));
+        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C);
     fac_precondition_strategy->setThnIdx(thn_cc_idx);
-    Pointer<FullFACPreconditioner> Krylov_precond =
-        new FullFACPreconditioner("KrylovPrecond",
-                                    fac_precondition_strategy,
-                                    input_db->getDatabase("KrylovPrecond"),
-                                    input_db->getInteger("multigrid_max_levels"),
-                                    "Krylov_precond_");
-    bool use_precond = input_db->getBool("USE_PRECOND");
+    Pointer<FullFACPreconditioner> Krylov_precond = new FullFACPreconditioner(
+        "KrylovPrecond", fac_precondition_strategy, d_precond_db, d_max_multigrid_levels, "Krylov_precond_");
     Krylov_precond->setNullspace(false, null_vecs);
-    if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
+    krylov_solver->setPreconditioner(Krylov_precond);
 
-    krylov_solver->setNullspace(false, null_vec);
+    krylov_solver->setNullspace(false, null_vecs);
     krylov_solver->initializeSolverState(u_vec, f_vec);
 
     // Set thn_cc_idx on the dense hierarchy.
-    if (use_precond)
+    Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
+    // Allocate data
+    for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
     {
-        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-        // Allocate data
-        for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-        {
-            Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-            if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
-        }
-        thn_fcn.setDataOnPatchHierarchy(
-            thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
-        // Also fill in theta ghost cells
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(thn_cc_idx,
-                                    "CONSERVATIVE_LINEAR_REFINE",
-                                    false,
-                                    "NONE",
-                                    "LINEAR",
-                                    true,
-                                    nullptr); // defaults to fill corner
-        HierarchyGhostCellInterpolation ghost_cell_fill;
-        ghost_cell_fill.initializeOperatorState(
-            ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(0.0);
+        Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+        if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
     }
+    d_thn_fcn.setDataOnPatchHierarchy(
+        thn_cc_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
+    // Also fill in theta ghost cells
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_cell_comp(1);
+    ghost_cell_comp[0] = ITC(thn_cc_idx,
+                             "CONSERVATIVE_LINEAR_REFINE",
+                             false,
+                             "NONE",
+                             "LINEAR",
+                             true,
+                             nullptr); // defaults to fill corner
+    HierarchyGhostCellInterpolation ghost_cell_fill;
+    ghost_cell_fill.initializeOperatorState(
+        ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+    ghost_cell_fill.fillData(0.0);
 
     // Solve for un(n+1), us(n+1), p(n+1).
-    krylov_solver->solveSystem(u_new_vec, f_vec);
+    krylov_solver->solveSystem(*u_new_vec, f_vec);
 
     // Reset the solution vector: u^n = u^(n+1)
     u_vec.copyVector(u_new_vec, true);
 
     // Free storage from cloning vectors
     u_new_vec->freeVectorComponents();
-    null_vec->freeVectorComponents();
+    null_vecs[0]->freeVectorComponents();
 
     // Deallocate patch data
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        level->deallocatePatchData(f_un_sc_idx, 0.0);
-        level->deallocatePatchData(f_us_sc_idx, 0.0);
-        level->deallocatePatchData(f_cc_idx, 0.0);
-        level->deallocatePatchData(thn_cc_idx, 0.0);
+        level->deallocatePatchData(f_un_sc_idx);
+        level->deallocatePatchData(f_us_sc_idx);
+        level->deallocatePatchData(f_cc_idx);
+        level->deallocatePatchData(thn_cc_idx);
+    }
+
+    // Deallocate patch data on the dense hierarchy
+    for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+        if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
     }
 
     return;
