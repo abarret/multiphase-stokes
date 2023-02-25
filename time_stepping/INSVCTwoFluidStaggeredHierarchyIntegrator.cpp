@@ -409,7 +409,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Now create a preconditioner
     Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C);
+        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D);
     fac_precondition_strategy->setThnIdx(thn_cc_idx);
     Pointer<FullFACPreconditioner> Krylov_precond = new FullFACPreconditioner(
         "KrylovPrecond", fac_precondition_strategy, d_precond_db, d_max_multigrid_levels, "Krylov_precond_");

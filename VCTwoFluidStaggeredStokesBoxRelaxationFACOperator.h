@@ -77,7 +77,10 @@ public:
      */
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
                                                       // SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                                      const std::string& default_options_prefix, const double w, const double C);
+                                                      const std::string& default_options_prefix, 
+                                                      const double w, 
+                                                      const double C, 
+                                                      const double D);
 
     /*!
      * \brief Destructor.
@@ -200,6 +203,7 @@ protected:
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
     double d_w = std::numeric_limits<double>::quiet_NaN(); // under relaxation factor
     double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
+    double d_D = std::numeric_limits<double>::quiet_NaN(); // D depends on time stepping scheme
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;

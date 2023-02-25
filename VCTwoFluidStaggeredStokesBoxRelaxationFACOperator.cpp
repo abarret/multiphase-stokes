@@ -102,8 +102,9 @@ extern "C"
                  const double&,  // nu_s
                  const double&,  // xi
                  const double&,  // w = under relaxation factor
-                 const double&); // C in C*u term
-}
+                 const double&, // C in C*u term
+                 const double&); // D 
+}   
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
 {
@@ -148,8 +149,8 @@ double convertToThs(double Thn);
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
     // const Pointer<Database> input_db,
-    const std::string& default_options_prefix, const double w, const double C)
-    : FACPreconditionerStrategy(object_name), d_w(w), d_C(C)
+    const std::string& default_options_prefix, const double w, const double C, const double D)
+    : FACPreconditionerStrategy(object_name), d_w(w), d_C(C), d_D(D)
 {
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -427,7 +428,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     nu_n,
                     nu_s,
                     xi,
-                    d_w, d_C);
+                    d_w, d_C, d_D);
 
         } // patchess
     }     // num_sweeps
