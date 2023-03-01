@@ -45,7 +45,7 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
       integer ilow1,  iup1
       integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
       integer f_p_gcw, thn_gcw
-      double precision eta_n, eta_s, nu_n, nu_s, xi, w
+      double precision eta_n, eta_s, nu_n, nu_s, xi, w, C, D
 c      
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
      &          ilow1-thn_gcw:iup1+thn_gcw) 
