@@ -323,7 +323,8 @@ main(int argc, char* argv[])
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
                 "Krylov_precond_",
                 input_db->getDouble("w"),
-                input_db->getDouble("C"));
+                C,
+                D);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
@@ -366,77 +367,7 @@ main(int argc, char* argv[])
             ghost_cell_fill.fillData(0.0);
         }
 
-        double time = 0.0;
-        double dt = 0.01;
-        double T = 1.0;
-
-        // u^(n+1). how to create this and allocate data?
-        Pointer<SAMRAIVectorReal<NDIM, double>> u_new_vec;
-        u_new_vec->copyVector(u_vec, false);
-        u_new_vec->allocateVectorData();
-
-        while (time < T)
-        {
-            // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
-            for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
-                for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-                {
-                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
-                    Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-                    Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_sc_idx);
-                    Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_sc_idx);
-                    Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_sc_idx);
-                    Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_sc_idx);
-                    Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
-
-                    for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
-                    {
-                        const SideIndex<NDIM>& idx = si();           // axis = 0, (i-1/2,j)
-                        CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-                        CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                        double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
-                        (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower *(*un_data)(idx);
-                        (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0-thn_lower) * (*us_data)(idx);
-                    }
-
-                    for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
-                    {
-                        const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
-                        CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-                        CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                        double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
-                        (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
-                        (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0-thn_lower) * (*us_data)(idx);
-                    }
-
-                } // patches
-            } // levels
-
-            // solve system to get u^n+1 from u^n
-            krylov_solver->solveSystem(u_new_vec, f_vec);
-
-            // update u^n to be equal to u^(n+1)
-            u_vec = u_new_vec;
-
-            // next time step
-            time += dt;
-
-            // how to write the output files?
-            // Interpolate the side-centered data to cell centers for output.
-            static const bool synch_cf_interface = true;
-            hier_math_ops.interp(draw_un_idx, draw_un_var, un_sc_idx, un_sc_var, nullptr, 0.0, synch_cf_interface);
-            hier_math_ops.interp(draw_fn_idx, draw_fn_var, f_un_sc_idx, f_un_sc_var, nullptr, 0.0, synch_cf_interface);
-            hier_math_ops.interp(draw_en_idx, draw_en_var, e_un_sc_idx, e_un_sc_var, nullptr, 0.0, synch_cf_interface);
-            hier_math_ops.interp(draw_us_idx, draw_us_var, us_sc_idx, us_sc_var, nullptr, 0.0, synch_cf_interface);
-            hier_math_ops.interp(draw_fs_idx, draw_fs_var, f_us_sc_idx, f_us_sc_var, nullptr, 0.0, synch_cf_interface);
-            hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
-
-            // Output data for plotting.
-            visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
-
-        } // end time stepping
+        krylov_solver->solveSystem(u_vec, f_vec);
 
         // Deallocate data
         if (use_precond)

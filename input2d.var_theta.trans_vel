@@ -1,5 +1,8 @@
 USE_PRECOND = TRUE
 w = 0.75
+C = 0.0
+D = 1.0
+IS_VEL_NULLSPACE = TRUE
 
 un {
    function_0 = "cos(2*PI*X_1)"
@@ -41,7 +44,7 @@ KrylovPrecondStrategy {
 
 }
 
-multigrid_max_levels = 6
+multigrid_max_levels = 5
 
 KrylovPrecond {
    cycle_type = "F_CYCLE"
@@ -64,7 +67,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 64
+N = 32
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
