@@ -614,8 +614,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) = (*rhs_un_data)(idx) - (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn +
-                                                             ddx_Thn_dy_vn + drag_n + pressure_n + d_C*(*un_data)(idx));
+                (*res_un_data)(idx) = (*rhs_un_data)(idx) - (d_D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn +
+                                                             ddx_Thn_dy_vn + drag_n + pressure_n) + d_C*(*un_data)(idx));
 
                 // solvent equation
                 double ddx_Ths_dx_us =
@@ -636,8 +636,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) = (*rhs_us_data)(idx) - (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs +
-                                                             ddx_Ths_dy_vs + drag_s + pressure_s + d_C*(*us_data)(idx));
+                (*res_us_data)(idx) = (*rhs_us_data)(idx) - (d_D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs +
+                                                             ddx_Ths_dy_vs + drag_s + pressure_s) + d_C*(*us_data)(idx));
             }
 
             // pout << "\n\n Looping over y-dir side-centers \n\n";
@@ -680,8 +680,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) = (*rhs_un_data)(idx) - (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn +
-                                                             ddy_Thn_dx_vn + drag_n + pressure_n + d_C*(*un_data)(idx));
+                (*res_un_data)(idx) = (*rhs_un_data)(idx) - (d_D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn +
+                                                             ddy_Thn_dx_vn + drag_n + pressure_n) + d_C*(*un_data)(idx));
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
@@ -702,8 +702,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) = (*rhs_us_data)(idx) - (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs +
-                                                             ddy_Ths_dx_vs + drag_s + pressure_s + d_C*(*us_data)(idx));
+                (*res_us_data)(idx) = (*rhs_us_data)(idx) - (d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs +
+                                                             ddy_Ths_dx_vs + drag_s + pressure_s) + d_C*(*us_data)(idx));
             }
         }
     }
