@@ -1,9 +1,8 @@
 USE_PRECOND = TRUE
 w = 0.75
-w = 0.75
 C = 0.0
 D = 1.0
-IS_VEL_NULLSPACE = FALSE
+IS_VEL_NULLSPACE = TRUE
 
 un {
    function_0 = "cos(2*PI*X_0)*cos(2*PI*X_1)"
