@@ -121,7 +121,7 @@ c
           A_box(1, 6) = 0.0
           A_box(1, 7) = 0.0
           A_box(1, 8) = 0.0
-          A_box(1, 9) = D * -thn_lower_x / dx(0)
+          A_box(1, 9) = D * (-thn_lower_x) / dx(0)
 c
           A_box(5, 5) = eta_s / (dx(0) * dx(0)) * 
      &    (-toThs(thn_data(i0,i1))-toThs(thn_data(i0-1,i1))) 
@@ -138,7 +138,7 @@ c
           A_box(5, 2) = 0.0
           A_box(5, 3) = 0.0
           A_box(5, 4) = 0.0
-          A_box(5, 9) = D * -toThs(thn_lower_x) / dx(0)
+          A_box(5, 9) = D * (-toThs(thn_lower_x)) / dx(0)
 c
           ! network at east edge
           A_box(2, 1) = D * eta_n / (dx(0) * dx(0)) * thn_data(i0,i1)
@@ -189,7 +189,7 @@ c
           A_box(3, 6) = 0.0
           A_box(3, 8) = 0.0
           A_box(3, 7) = D * xi/nu_n * thn_lower_y * toThs(thn_lower_y)
-          A_box(3, 9) = D * -thn_lower_y / dx(1)
+          A_box(3, 9) = D * (-thn_lower_y) / dx(1)
 c
           A_box(7, 5) = D * eta_s / (dx(0) * dx(1)) * 
      &    (toThs(thn_data(i0,i1)) - toThs(thn_imhalf_jmhalf))
@@ -206,7 +206,7 @@ c
           A_box(7, 2) = 0.0
           A_box(7, 4) = 0.0
           A_box(7, 3) = D * xi/nu_s * thn_lower_y * toThs(thn_lower_y)
-          A_box(7, 9) = D * -toThs(thn_lower_y) / dx(1)
+          A_box(7, 9) = D * (-toThs(thn_lower_y)) / dx(1)
 c
           ! network at north edge
           A_box(4, 1) = D * eta_n / (dx(0) * dx(1)) * 

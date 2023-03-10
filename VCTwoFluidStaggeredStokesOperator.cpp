@@ -39,15 +39,13 @@
 #include "tbox/TimerManager.h"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
 // Local includes
 #include "VCTwoFluidStaggeredStokesOperator.h"
 
-#include <math.h>
-
-#include <string>
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
 namespace IBAMR
@@ -65,9 +63,10 @@ static const int SIDEG = 1;
 static const std::string CC_DATA_REFINE_TYPE =
     "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
                                   // patch
-static const std::string SC_DATA_REFINE_TYPE = "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost
-                                                       // cells on refine patch
-static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation. 
+static const std::string SC_DATA_REFINE_TYPE =
+    "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost
+                                  // cells on refine patch
+static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation.
 static const std::string DATA_COARSEN_TYPE =
     "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
                      // the hierarchies
@@ -85,7 +84,11 @@ static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
 
-double convertToThs(double Thn);
+double
+convertToThs(double Thn)
+{
+    return 1.0 - Thn; // Thn+Ths = 1
+}
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
                                                                      bool homogeneous_bc,
@@ -318,9 +321,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const double* const xlow =
-                pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
-            const hier::Index<NDIM>& idx_low = patch->getBox().lower();
             Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
             Pointer<CellData<NDIM, double>> A_P_data =
                 patch->getPatchData(A_P_idx); // result of applying operator (eqn 3)
@@ -336,10 +336,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 const CellIndex<NDIM>& idx = ci();
-                VectorNd x; // <- Eigen3 vector
-                for (int d = 0; d < NDIM; ++d)
-                    x[d] = xlow[d] + dx[d] * (idx(d) - idx_low(d) + 0.5); // Get's physical location of idx.
-
                 SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
                 SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
                 SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
@@ -505,7 +501,8 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     }
     if (d_bc_helper) d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
 
-    auto sync_fcn = [&](const int dst_idx) -> void {
+    auto sync_fcn = [&](const int dst_idx) -> void
+    {
         for (int ln = d_hierarchy->getFinestLevelNumber(); ln > 0; --ln)
         {
             Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -520,7 +517,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             coarsen_alg->registerCoarsen(dst_idx, d_os_idx, d_os_coarsen_op);
             coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
             d_os_coarsen_scheds[ln - 1]->coarsenData();
-            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]); 
+            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
         }
     };
 
@@ -530,12 +527,6 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     IBAMR_TIMER_STOP(t_apply);
     return;
 } // apply
-
-double
-convertToThs(double Thn)
-{
-    return 1.0 - Thn; // Thn+Ths = 1
-}
 
 void
 VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& in,

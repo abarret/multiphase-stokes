@@ -102,9 +102,9 @@ extern "C"
                  const double&,  // nu_s
                  const double&,  // xi
                  const double&,  // w = under relaxation factor
-                 const double&, // C in C*u term
-                 const double&); // D 
-}   
+                 const double&,  // C in C*u term
+                 const double&); // D
+}
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
 {
@@ -148,8 +148,10 @@ double convertToThs(double Thn);
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    // const Pointer<Database> input_db,
-    const std::string& default_options_prefix, const double w, const double C, const double D)
+    const std::string& default_options_prefix,
+    const double w,
+    const double C,
+    const double D)
     : FACPreconditionerStrategy(object_name), d_w(w), d_C(C), d_D(D)
 {
     // Create variables and register them with the variable database.
@@ -360,9 +362,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const double* const xlow =
-                pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
-            const hier::Index<NDIM>& idx_low = patch->getBox().lower();
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
@@ -428,7 +427,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     nu_n,
                     nu_s,
                     xi,
-                    d_w, d_C, d_D);
+                    d_w,
+                    d_C,
+                    d_D);
 
         } // patchess
     }     // num_sweeps
@@ -614,8 +615,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) = (*rhs_un_data)(idx) - (d_D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn +
-                                                             ddx_Thn_dy_vn + drag_n + pressure_n) + d_C*(*un_data)(idx));
+                (*res_un_data)(idx) =
+                    (*rhs_un_data)(idx) -
+                    (d_D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n + pressure_n) +
+                     d_C * (*un_data)(idx));
 
                 // solvent equation
                 double ddx_Ths_dx_us =
@@ -636,8 +639,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) = (*rhs_us_data)(idx) - (d_D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs +
-                                                             ddx_Ths_dy_vs + drag_s + pressure_s) + d_C*(*us_data)(idx));
+                (*res_us_data)(idx) =
+                    (*rhs_us_data)(idx) -
+                    (d_D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s) +
+                     d_C * (*us_data)(idx));
             }
 
             // pout << "\n\n Looping over y-dir side-centers \n\n";
@@ -680,8 +685,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) = (*rhs_un_data)(idx) - (d_D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn +
-                                                             ddy_Thn_dx_vn + drag_n + pressure_n) + d_C*(*un_data)(idx));
+                (*res_un_data)(idx) =
+                    (*rhs_un_data)(idx) -
+                    (d_D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n) +
+                     d_C * (*un_data)(idx));
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
@@ -702,8 +709,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
                 double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) = (*rhs_us_data)(idx) - (d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs +
-                                                             ddy_Ths_dx_vs + drag_s + pressure_s) + d_C*(*us_data)(idx));
+                (*res_us_data)(idx) =
+                    (*rhs_us_data)(idx) -
+                    (d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s) +
+                     d_C * (*us_data)(idx));
             }
         }
     }

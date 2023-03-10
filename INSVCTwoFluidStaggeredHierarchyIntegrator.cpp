@@ -115,10 +115,10 @@
 #include <vector>
 
 // Local includes
+#include "FullFACPreconditioner.h"
+#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "VCTwoFluidStaggeredStokesOperator.h"
-#include "tests/multigrid/FullFACPreconditioner.h"
-#include "time_stepping/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
@@ -375,21 +375,21 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
-            for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
+            for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++)                      // side-centers in x-dir
             {
-                const SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                const SideIndex<NDIM>& idx = si();                                         // axis = 0, (i-1/2,j)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);                                 // (i-1,j)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                 (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
                 (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0 - thn_lower) * (*us_data)(idx);
             }
 
-            for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
+            for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)                      // side-centers in y-dir
             {
-                const SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                const SideIndex<NDIM>& idx = si();                                         // axis = 1, (i,j-1/2)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);                                 // (i,j-1)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
                 (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
                 (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0 - thn_lower) * (*us_data)(idx);
