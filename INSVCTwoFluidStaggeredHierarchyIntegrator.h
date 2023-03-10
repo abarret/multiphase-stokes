@@ -116,8 +116,8 @@ public:
      */
     SAMRAI::tbox::Pointer<IBTK::PoissonSolver> getPressureSubdomainSolver() override;
 
-     /*!
-     * Set initial conditions for the state variables 
+    /*!
+     * Set initial conditions for the state variables
      */
     void setInitialData(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> un_fcn,
                         SAMRAI::tbox::Pointer<IBTK::CartGridFunction> us_fcn,
@@ -239,4 +239,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif //#ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
+#endif // #ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator

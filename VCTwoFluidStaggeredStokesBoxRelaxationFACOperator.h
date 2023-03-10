@@ -38,31 +38,6 @@
 #include <string>
 #include <vector>
 
-namespace SAMRAI
-{
-namespace hier
-{
-template <int DIM>
-class Box;
-template <int DIM>
-class BoxList;
-template <int DIM>
-class Patch;
-} // namespace hier
-namespace pdat
-{
-template <int DIM, class TYPE>
-class CellData;
-template <int DIM, class TYPE>
-class SideData;
-} // namespace pdat
-namespace solv
-{
-template <int DIM, class TYPE>
-class SAMRAIVectorReal;
-} // namespace solv
-} // namespace SAMRAI
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
 namespace IBTK
@@ -76,11 +51,10 @@ public:
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
-                                                      // SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                                      const std::string& default_options_prefix, 
-                                                      const double w, 
-                                                      const double C, 
-                                                      const double D);
+                                                      const std::string& default_options_prefix,
+                                                      double w,
+                                                      double C,
+                                                      double D);
 
     /*!
      * \brief Destructor.

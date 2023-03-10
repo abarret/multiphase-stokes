@@ -114,10 +114,10 @@
 #include <vector>
 
 // Local includes
+#include "FullFACPreconditioner.h"
+#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "VCTwoFluidStaggeredStokesOperator.h"
-#include "tests/multigrid/FullFACPreconditioner.h"
-#include "time_stepping/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
@@ -327,7 +327,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     f_vec.addComponent(d_f_cc_var, f_cc_idx, h_cc_idx);
 
     Pointer<SAMRAIVectorReal<NDIM, double>> u_new_vec;
-    u_new_vec = u_vec.cloneVector("u_new");      // should delete the vector at the end
+    u_new_vec = u_vec.cloneVector("u_new"); // should delete the vector at the end
     u_new_vec->allocateVectorData();
     Pointer<SAMRAIVectorReal<NDIM, double>> u_vec_ptr(&u_vec, false);
     u_new_vec->copyVector(u_vec_ptr, true);
@@ -357,7 +357,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     d_thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, d_thn_cc_var, d_hierarchy, 0.0);
 
     const double dt = new_time - current_time;
-    const double C = d_rho/dt;
+    const double C = d_rho / dt;
 
     // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
