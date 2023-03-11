@@ -34,9 +34,9 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
+#include "FullFACPreconditioner.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "VCTwoFluidStaggeredStokesOperator.h"
-#include "tests/multigrid/FullFACPreconditioner.h"
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -323,7 +323,8 @@ main(int argc, char* argv[])
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
                 "Krylov_precond_",
                 input_db->getDouble("w"),
-                C, D); 
+                C,
+                D);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
