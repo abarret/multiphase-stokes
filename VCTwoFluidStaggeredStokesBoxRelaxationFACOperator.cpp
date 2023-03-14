@@ -444,6 +444,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
 
         } // patchess
     }     // num_sweeps
+    performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
     IBTK_TIMER_STOP(t_smooth_error);
     return;
 }
