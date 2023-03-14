@@ -124,6 +124,21 @@ public:
                         SAMRAI::tbox::Pointer<IBTK::CartGridFunction> p_fcn);
 
     /*!
+     * Register forcing functions. Any can be NULL
+     */
+    void setForcingFunctions(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn = nullptr,
+                             SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn = nullptr,
+                             SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fp_fcn = nullptr);
+
+    /*!
+     * Register the volume fraction function.
+     *
+     * TODO: Current implementations require this function to be registered. We should optionally allow a patch index to
+     * be registered.
+     */
+    void setNetworkVolumeFractionFunction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> thn_fcn);
+
+    /*!
      * Initialize the variables, basic communications algorithms, solvers, and
      * other data structures used by this time integrator object.
      *
@@ -170,6 +185,15 @@ public:
                                        bool skip_synchronize_new_state_data,
                                        int num_cycles = 1) override;
 
+    void regridProjection() override;
+
+    double getStableTimestep(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch) const override;
+
+    void synchronizeHierarchyDataSpecialized(IBTK::VariableContextType ctx_type) override;
+
+protected:
+    void setupPlotDataSpecialized() override;
+
 private:
     /*!
      * \brief Default constructor.
@@ -199,7 +223,7 @@ private:
     INSVCTwoFluidStaggeredHierarchyIntegrator&
     operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
 
-    IBTK::muParserCartGridFunction d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
 
     // CartGridFunctions that set the initial values for state variables.
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn;
@@ -234,6 +258,11 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
     double d_w = std::numeric_limits<double>::quiet_NaN();
     int d_max_multigrid_levels = -1;
+
+    /*!
+     * Velocity Drawing information.
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_un_draw_var, d_us_draw_var;
 };
 } // namespace IBAMR
 
