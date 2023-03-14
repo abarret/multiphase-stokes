@@ -20,4 +20,8 @@ ADD_EXECUTABLE(fluid_multigrid multigrid.cpp)
 TARGET_SOURCES(fluid_multigrid PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp FullFACPreconditioner.cpp RBGS.f)
 TARGET_LINK_LIBRARIES(fluid_multigrid IBAMR::IBAMR2d)
 
+ADD_EXECUTABLE(time_stepping time_stepping.cpp)
+TARGET_SOURCES(time_stepping PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp FullFACPreconditioner.cpp RBGS.f INSVCTwoFluidStaggeredHierarchyIntegrator.cpp)
+TARGET_LINK_LIBRARIES(time_stepping IBAMR::IBAMR2d)
+
 ADD_SUBDIRECTORY(tests)
