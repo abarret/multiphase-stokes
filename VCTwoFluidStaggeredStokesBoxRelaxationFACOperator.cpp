@@ -165,6 +165,12 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
     Pointer<CellVariable<NDIM, double>> p_scr_var = new CellVariable<NDIM, double>(d_object_name + "::p_scr");
 
     // Register patch data indices
+    if (var_db->checkVariableExists(d_object_name + "::un_scr"))
+        un_scr_var = var_db->getVariable(d_object_name + "::un_scr");
+    if (var_db->checkVariableExists(d_object_name + "::us_scr"))
+        us_scr_var = var_db->getVariable(d_object_name + "::us_scr");
+    if (var_db->checkVariableExists(d_object_name + "::p_scr"))
+        p_scr_var = var_db->getVariable(d_object_name + "::p_scr");
     d_un_scr_idx = var_db->registerVariableAndContext(un_scr_var, d_ctx, IntVector<NDIM>(1));
     d_us_scr_idx = var_db->registerVariableAndContext(us_scr_var, d_ctx, IntVector<NDIM>(1));
     d_p_scr_idx = var_db->registerVariableAndContext(p_scr_var, d_ctx, IntVector<NDIM>(1));
@@ -181,6 +187,11 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator()
 {
+    // Remove internal patch index from variable database.
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    var_db->removePatchDataIndex(d_un_scr_idx);
+    var_db->removePatchDataIndex(d_us_scr_idx);
+    var_db->removePatchDataIndex(d_p_scr_idx);
     return;
 }
 

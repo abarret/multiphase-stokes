@@ -122,6 +122,9 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
     }
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
+    // Check if we've already made this variable
+    if (var_db->checkVariableExists(d_object_name + "::outerside_variable"))
+        d_os_var = var_db->getVariable(d_object_name + "::outerside_variable");
     d_os_idx = var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"));
 
     // Initialize the boundary conditions objects.
@@ -158,6 +161,9 @@ VCTwoFluidStaggeredStokesOperator::~VCTwoFluidStaggeredStokesOperator()
     d_default_us_bc_coef = nullptr;
     delete d_default_P_bc_coef;
     d_default_P_bc_coef = nullptr;
+    // Remove internal patch index from variable database.
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    var_db->removePatchDataIndex(d_os_idx);
     return;
 } // ~TwoFluidStaggeredStokesOperator
 
