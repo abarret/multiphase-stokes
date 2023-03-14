@@ -123,6 +123,12 @@
 
 namespace IBAMR
 {
+static double
+convertToThs(const double thn)
+{
+    return 1.0 - thn;
+}
+
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
     std::string object_name,
@@ -143,15 +149,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                              new CellVariable<NDIM, double>(object_name + "::Q"),
                              "CONSERVATIVE_COARSEN",
                              "CONSTANT_REFINE",
-                             register_for_restart),
-      d_thn_fcn("thn", input_db->getDatabase("thn"), grid_geometry),
-      d_f_un_fcn("f_un", input_db->getDatabase("f_un"), grid_geometry),
-      d_f_us_fcn("f_us", input_db->getDatabase("f_us"), grid_geometry),
-      d_f_p_fcn("f_p", input_db->getDatabase("f_p"), grid_geometry)
+                             register_for_restart)
 {
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
-    if (input_db->keyExists("solver")) d_solver_db = input_db->getDatabase("solver");
-    if (input_db->keyExists("precond")) d_precond_db = input_db->getDatabase("precond");
+    if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
+    if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
     if (input_db->keyExists("w")) d_w = input_db->getDouble("w");
     if (input_db->keyExists("max_multigrid_levels"))
         d_max_multigrid_levels = input_db->getInteger("max_multigrid_levels");
@@ -201,6 +203,25 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFuncti
 }
 
 void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctions(Pointer<CartGridFunction> fn_fcn,
+                                                               Pointer<CartGridFunction> fs_fcn,
+                                                               Pointer<CartGridFunction> fp_fcn)
+{
+    d_f_un_fcn = fn_fcn;
+    d_f_us_fcn = fs_fcn;
+    d_f_p_fcn = fp_fcn;
+    return;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Pointer<CartGridFunction> thn_fcn)
+{
+    // Make sure we have a valid pointer.
+    TBOX_ASSERT(thn_fcn);
+    d_thn_fcn = thn_fcn;
+}
+
+void
 INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHierarchy<NDIM>> hierarchy,
                                                                          Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
 {
@@ -231,6 +252,27 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     var_db->registerVariableAndContext(d_f_cc_var, d_ctx, IntVector<NDIM>(1));
     var_db->registerVariableAndContext(d_f_un_sc_var, d_ctx, IntVector<NDIM>(1));
     var_db->registerVariableAndContext(d_f_us_sc_var, d_ctx, IntVector<NDIM>(1));
+
+    // Drawing variables
+    if (d_visit_writer)
+    {
+        d_un_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Un_draw", NDIM);
+        d_us_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Us_draw", NDIM);
+        const int un_draw_idx = var_db->registerVariableAndContext(d_un_draw_var, d_ctx);
+        const int us_draw_idx = var_db->registerVariableAndContext(d_us_draw_var, d_ctx);
+
+        const int p_idx = var_db->mapVariableAndContextToIndex(d_p_cc_var, d_ctx);
+
+        d_visit_writer->registerPlotQuantity("Un", "VECTOR", un_draw_idx);
+        for (int d = 0; d < NDIM; ++d)
+            d_visit_writer->registerPlotQuantity("Un_" + std::to_string(d), "SCALAR", un_draw_idx, d);
+
+        d_visit_writer->registerPlotQuantity("Us", "VECTOR", us_draw_idx);
+        for (int d = 0; d < NDIM; ++d)
+            d_visit_writer->registerPlotQuantity("Us_" + std::to_string(d), "SCALAR", us_draw_idx, d);
+
+        d_visit_writer->registerPlotQuantity("P", "SCALAR", p_idx);
+    }
 
     d_integrator_is_initialized = true;
     return;
@@ -263,6 +305,15 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointe
         d_un_init_fcn->setDataOnPatchLevel(un_sc_idx, d_un_sc_var, level, init_data_time, true);
         d_us_init_fcn->setDataOnPatchLevel(us_sc_idx, d_us_sc_var, level, init_data_time, true);
         d_p_init_fcn->setDataOnPatchLevel(p_cc_idx, d_p_cc_var, level, init_data_time, true);
+
+        // Drawing data
+        if (d_visit_writer)
+        {
+            const int un_draw_idx = var_db->mapVariableAndContextToIndex(d_un_draw_var, d_ctx);
+            const int us_draw_idx = var_db->mapVariableAndContextToIndex(d_us_draw_var, d_ctx);
+            if (!level->checkAllocated(un_draw_idx)) level->allocatePatchData(un_draw_idx, init_data_time);
+            if (!level->checkAllocated(us_draw_idx)) level->allocatePatchData(us_draw_idx, init_data_time);
+        }
     }
 
     // TODO: When a regrid operation occurs, we will have to copy data from the "old level" to the new hierarchy.
@@ -290,6 +341,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                                                               const double new_time,
                                                               const int cycle_num)
 {
+    INSHierarchyIntegrator::integrateHierarchy(current_time, new_time, cycle_num);
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_sc_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, d_ctx);
     const int us_sc_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, d_ctx);
@@ -312,6 +364,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Setup un(n), us(n), p(n) and right-hand-side vectors.
     HierarchyMathOps hier_math_ops("hier_math_ops", d_hierarchy);
+    hier_math_ops.resetLevels(0, d_hierarchy->getFinestLevelNumber());
     const int h_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
     const int h_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
 
@@ -351,15 +404,21 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         }
     }
 
-    d_f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, d_f_un_sc_var, d_hierarchy, 0.0);
-    d_f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, d_f_us_sc_var, d_hierarchy, 0.0);
-    d_f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, d_f_cc_var, d_hierarchy, 0.0);
-    d_thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, d_thn_cc_var, d_hierarchy, 0.0);
+    // Set the force at the correct time.
+    // NOTE: This depends on the time stepping scheme. Currently computes forces for forward Euler.
+    // Zero out forces first, in case we haven't registered a forcing function
+    f_vec.setToScalar(0.0);
+    if (d_f_un_fcn) d_f_un_fcn->setDataOnPatchHierarchy(f_un_sc_idx, d_f_un_sc_var, d_hierarchy, current_time);
+    if (d_f_us_fcn) d_f_us_fcn->setDataOnPatchHierarchy(f_us_sc_idx, d_f_us_sc_var, d_hierarchy, current_time);
+    if (d_f_p_fcn) d_f_p_fcn->setDataOnPatchHierarchy(f_cc_idx, d_f_cc_var, d_hierarchy, current_time);
+
+    // Set volume fraction at correct time.
+    d_thn_fcn->setDataOnPatchHierarchy(thn_cc_idx, d_thn_cc_var, d_hierarchy, current_time);
 
     const double dt = new_time - current_time;
     const double C = d_rho / dt;
 
-    // set-up RHS for backward Euler scheme: f(n) + C*u_i(n) for  i = n, s
+    // set-up RHS to treat viscosity and drag with backward Euler: f(n) + C*u_i(n) for  i = n, s
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -381,7 +440,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                 CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                 (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0 - thn_lower) * (*us_data)(idx);
+                (*f_us_data)(idx) = (*f_us_data)(idx) + C * convertToThs(thn_lower) * (*us_data)(idx);
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
@@ -391,7 +450,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                 CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
                 (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + C * (1.0 - thn_lower) * (*us_data)(idx);
+                (*f_us_data)(idx) = (*f_us_data)(idx) + C * convertToThs(thn_lower) * (*us_data)(idx);
             }
         } // patches
     }     // levels
@@ -427,7 +486,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
         if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
     }
-    d_thn_fcn.setDataOnPatchHierarchy(
+    d_thn_fcn->setDataOnPatchHierarchy(
         thn_cc_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
     // Also fill in theta ghost cells
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
@@ -490,6 +549,68 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
     return;
 } // postprocessIntegrateHierarchy
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::regridProjection()
+{
+    // intentionally blank
+}
+
+double
+INSVCTwoFluidStaggeredHierarchyIntegrator::getStableTimestep(Pointer<Patch<NDIM>> /*patch*/) const
+{
+    return d_dt_init;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::synchronizeHierarchyDataSpecialized(VariableContextType ctx_type)
+{
+    // intentionally blank.
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
+{
+    // Interpolate velocities to node centered.
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int un_draw_idx = var_db->mapVariableAndContextToIndex(d_un_draw_var, d_ctx);
+    const int us_draw_idx = var_db->mapVariableAndContextToIndex(d_us_draw_var, d_ctx);
+    const int un_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, d_ctx);
+    const int us_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, d_ctx);
+
+    static const bool synch_cf_interface = true;
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+
+    // We need ghost cells to interpolate to nodes.
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_comp = { ITC(un_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR"),
+                                    ITC(us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR") };
+    HierarchyGhostCellInterpolation hier_bdry_fill;
+    hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
+    hier_bdry_fill.fillData(0.0);
+
+    // interpolate
+    HierarchyMathOps hier_math_ops("hier_math_ops", d_hierarchy);
+    hier_math_ops.setPatchHierarchy(d_hierarchy);
+    hier_math_ops.resetLevels(coarsest_ln, finest_ln);
+    hier_math_ops.interp(un_draw_idx,
+                         d_un_draw_var,
+                         synch_cf_interface,
+                         un_idx,
+                         d_un_sc_var,
+                         nullptr,
+                         d_integrator_time,
+                         synch_cf_interface);
+    hier_math_ops.interp(us_draw_idx,
+                         d_us_draw_var,
+                         synch_cf_interface,
+                         us_idx,
+                         d_us_sc_var,
+                         nullptr,
+                         d_integrator_time,
+                         synch_cf_interface);
+}
 
 //////////////////////////////////////////////////////////////////////////////
 
