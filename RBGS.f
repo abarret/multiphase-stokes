@@ -254,7 +254,8 @@ c
           A_box(9, 9) = 0.0
 c
           ! network at west edge
-          b(1) = f_un_data_0(i0,i1)-thn_lower_x/dx(0)*p_data(i0-1,i1) - 
+          b(1) = f_un_data_0(i0,i1)+D*(-thn_lower_x/dx(0)*
+     &        p_data(i0-1,i1) -
      &        eta_n / (dx(0)* dx(0)) * 
      &        thn_data(i0-1,i1) * un_data_0(i0-1,i1) -
      &        eta_n / (dx(1)* dx(1)) * 
@@ -266,10 +267,10 @@ c
      &        eta_n / (dx(0)* dx(1)) * 
      &        thn_imhalf_jmhalf * un_data_1(i0-1,i1) -
      &        eta_n / (dx(0)* dx(1)) * thn_data(i0-1,i1) *
-     &        (un_data_1(i0-1,i1+1) - un_data_1(i0-1,i1))
+     &        (un_data_1(i0-1,i1+1) - un_data_1(i0-1,i1)))
 c
           ! solvent at west edge
-          b(5) = f_us_data_0(i0,i1)-toThs(thn_lower_x) / dx(0) * 
+          b(5) = f_us_data_0(i0,i1)+D*(-toThs(thn_lower_x) / dx(0) *
      &      p_data(i0-1,i1) -
      &      eta_s / (dx(0)* dx(0)) * 
      &      toThs(thn_data(i0-1,i1)) * us_data_0(i0-1,i1) -
@@ -283,10 +284,10 @@ c
      &      toThs(thn_imhalf_jmhalf) * us_data_1(i0-1,i1) -
      &      eta_s / (dx(0)* dx(1)) * 
      &      toThs(thn_data(i0-1,i1)) *
-     &      (us_data_1(i0-1,i1+1) - us_data_1(i0-1,i1))
+     &      (us_data_1(i0-1,i1+1) - us_data_1(i0-1,i1)))
 c
           ! network at east edge
-          b(2) = f_un_data_0(i0+1,i1) + thn_upper_x / dx(0) * 
+          b(2) = f_un_data_0(i0+1,i1) + D*(thn_upper_x / dx(0) *
      &        p_data(i0+1,i1) -
      &        eta_n / (dx(0)* dx(0)) * thn_data(i0+1,i1) * 
      &        un_data_0(i0+2,i1) -
@@ -299,10 +300,10 @@ c
      &        eta_n / (dx(0)* dx(1)) * thn_iphalf_jmhalf * 
      &        un_data_1(i0+1,i1) +
      &        eta_n / (dx(0)* dx(1)) * thn_data(i0+1,i1) *
-     &        (un_data_1(i0+1,i1+1) - un_data_1(i0+1,i1))
+     &        (un_data_1(i0+1,i1+1) - un_data_1(i0+1,i1)))
 c
           ! solvent at east edge
-          b(6) = f_us_data_0(i0+1,i1) + toThs(thn_upper_x) / dx(0) * 
+          b(6) = f_us_data_0(i0+1,i1) + D*(toThs(thn_upper_x) / dx(0) *
      &    p_data(i0+1,i1) -
      &    eta_s / (dx(0)* dx(0)) * toThs(thn_data(i0+1,i1)) * 
      &    us_data_0(i0+2,i1) -
@@ -315,10 +316,10 @@ c
      &    eta_s / (dx(0)* dx(1)) * toThs(thn_iphalf_jmhalf) * 
      &    us_data_1(i0+1,i1) +
      &    eta_s / (dx(0)* dx(1)) * toThs(thn_data(i0+1,i1)) *
-     &        (us_data_1(i0+1,i1+1) - us_data_1(i0+1,i1))
+     &        (us_data_1(i0+1,i1+1) - us_data_1(i0+1,i1)))
 c
           ! network at south edge
-          b(3) = f_un_data_1(i0,i1)-thn_lower_y / dx(1) * 
+          b(3) = f_un_data_1(i0,i1)+D*(-thn_lower_y / dx(1) *
      &        p_data(i0,i1-1) -
      &        eta_n / (dx(1)* dx(1)) * thn_data(i0,i1-1) * 
      &        un_data_1(i0,i1-1) -
@@ -331,10 +332,10 @@ c
      &        eta_n / (dx(0)* dx(1)) * thn_imhalf_jmhalf * 
      &        un_data_0(i0,i1-1) -
      &        eta_n / (dx(0)* dx(1)) * thn_data(i0,i1-1) *
-     &        (un_data_0(i0+1,i1-1) - un_data_0(i0,i1-1))
+     &        (un_data_0(i0+1,i1-1) - un_data_0(i0,i1-1)))
 c
           ! solvent at south edge
-          b(7) = f_us_data_1(i0,i1)-toThs(thn_lower_y) / dx(1) * 
+          b(7) = f_us_data_1(i0,i1)+D*(-toThs(thn_lower_y) / dx(1) *
      &    p_data(i0,i1-1) -
      &    eta_s / (dx(1)* dx(1)) * toThs(thn_data(i0,i1-1)) * 
      &    us_data_1(i0,i1-1) -
@@ -347,10 +348,10 @@ c
      &    eta_s / (dx(0)* dx(1)) * toThs(thn_imhalf_jmhalf) * 
      &    us_data_0(i0,i1-1) -
      &    eta_s / (dx(0)* dx(1)) * toThs(thn_data(i0,i1-1)) *
-     &    (us_data_0(i0+1,i1-1) - us_data_0(i0,i1-1))
+     &    (us_data_0(i0+1,i1-1) - us_data_0(i0,i1-1)))
 c
           ! network at north edge
-          b(4) = f_un_data_1(i0,i1+1) + thn_upper_y / dx(1) * 
+          b(4) = f_un_data_1(i0,i1+1) + D*(thn_upper_y / dx(1) *
      &        p_data(i0,i1+1) -
      &        eta_n / (dx(1)* dx(1)) * thn_data(i0,i1+1) * 
      &        un_data_1(i0,i1+2) -
@@ -363,10 +364,10 @@ c
      &        eta_n / (dx(0)* dx(1)) * thn_imhalf_jphalf * 
      &        un_data_0(i0,i1 + 1) +
      &        eta_n / (dx(0)* dx(1)) * thn_data(i0,i1+1) *
-     &        (un_data_0(i0+1,i1+1) - un_data_0(i0,i1 + 1))
+     &        (un_data_0(i0+1,i1+1) - un_data_0(i0,i1 + 1)))
 c
           ! solvent at north edge
-          b(8) =  f_us_data_1(i0,i1+1) + toThs(thn_upper_y) / dx(1)*
+          b(8) =  f_us_data_1(i0,i1+1) + D*(toThs(thn_upper_y) / dx(1)*
      &    p_data(i0,i1+1) -
      &    eta_s / (dx(1)* dx(1)) * toThs(thn_data(i0,i1+1)) * 
      &    us_data_1(i0,i1+2) -
@@ -379,13 +380,13 @@ c
      &    eta_s / (dx(0)* dx(1)) * toThs(thn_imhalf_jphalf) * 
      &    us_data_0(i0,i1 + 1) +
      &    eta_s / (dx(0)* dx(1)) * toThs(thn_data(i0,i1+1)) *
-     &    (us_data_0(i0+1,i1+1) - us_data_0(i0,i1 + 1))
+     &    (us_data_0(i0+1,i1+1) - us_data_0(i0,i1 + 1)))
 c
           ! pressure at cell center
           b(9) = f_p_data(i0,i1)
 c
           ! CALL dgetrf( 9, 9, A_box, 9, ipiv, info)
-          
+
           !IF( info.EQ.0 ) THEN
           !     print *, 'info is:'
                ! Solve the system A*X = B, overwriting B with X.
@@ -395,7 +396,7 @@ c    &               9, info )
 
           ! solve the system Ax = b, overwriting b with x
           call dgesv(9, 1, A_box, 9, ipiv, b, 9, info)
-c         
+c
           if (info /= 0) then
             ! print *, A_box
             print *, 'ERROR IN DGESV'
@@ -414,7 +415,7 @@ c
 c
         enddo
       enddo
-c     
+c
       end subroutine
 
 
