@@ -434,7 +434,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         ghost_cell_fill.fillData(0.0);
     }
 
-    // set-up RHS to treat viscosity and drag with backward Euler: f(n) + C*u_i(n) for  i = n, s
+    // set-up RHS to treat viscosity and drag with backward Euler: f(n) + C*theta_i(n)*u_i(n) for  i = n, s
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
