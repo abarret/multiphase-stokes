@@ -75,7 +75,6 @@ public:
     FullFACPreconditioner(std::string object_name,
                           SAMRAI::tbox::Pointer<FACPreconditionerStrategy> fac_strategy,
                           SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                          int multigrid_max_levels,
                           const std::string& default_options_prefix);
 
     /*!

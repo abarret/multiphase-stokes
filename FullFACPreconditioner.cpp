@@ -44,11 +44,10 @@ namespace IBTK
 FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
                                              Pointer<FACPreconditionerStrategy> fac_strategy,
                                              Pointer<Database> input_db,
-                                             int multigrid_max_levels,
                                              const std::string& default_options_prefix)
-    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix),
-      d_multigrid_max_levels(multigrid_max_levels)
+    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix)
 {
+    d_multigrid_max_levels = input_db->getInteger("max_multigrid_levels");
     return;
 } // FACPreconditioner
 
