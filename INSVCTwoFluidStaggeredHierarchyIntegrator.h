@@ -257,7 +257,7 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
     double d_w = std::numeric_limits<double>::quiet_NaN();
-    int d_max_multigrid_levels = -1;
+    bool d_use_preconditioner = true;
 
     /*!
      * Velocity Drawing information.

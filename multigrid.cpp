@@ -330,7 +330,6 @@ main(int argc, char* argv[])
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,
                                       app_initializer->getComponentDatabase("KrylovPrecond"),
-                                      input_db->getInteger("multigrid_max_levels"),
                                       "Krylov_precond_");
         bool use_precond = input_db->getBool("USE_PRECOND");
         Krylov_precond->setNullspace(false, null_vecs);

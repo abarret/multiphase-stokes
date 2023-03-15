@@ -1,3 +1,9 @@
+USE_PRECOND = TRUE
+w = 0.75
+C = 0.0
+D = 1.0
+IS_VEL_NULLSPACE = FALSE
+
 un {
    function_0 = "0.0"
    function_1 = "0.0"
@@ -35,7 +41,7 @@ MAX_MULTIGRID_LEVELS = 5
 START_TIME = 0.0
 END_TIME = 1.0
 NUM_CYCLES = 1
-DT_MAX = 0.005
+DT_MAX = 0.0005
 ENABLE_LOGGING = TRUE
 W = 0.75
 
@@ -48,14 +54,14 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_timestepping"
+   viz_dump_dirname = "viz2d_multigrid1"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
    timer_enabled = TRUE
 }
 
-N = 32
+N = 64
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
@@ -79,10 +85,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
    w = W
-   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 
    solver_db {
-
+      ksp_type = "fgmres"
    }
 
    precond_db {
@@ -90,6 +95,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
       num_pre_sweeps = 5
       num_post_sweeps = 5
       enable_logging = TRUE
+      max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
 }
 
@@ -97,7 +103,7 @@ MultigridAlg {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 4, 4              // vector ratio to next coarser level
