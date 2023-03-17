@@ -191,6 +191,30 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureSubdomainSolver()
     return nullptr;
 } // getPressureSubdomainSolver
 
+Pointer<SideVariable<NDIM, double>>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getSolventVariable() const
+{
+    return d_us_sc_var;
+}
+
+Pointer<SideVariable<NDIM, double>>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getNetworkVariable() const
+{
+    return d_un_sc_var;
+}
+
+Pointer<CellVariable<NDIM, double>>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureVariable() const
+{
+    return d_p_cc_var;
+}
+
+Pointer<VariableContext>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getContext() const
+{
+    return d_ctx;
+}
+
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
                                                           Pointer<CartGridFunction> us_fcn,
@@ -457,6 +481,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                 (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
                 (*f_us_data)(idx) = (*f_us_data)(idx) + C * convertToThs(thn_lower) * (*us_data)(idx);
+                if (idx(0) == 0 && idx(1) == 0) pout << "(*us_data)(" << idx << ") = " << (*us_data)(idx) << "\n";
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)                      // side-centers in y-dir

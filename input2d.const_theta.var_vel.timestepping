@@ -7,7 +7,7 @@ DT_MAX = 0.005
 ENABLE_LOGGING = TRUE
 W = 0.75
 USE_PRECONDITIONER = TRUE
-
+N = 128
 VIZ_DUMP_TIME_INTERVAL = 0.01
 
 un {
@@ -18,7 +18,7 @@ un {
 us {
    function_0 = "0.0"
    function_1 = "0.0"
-} // so that average of un + us is 0
+}
 
 p {
    function = "0.0"
@@ -42,6 +42,20 @@ thn {
    function = "0.5"
 }
 
+un_exact {
+   function_0 = "-cos(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_1)*cos(2*PI*X_0)"
+}
+
+us_exact {
+   function_0 = "cos(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "cos(2*PI*X_1)*cos(2*PI*X_0)"
+} // so that average of un + us is 0
+
+p_exact {
+   function = "0.0"
+} // pressure has mean 0
+
 INSVCTwoFluidStaggeredHierarchyIntegrator {
    rho                           = RHO
    start_time                    = START_TIME
@@ -58,8 +72,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
 
    precond_db {
       cycle_type = "V_CYCLE"
-      num_pre_sweeps = 3
-      num_post_sweeps = 3
+      num_pre_sweeps = 5
+      num_post_sweeps = 5
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
@@ -72,14 +86,12 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_multigrid"
+   viz_dump_dirname = "viz2d_timestepping"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
    timer_enabled = TRUE
 }
-
-N = 64
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
@@ -89,7 +101,7 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 2, 2              // vector ratio to next coarser level
