@@ -481,7 +481,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                 (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
                 (*f_us_data)(idx) = (*f_us_data)(idx) + C * convertToThs(thn_lower) * (*us_data)(idx);
-                if (idx(0) == 0 && idx(1) == 0) pout << "(*us_data)(" << idx << ") = " << (*us_data)(idx) << "\n";
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)                      // side-centers in y-dir
