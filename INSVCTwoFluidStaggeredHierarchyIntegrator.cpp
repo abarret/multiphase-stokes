@@ -190,6 +190,30 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureSubdomainSolver()
     return nullptr;
 } // getPressureSubdomainSolver
 
+Pointer<SideVariable<NDIM, double>>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getSolventVariable() const
+{
+    return d_us_sc_var;
+}
+
+Pointer<SideVariable<NDIM, double>>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getNetworkVariable() const
+{
+    return d_un_sc_var;
+}
+
+Pointer<CellVariable<NDIM, double>>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureVariable() const
+{
+    return d_p_cc_var;
+}
+
+Pointer<VariableContext>
+INSVCTwoFluidStaggeredHierarchyIntegrator::getContext() const
+{
+    return d_ctx;
+}
+
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
                                                           Pointer<CartGridFunction> us_fcn,

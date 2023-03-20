@@ -117,6 +117,26 @@ public:
     SAMRAI::tbox::Pointer<IBTK::PoissonSolver> getPressureSubdomainSolver() override;
 
     /*!
+     * Get solvent velocity variable.
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> getSolventVariable() const;
+
+    /*!
+     * Get network velocity variable.
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> getNetworkVariable() const;
+
+    /*!
+     * Get pressure velocity variable.
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getPressureVariable() const;
+
+    /*!
+     * Get the context used in the hierarchy.
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> getContext() const;
+
+    /*!
      * Set initial conditions for the state variables
      */
     void setInitialData(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> un_fcn,
