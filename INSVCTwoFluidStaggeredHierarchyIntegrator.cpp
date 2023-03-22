@@ -150,7 +150,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                              "CONSERVATIVE_COARSEN",
                              "CONSTANT_REFINE",
                              register_for_restart)
-{
+{   
+    if (input_db->keyExists("viscous_time_stepping_type"))
+            d_viscous_time_stepping_type =
+                string_to_enum<TimeSteppingType>(db->getString("viscous_time_stepping_type"));
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
     if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
@@ -456,7 +459,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(0.0);
     }
-
+    
     // set-up RHS to treat viscosity and drag with backward Euler: f(n) + C*theta_i(n)*u_i(n) for  i = n, s
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
@@ -494,10 +497,36 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         } // patches
     }     // levels
 
+    switch(d_viscous_time_stepping_type) {
+        case TRAPEZOIDAL_RULE:
+            VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
+            const double D1 = 0.5; // This will depend on the time stepping scheme.
+            const double D2 = -0.5; // This will depend on the time stepping scheme. 
+
+            stokes_op.setCandDCoefficients(0.0, D1);
+            stokes_op.setDragCoefficient(1.0, 1.0, 1.0);
+            stokes_op.setViscosityCoefficient(1.0, 1.0);
+            stokes_op.setThnIdx(thn_cc_idx);
+            
+            // store results of applying stokes operator in f2_vec
+            Pointer<SAMRAIVectorReal<NDIM, double>> f2_vec;
+            f2_vec = f_vec.cloneVector("f2_vec");
+            f2_vec->allocateVectorData();
+            f2_vec->copyVector(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false), true);
+            stokes_op.initializeOperatorState(u_vec, f2_vec);
+            stokes_op.apply(u_vec, *f2_vec);
+
+            // Sum f_vec and f2_vec and store result in f_vec
+            Pointer<SAMRAIVectorReal<NDIM, double>> f_vec_ptr(&f_vec, false);
+            f_vec.axpy(1.0, f_vec_ptr, f2_vec, true);
+
+        case BACKWARD_EULER:
+            const double D2 = -1.0; // This will depend on the time stepping scheme.
+    }
+    
     // Setup the stokes operator
     Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
-    const double D = -1.0; // This will depend on the time stepping scheme.
-    stokes_op->setCandDCoefficients(C, D);
+    stokes_op->setCandDCoefficients(C, D2);
     stokes_op->setDragCoefficient(1.0, 1.0, 1.0);
     stokes_op->setViscosityCoefficient(1.0, 1.0);
     stokes_op->setThnIdx(thn_cc_idx);
