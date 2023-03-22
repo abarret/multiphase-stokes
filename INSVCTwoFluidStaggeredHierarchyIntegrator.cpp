@@ -459,7 +459,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(0.0);
     }
-    
     // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule: 
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
     const double D1;
