@@ -513,7 +513,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
             f2_vec = f_vec.cloneVector("f2_vec");
             f2_vec->allocateVectorData();
             f2_vec->copyVector(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false), true);
-            stokes_op.initializeOperatorState(u_vec, f2_vec);
+            stokes_op.initializeOperatorState(u_vec, *f2_vec);
             stokes_op.apply(u_vec, *f2_vec);
 
             // Sum f_vec and f2_vec and store result in f_vec
