@@ -460,22 +460,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     if (d_f_us_fcn) d_f_us_fcn->setDataOnPatchHierarchy(f_us_idx, d_f_us_sc_var, d_hierarchy, current_time);
     if (d_f_p_fcn) d_f_p_fcn->setDataOnPatchHierarchy(f_p_idx, d_f_cc_var, d_hierarchy, current_time);
 
-    // Need to fill in ghost cells for theta to do interpolation
-    {
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(thn_idx,
-                                 "CONSERVATIVE_LINEAR_REFINE",
-                                 false,
-                                 "NONE",
-                                 "LINEAR",
-                                 true,
-                                 nullptr); // defaults to fill corner
-        HierarchyGhostCellInterpolation ghost_cell_fill;
-        ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(0.0);
-    }
-
     // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule:
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
     double D1 = std::numeric_limits<double>::signaling_NaN();
