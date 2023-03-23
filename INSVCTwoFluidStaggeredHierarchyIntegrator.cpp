@@ -153,7 +153,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
 {   
     if (input_db->keyExists("viscous_time_stepping_type"))
             d_viscous_time_stepping_type =
-                string_to_enum<TimeSteppingType>(db->getString("viscous_time_stepping_type"));
+                string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
     if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
@@ -475,8 +475,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
             D2 = -1.0; 
             break;
 
-        default:  // Use Backward Euler
-            TBOX_ERROR("Unknown time stepping type " + string_to_num(d_viscous_time_stepping_type) + ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
+        default:  // string_to_num caused a compile error, so using enum_to_string instead
+            TBOX_ERROR("Unknown time stepping type " + enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type)
+            + ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
     
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
@@ -509,7 +510,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Now create a preconditioner
     Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D);
+        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D2);
     fac_precondition_strategy->setThnIdx(thn_cc_idx);
     Pointer<FullFACPreconditioner> precond;
     if (d_use_preconditioner)
