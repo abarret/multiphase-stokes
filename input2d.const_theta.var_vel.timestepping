@@ -9,6 +9,7 @@ W = 0.75
 USE_PRECONDITIONER = TRUE
 N = 128
 VIZ_DUMP_TIME_INTERVAL = 0.01
+VISCOUS_TIME_STEPPING_TYPE = "TRAPEZOIDAL_RULE"
 
 un {
    function_0 = "0.0"
@@ -65,6 +66,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    enable_logging                = ENABLE_LOGGING
    w = W
    use_preconditioner = USE_PRECONDITIONER
+   viscous_time_stepping_type = VISCOUS_TIME_STEPPING_TYPE
 
    solver_db {
       ksp_type = "fgmres"

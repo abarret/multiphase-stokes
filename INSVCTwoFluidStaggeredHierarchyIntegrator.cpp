@@ -152,6 +152,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                              "CONSTANT_REFINE",
                              register_for_restart)
 {
+    if (input_db->keyExists("viscous_time_stepping_type"))
+        d_viscous_time_stepping_type =
+            string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
     if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
@@ -457,48 +460,49 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(0.0);
     }
+    // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule:
+    // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
+    double D1;
+    double D2;
 
-    // set-up RHS to treat viscosity and drag with backward Euler: f(n) + C*theta_i(n)*u_i(n) for  i = n, s
-    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+    switch (d_viscous_time_stepping_type)
     {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_sc_idx);
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_sc_idx);
-            Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_sc_idx);
-            Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_sc_idx);
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
-            IntVector<NDIM> xp(1, 0), yp(0, 1);
+    case TRAPEZOIDAL_RULE:
+        D1 = 0.5;
+        D2 = -0.5;
+        break;
 
-            for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++)                      // side-centers in x-dir
-            {
-                const SideIndex<NDIM>& idx = si();                                         // axis = 0, (i-1/2,j)
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);                                 // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
-                (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + C * convertToThs(thn_lower) * (*us_data)(idx);
-            }
+    case BACKWARD_EULER:
+        D1 = 0.0;
+        D2 = -1.0;
+        break;
 
-            for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)                      // side-centers in y-dir
-            {
-                const SideIndex<NDIM>& idx = si();                                         // axis = 1, (i,j-1/2)
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);                                 // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);                                  // (i,j)
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
-                (*f_un_data)(idx) = (*f_un_data)(idx) + C * thn_lower * (*un_data)(idx);
-                (*f_us_data)(idx) = (*f_us_data)(idx) + C * convertToThs(thn_lower) * (*us_data)(idx);
-            }
-        } // patches
-    }     // levels
+    default: // string_to_num caused a compile error, so using enum_to_string instead
+        TBOX_ERROR("Unknown time stepping type " + enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
+                   ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
+    }
+
+    VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
+    RHS_op.setCandDCoefficients(C, D1);
+    RHS_op.setDragCoefficient(1.0, 1.0, 1.0);
+    RHS_op.setViscosityCoefficient(1.0, 1.0);
+    RHS_op.setThnIdx(thn_cc_idx);
+
+    // Store results of applying stokes operator in f2_vec
+    Pointer<SAMRAIVectorReal<NDIM, double>> f2_vec;
+    f2_vec = f_vec.cloneVector("f2_vec");
+    f2_vec->allocateVectorData();
+    f2_vec->copyVector(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false), true);
+    RHS_op.initializeOperatorState(u_vec, *f2_vec);
+    RHS_op.apply(u_vec, *f2_vec);
+
+    // Sum f_vec and f2_vec and store result in f_vec
+    Pointer<SAMRAIVectorReal<NDIM, double>> f_vec_ptr(&f_vec, false);
+    f_vec.axpy(1.0, f_vec_ptr, f2_vec, true);
 
     // Setup the stokes operator
     Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
-    const double D = -1.0; // This will depend on the time stepping scheme.
-    stokes_op->setCandDCoefficients(C, D);
+    stokes_op->setCandDCoefficients(C, D2);
     stokes_op->setDragCoefficient(1.0, 1.0, 1.0);
     stokes_op->setViscosityCoefficient(1.0, 1.0);
     stokes_op->setThnIdx(thn_cc_idx);
@@ -508,7 +512,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Now create a preconditioner
     Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D);
+        new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D2);
     fac_precondition_strategy->setThnIdx(thn_cc_idx);
     Pointer<FullFACPreconditioner> precond;
     if (d_use_preconditioner)
