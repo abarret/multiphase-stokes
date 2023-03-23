@@ -476,8 +476,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
             break;
 
         default:  // Use Backward Euler
-            D1 = 0.0;
-            D2 = -1.0;
+            TBOX_ERROR("Unknown time stepping type " + string_to_num(d_viscous_time_stepping_type) + ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
     
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
