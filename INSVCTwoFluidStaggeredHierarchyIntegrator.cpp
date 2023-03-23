@@ -461,8 +461,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     }
     // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule: 
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
-    const double D1;
-    const double D2;
+    double D1;
+    double D2;
 
     switch(d_viscous_time_stepping_type) {
         case TRAPEZOIDAL_RULE:
