@@ -140,9 +140,7 @@ main(int argc, char* argv[])
             pout << "Simulation time is " << loop_time << "\n";
 
             dt = ins_integrator->getMaximumTimeStepSize();
-            ins_integrator->preprocessIntegrateHierarchy(loop_time, loop_time + dt, 1);
-            ins_integrator->integrateHierarchy(loop_time, loop_time + dt, 0);
-            ins_integrator->postprocessIntegrateHierarchy(loop_time, loop_time + dt, true, 1);
+            ins_integrator->advanceHierarchy(dt);
             loop_time += dt;
 
             pout << "\n";
@@ -176,7 +174,7 @@ main(int argc, char* argv[])
         Pointer<CellVariable<NDIM, double>> p_var = ins_integrator->getPressureVariable();
 
         auto var_db = VariableDatabase<NDIM>::getDatabase();
-        Pointer<VariableContext> ctx = ins_integrator->getContext();
+        Pointer<VariableContext> ctx = ins_integrator->getCurrentContext();
         const int un_idx = var_db->mapVariableAndContextToIndex(un_var, ctx);
         const int us_idx = var_db->mapVariableAndContextToIndex(us_var, ctx);
         const int p_idx = var_db->mapVariableAndContextToIndex(p_var, ctx);
@@ -236,5 +234,13 @@ main(int argc, char* argv[])
         pout << "\nWriting visualization files...\n\n";
         ins_integrator->setupPlotData();
         visit_data_writer->writePlotData(patch_hierarchy, iteration_num + 1, loop_time);
+
+        for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
+            level->deallocatePatchData(un_exa_idx);
+            level->deallocatePatchData(us_exa_idx);
+            level->deallocatePatchData(p_exa_idx);
+        }
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
