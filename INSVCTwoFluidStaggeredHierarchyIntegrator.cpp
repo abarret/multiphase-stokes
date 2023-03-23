@@ -150,10 +150,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                              "CONSERVATIVE_COARSEN",
                              "CONSTANT_REFINE",
                              register_for_restart)
-{   
+{
     if (input_db->keyExists("viscous_time_stepping_type"))
-            d_viscous_time_stepping_type =
-                string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
+        d_viscous_time_stepping_type =
+            string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
     if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
@@ -476,26 +476,27 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         ghost_cell_fill.fillData(0.0);
     }
 
-    // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule: 
+    // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule:
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
     double D1 = std::numeric_limits<double>::signaling_NaN();
     double D2 = std::numeric_limits<double>::signaling_NaN();
     const double C = d_rho / dt;
 
-    switch(d_viscous_time_stepping_type) {
-        case TRAPEZOIDAL_RULE:
-            D1 = 0.5; 
-            D2 = -0.5; 
-            break;
+    switch (d_viscous_time_stepping_type)
+    {
+    case TRAPEZOIDAL_RULE:
+        D1 = 0.5;
+        D2 = -0.5;
+        break;
 
-        case BACKWARD_EULER:
-            D1 = 0.0;
-            D2 = -1.0; 
-            break;
+    case BACKWARD_EULER:
+        D1 = 0.0;
+        D2 = -1.0;
+        break;
 
-        default:
-            TBOX_ERROR("Unknown time stepping type " + enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type)
-            + ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
+    default:
+        TBOX_ERROR("Unknown time stepping type " + enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
+                   ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
 
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
@@ -527,13 +528,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Now create a preconditioner
     if (d_use_preconditioner)
     {
-            d_precond_op = new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-                "KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D2);
-            d_precond_op->setThnIdx(thn_idx);
-            d_stokes_precond =
-                new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
-            d_stokes_precond->setNullspace(false, d_nul_vecs);
-            d_stokes_solver->setPreconditioner(d_stokes_precond);
+        d_precond_op = new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
+            "KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D2);
+        d_precond_op->setThnIdx(thn_idx);
+        d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
+        d_stokes_precond->setNullspace(false, d_nul_vecs);
+        d_stokes_solver->setPreconditioner(d_stokes_precond);
     }
 
     d_stokes_solver->setNullspace(false, d_nul_vecs);
@@ -542,31 +542,31 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Set thn_cc_idx on the dense hierarchy.
     if (d_use_preconditioner)
     {
-            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
-            // Allocate data
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, 0.0);
-            }
-            d_thn_fcn->setDataOnPatchHierarchy(
-                thn_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
-            {
-                // Also fill in theta ghost cells
-                using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-                std::vector<ITC> ghost_cell_comp(1);
-                ghost_cell_comp[0] = ITC(thn_idx,
-                                         "CONSERVATIVE_LINEAR_REFINE",
-                                         false,
-                                         "NONE",
-                                         "LINEAR",
-                                         true,
-                                         nullptr); // defaults to fill corner
-                HierarchyGhostCellInterpolation ghost_cell_fill;
-                ghost_cell_fill.initializeOperatorState(
-                    ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-                ghost_cell_fill.fillData(0.0);
-            }
+        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
+        // Allocate data
+        for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+            if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, 0.0);
+        }
+        d_thn_fcn->setDataOnPatchHierarchy(
+            thn_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
+        {
+            // Also fill in theta ghost cells
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comp(1);
+            ghost_cell_comp[0] = ITC(thn_idx,
+                                     "CONSERVATIVE_LINEAR_REFINE",
+                                     false,
+                                     "NONE",
+                                     "LINEAR",
+                                     true,
+                                     nullptr); // defaults to fill corner
+            HierarchyGhostCellInterpolation ghost_cell_fill;
+            ghost_cell_fill.initializeOperatorState(
+                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+            ghost_cell_fill.fillData(0.0);
+        }
     }
 
     executePreprocessIntegrateHierarchyCallbackFcns(current_time, new_time, num_cycles);
@@ -615,14 +615,14 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     // Deallocate patch data on the dense hierarchy
     if (d_use_preconditioner)
     {
-            auto var_db = VariableDatabase<NDIM>::getDatabase();
-            const int thn_cc_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
-            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
-            }
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int thn_cc_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
+        for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+            if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
+        }
     }
 
     // Execute any registered callbacks.
