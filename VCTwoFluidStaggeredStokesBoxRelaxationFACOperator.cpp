@@ -156,7 +156,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
 {
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
-    Pointer<VariableContext> d_ctx = var_db->getContext("context");
+    Pointer<VariableContext> d_ctx = var_db->getContext(d_object_name + "::context");
 
     // State scratch variables: Velocity and pressure.
     // Prepend with d_object_name to ensure there are no conflicts.
@@ -166,11 +166,23 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
 
     // Register patch data indices
     if (var_db->checkVariableExists(d_object_name + "::un_scr"))
+    {
         un_scr_var = var_db->getVariable(d_object_name + "::un_scr");
+        d_un_scr_idx = var_db->mapVariableAndContextToIndex(un_scr_var, d_ctx);
+        var_db->removePatchDataIndex(d_un_scr_idx);
+    }
     if (var_db->checkVariableExists(d_object_name + "::us_scr"))
+    {
         us_scr_var = var_db->getVariable(d_object_name + "::us_scr");
+        d_us_scr_idx = var_db->mapVariableAndContextToIndex(us_scr_var, d_ctx);
+        var_db->removePatchDataIndex(d_us_scr_idx);
+    }
     if (var_db->checkVariableExists(d_object_name + "::p_scr"))
+    {
         p_scr_var = var_db->getVariable(d_object_name + "::p_scr");
+        d_p_scr_idx = var_db->mapVariableAndContextToIndex(p_scr_var, d_ctx);
+        var_db->removePatchDataIndex(d_p_scr_idx);
+    }
     d_un_scr_idx = var_db->registerVariableAndContext(un_scr_var, d_ctx, IntVector<NDIM>(1));
     d_us_scr_idx = var_db->registerVariableAndContext(us_scr_var, d_ctx, IntVector<NDIM>(1));
     d_p_scr_idx = var_db->registerVariableAndContext(p_scr_var, d_ctx, IntVector<NDIM>(1));
@@ -187,11 +199,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator()
 {
-    // Remove internal patch index from variable database.
-    auto var_db = VariableDatabase<NDIM>::getDatabase();
-    var_db->removePatchDataIndex(d_un_scr_idx);
-    var_db->removePatchDataIndex(d_us_scr_idx);
-    var_db->removePatchDataIndex(d_p_scr_idx);
+    // Dallocate operator state first
+    deallocateOperatorState();
     return;
 }
 
@@ -763,6 +772,7 @@ void
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
                                                                            const SAMRAIVectorReal<NDIM, double>& rhs)
 {
+    if (d_is_initialized) deallocateOperatorState();
     // Setup solution and rhs vectors.
     Pointer<SideVariable<NDIM, double>> un_sol_var = sol.getComponentVariable(0);
     Pointer<SideVariable<NDIM, double>> us_sol_var = sol.getComponentVariable(1);
@@ -863,6 +873,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     d_cc_bdry_op = new CartCellDoubleQuadraticCFInterpolation();
     d_cc_bdry_op->setConsistentInterpolationScheme(false);
     d_cc_bdry_op->setPatchHierarchy(d_hierarchy);
+
+    d_is_initialized = true;
     return;
 }
 
@@ -879,6 +891,19 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
     d_us_prolong_op.setNull();
     d_p_prolong_op.setNull();
     d_prolong_scheds.resize(0);
+
+    // Deallocate any data associated with the operator
+    int coarsest_ln = 0;
+    int finest_ln = d_hierarchy->getFinestLevelNumber();
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        level->deallocatePatchData(d_un_scr_idx);
+        level->deallocatePatchData(d_us_scr_idx);
+        level->deallocatePatchData(d_p_scr_idx);
+    }
+
+    d_is_initialized = false;
     return;
 }
 
