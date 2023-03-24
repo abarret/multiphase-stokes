@@ -103,7 +103,8 @@ extern "C"
                  const double&,  // xi
                  const double&,  // w = under relaxation factor
                  const double&,  // C in C*u term
-                 const double&); // D
+                 const double&, // D
+                 const int&); // red_or_black
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
@@ -335,7 +336,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
 
     // outer for loop for number of sweeps
-    for (int sweep = 0; sweep < num_sweeps; sweep++)
+    for (int sweep = 0; sweep < 2*num_sweeps; sweep++)
     {
         // Fill in ghost cells. We only want to use values on our current level to fill in ghost cells.
         // TODO: d_ghostfill_no_restrict_scheds does not fill in ghost cells in at coarse fine interfaces. We need to
@@ -409,7 +410,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
             const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
             const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
-
+            int red_or_black = sweep % 2; // red = 0 and black = 1
             R_B_G_S(dx,
                     patch_lower(0), // ilower0
                     patch_upper(0), // iupper0
@@ -440,7 +441,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
                     xi,
                     d_w,
                     d_C,
-                    d_D);
+                    d_D,
+                    red_or_black);
 
         } // patchess
     }     // num_sweeps

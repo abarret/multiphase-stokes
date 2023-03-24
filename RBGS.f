@@ -35,7 +35,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        f_un_data_0, f_un_data_1, f_un_gcw,
      &        f_us_data_0, f_us_data_1, f_us_gcw,
      &        thn_data, thn_gcw, eta_n, eta_s,
-     &        nu_n, nu_s, xi, w, C, D)
+     &        nu_n, nu_s, xi, w, C, D, red_or_black)
 c
       use my_subs
       implicit none
@@ -44,7 +44,7 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
       integer ilow0,  iup0  
       integer ilow1,  iup1
       integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
-      integer f_p_gcw, thn_gcw
+      integer f_p_gcw, thn_gcw, red_or_black
       double precision eta_n, eta_s, nu_n, nu_s, xi, w, C, D
 c      
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
@@ -90,6 +90,8 @@ c
       do i1 = ilow1, iup1   
         do i0 = ilow0, iup0  ! same loop as the c++ code (currently this is just GS)
 c
+          if( mod(i0+i1,2) .EQ. red_or_black ) then
+          
           ! calculate thn at sides
           thn_lower_x = 0.5d0*(thn_data(i0,i1)+thn_data(i0-1,i1))  ! thn(i-1/2, j)
           thn_upper_x = 0.5d0*(thn_data(i0,i1)+thn_data(i0+1,i1))  ! thn(i+1/2, j)
@@ -413,6 +415,7 @@ c
           us_data_1(i0,i1+1) = (1.d0-w)*us_data_1(i0,i1+1) + w*b(8);
           p_data(i0,i1) = (1.d0-w)*p_data(i0,i1) + w*b(9);
 c
+          end if
         enddo
       enddo
 c
