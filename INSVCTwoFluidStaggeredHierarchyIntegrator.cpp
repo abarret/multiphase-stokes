@@ -248,6 +248,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "un_sc");
     d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "us_sc");
     d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "thn_cc");
+    d_grad_x_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_x_thn_cc");  // I thought about using a sideVariable
+    d_grad_y_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_y_thn_cc");  // but ultimately opted against it
     d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_un_sc");
     d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_us_sc");
     d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "f_cc");
@@ -290,6 +292,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getScratchContext());
+
+    // Register gradient of thn with the current context
+    int grad_x_thn_idx, grad_y_thn_idx;
+    registerVariable(grad_x_thn_idx, d_grad_x_thn_var, IntVector<NDIM>(1), getCurrentContext());
+    registerVariable(grad_y_thn_idx, d_grad_y_thn_var, IntVector<NDIM>(1), getCurrentContext());
 
     // Drawing variables. Velocities are node centered that get allocated with the current context.
     // Pressure is cell centered, so we can just use the current context for that.
@@ -361,31 +368,26 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            const int grad_x_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_x_thn_var, getCurrentContext());
+            const int grad_y_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_y_thn_var, getCurrentContext());
+            Pointer<CellData<NDIM, double>> grad_x_thn_data = patch->getPatchData(grad_x_thn_idx);
+            Pointer<CellData<NDIM, double>> grad_y_thn_data = patch->getPatchData(grad_y_thn_idx);
             Pointer<CellData<NDIM, int> > tagged_data = patch->getPatchData(tag_idx);
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 const CellIndex<NDIM>& idx = ci();
 
-                // thn at sidess
-                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
-                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
-                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
-                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-
-                // compute gradient of theta in x and y directions
-                double thn_grad_x = (thn_upper_x - thn_lower_x)/dx[0];
-                double thn_grad_y = (thn_upper_y - thn_lower_y)/dx[1];
-
-                if (std::abs(thn_grad_x) > threshold || std::abs(thn_grad_y) > threshold){
+                if (std::abs((*grad_x_thn_data)(idx)) > threshold || std::abs((*grad_y_thn_data)(idx)) > threshold){
 
                     (*tagged_data)(idx) = 1;   
 
                 }
             }   
         }
+
+        // deallocate the gradient patch data on dense hierarchy here?
+        
     return;
 } // applyGradientDetectorSpecialized
 
@@ -566,6 +568,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         {
             Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
             if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, 0.0);
+            if (!level->checkAllocated(grad_x_thn_idx)) level->allocatePatchData(grad_x_thn_idx, 0.0);
+            if (!level->checkAllocated(grad_y_thn_idx)) level->allocatePatchData(grad_y_thn_idx, 0.0);
         }
         d_thn_fcn->setDataOnPatchHierarchy(
             thn_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
@@ -630,6 +634,42 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
 
+    // Calculate gradient of thn
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
+            const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+            const int grad_x_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_x_thn_var, getCurrentContext());
+            const int grad_y_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_y_thn_var, getCurrentContext());
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<CellData<NDIM, double>> grad_x_thn_data = patch->getPatchData(grad_x_thn_idx);
+            Pointer<CellData<NDIM, double>> grad_y_thn_data = patch->getPatchData(grad_y_thn_idx);
+            IntVector<NDIM> xp(1, 0), yp(0, 1);
+
+           for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
+            {
+                const CellIndex<NDIM>& idx = ci();
+                SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
+                SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
+                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
+                SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
+
+                // thn at sidess
+                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
+                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
+                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
+                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
+
+                // Compute gradient of thn in x-dir
+                (*grad_x_thn_data) = (thn_upper_x - thn_lower_x)/dx[0];
+
+                // Compute gradient of thn in y-dir
+                (*grad_y_thn_data) = (thn_upper_y - thn_lower_y)/dx[1];
+            }
+        } //PatchLevel
+
     // Deallocate patch data on the dense hierarchy
     if (d_use_preconditioner)
     {
@@ -640,6 +680,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
         {
             Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
             if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
+            // deallocate the gradient thn patch data here?
         }
     }
 
