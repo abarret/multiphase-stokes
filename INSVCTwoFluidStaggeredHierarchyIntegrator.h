@@ -109,11 +109,18 @@ public:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getPressureVariable() const;
 
     /*!
-     * Set initial conditions for the state variables
+     * Set initial conditions for the state variables.
+     *
+     * NOTE: These pointers are set to nullptr after they are used.
      */
     void setInitialData(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> un_fcn,
                         SAMRAI::tbox::Pointer<IBTK::CartGridFunction> us_fcn,
                         SAMRAI::tbox::Pointer<IBTK::CartGridFunction> p_fcn);
+
+    /*!
+     * Set the initial conditions for the network volume fraction.
+     */
+    void setInitialNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> thn_init_fcn);
 
     /*!
      * Register forcing functions. Any can be NULL
@@ -123,12 +130,20 @@ public:
                              SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fp_fcn = nullptr);
 
     /*!
-     * Register the volume fraction function.
+     * Register the volume fraction function. If a function is not registered, the volume fraction is advected with the
+     * fluid.
      *
-     * TODO: Current implementations require this function to be registered. We should optionally allow a patch index to
-     * be registered.
+     * An optional argument allows this function to be used as the initial condition for the volume fraction. If this is
+     * set to false, users are expected to call setInitialNetworkVolumeFraction.
      */
-    void setNetworkVolumeFractionFunction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> thn_fcn);
+    void setNetworkVolumeFractionFunction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> thn_fcn,
+                                          bool use_as_initial_condition = true);
+
+    /*!
+     * Sets that the network volume fraction should be advected with the specified advection diffusion integrator. Also
+     * registers the integrator with the hierarchy.
+     */
+    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator);
 
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
@@ -231,17 +246,16 @@ private:
     INSVCTwoFluidStaggeredHierarchyIntegrator&
     operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
 
-    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn, d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
 
     // CartGridFunctions that set the initial values for state variables.
-    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn, d_thn_init_fcn;
 
     /*!
      * Fluid solver variables.
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_us_sc_var;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_us_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_f_cc_var;
@@ -290,6 +304,17 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>> d_hier_cc_data_ops;
     SAMRAI::tbox::Pointer<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>> d_hier_sc_data_ops;
+    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyFaceDataOpsReal<NDIM, double>> d_hier_fc_data_ops;
+
+    /*!
+     * Network volume fraction. We either specify the function thn_fcn, or we use the d_thn_integrator.
+     *
+     * IMPORTANT: d_thn_integrator should be listed in d_adv_diff_hier_integrators. We ONLY use d_thn_integrator for the
+     * contexts.
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
+    SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
 };
 } // namespace IBAMR
 
