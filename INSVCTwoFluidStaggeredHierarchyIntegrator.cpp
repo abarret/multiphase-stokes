@@ -387,7 +387,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
         }
 
         // deallocate the gradient patch data on dense hierarchy here?
-        
+
     return;
 } // applyGradientDetectorSpecialized
 
@@ -431,6 +431,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
     const int us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getScratchContext());
     const int p_scr_idx = var_db->mapVariableAndContextToIndex(d_P_var, getScratchContext());
+    const int grad_x_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_x_thn_var, getCurrentContext());
+    const int grad_y_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_y_thn_var, getCurrentContext());
 
     // Allocate scratch and new data
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
