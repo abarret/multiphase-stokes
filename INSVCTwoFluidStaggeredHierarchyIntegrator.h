@@ -109,6 +109,16 @@ public:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getPressureVariable() const;
 
     /*!
+     * \brief Set the viscosity coefficients for the viscous stresses.
+     */
+    void setViscosityCoefficient(double eta_n, double eta_s);
+
+    /*!
+     * \brief Set the drag coefficients for each phase.
+     */
+    void setDragCoefficient(double xi, double nu_n, double nu_s);
+
+    /*!
      * Set initial conditions for the state variables.
      *
      * NOTE: These pointers are set to nullptr after they are used.
@@ -275,8 +285,11 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
 
-    // Density
+    // Physical parameters
     double d_rho = std::numeric_limits<double>::quiet_NaN();
+    double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
+           d_nu_s = std::numeric_limits<double>::quiet_NaN();
+    double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
 
     /*!
      * Solver information

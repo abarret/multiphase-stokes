@@ -321,11 +321,12 @@ main(int argc, char* argv[])
             new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_",
-                input_db->getDouble("w"),
-                C,
-                D);
+                "Krylov_precond_");
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
+        fac_precondition_strategy->setCandDCoefficients(C, D);
+        fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
+        fac_precondition_strategy->setViscosityCoefficient(1.0, 1.0);
+        fac_precondition_strategy->setViscosityCoefficient(1.0, 1.0);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,
