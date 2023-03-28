@@ -272,9 +272,13 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
 
         // Setup the box relaxation FAC operator
-        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "", 1.0 /*w*/, 0.0 /*C*/, 1.0 /*D*/);
+        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
         box_relax.setThnIdx(thn_cc_idx);
         box_relax.setToZero(u_vec, 0);
+        box_relax.setCandDCoefficients(0.0, 1.0);
+        box_relax.setUnderRelaxationParamater(1.0);
+        box_relax.setViscosityCoefficient(1.0, 1.0);
+        box_relax.setDragCoefficient(1.0, 1.0, 1.0);
 
         for (int i = 0; i <= 680; i++)
         {

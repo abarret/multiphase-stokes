@@ -236,6 +236,21 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureVariable() const
 }
 
 void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
+{
+    d_eta_n = eta_n;
+    d_eta_s = eta_s;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
+{
+    d_xi = xi;
+    d_nu_n = nu_n;
+    d_nu_s = nu_s;
+}
+
+void
 INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
                                                           Pointer<CartGridFunction> us_fcn,
                                                           Pointer<CartGridFunction> p_fcn)
@@ -601,8 +616,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
     RHS_op.setCandDCoefficients(C, D1);
-    RHS_op.setDragCoefficient(1.0, 1.0, 1.0);
-    RHS_op.setViscosityCoefficient(1.0, 1.0);
+    RHS_op.setDragCoefficient(d_xi, d_nu_n, d_nu_s);
+    RHS_op.setViscosityCoefficient(d_eta_n, d_eta_s);
     RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
 
     // Store results of applying stokes operator in f2_vec
@@ -620,8 +635,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
     d_stokes_op->setCandDCoefficients(C, D2);
-    d_stokes_op->setDragCoefficient(1.0, 1.0, 1.0);
-    d_stokes_op->setViscosityCoefficient(1.0, 1.0);
+    d_stokes_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
+    d_stokes_op->setViscosityCoefficient(d_eta_n, d_eta_s);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
 
     d_stokes_solver = new PETScKrylovLinearSolver("solver", d_solver_db, "solver_");
@@ -630,9 +645,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Now create a preconditioner
     if (d_use_preconditioner)
     {
-        d_precond_op = new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-            "KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D2);
+        d_precond_op =
+            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_");
         d_precond_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
+        d_precond_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
+        d_precond_op->setViscosityCoefficient(d_eta_n, d_eta_s);
+        d_precond_op->setUnderRelaxationParamater(d_w);
+        d_precond_op->setCandDCoefficients(C, D2);
         d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
         d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);

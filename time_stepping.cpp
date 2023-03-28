@@ -84,6 +84,9 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
+        ins_integrator->setViscosityCoefficient(1.0, 1.0);
+        ins_integrator->setDragCoefficient(1.0, 1.0, 1.0);
+
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
             new muParserCartGridFunction("un", app_initializer->getComponentDatabase("un"), grid_geometry);
