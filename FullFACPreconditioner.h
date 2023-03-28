@@ -192,6 +192,14 @@ public:
         return d_dense_hierarchy;
     }
 
+    /*!
+     * Allocate and transfer data from the base hierarchy given to the object via initializeOperatorState() to the dense
+     * hierarchy owned by this object. If specified, this will also deallocate data from the dense hierarchy when
+     * deallocateSolverState() is called.
+     */
+    void transferToDense(int idx, bool deallocate_data = true);
+    void transferToDense(std::set<int> idxs, bool deallocate_data = true);
+
 protected:
 private:
     int d_multigrid_max_levels = -1;
@@ -237,6 +245,8 @@ private:
 
     std::map<SAMRAI::hier::Variable<NDIM>*, SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyDataOpsReal<NDIM, double>>>
         d_var_op_map;
+
+    std::set<int> d_allocated_idxs;
 };
 } // namespace IBTK
 
