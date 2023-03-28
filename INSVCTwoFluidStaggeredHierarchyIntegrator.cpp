@@ -607,7 +607,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Set the initial guess for the system to be the most recent approximation to t^{n+1}
     d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(0), un_new_idx);
-    d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(1), un_new_idx);
+    d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(1), us_new_idx);
     d_hier_cc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(2), p_new_idx);
 
     // Solve for un(n+1), us(n+1), p(n+1).
