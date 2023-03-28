@@ -353,7 +353,41 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
     // Fill in the tag_idx with 1 if the cell index on a given level should be refined.
     // tag_idx corresponds to patch data CellData<NDIM, int>.
     // TODO: Implement reasonable refinement criteria.
-}
+    const double threshold = 1.0;  // set arbitrarily for now
+    Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(level_num);
+
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
+            const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<CellData<NDIM, int> > tagged_data = patch->getPatchData(tag_idx);
+
+            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
+            {
+                const CellIndex<NDIM>& idx = ci();
+
+                // thn at sidess
+                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
+                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
+                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
+                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
+
+                // compute gradient of theta in x and y directions
+                double thn_grad_x = (thn_upper_x - thn_lower_x)/dx[0];
+                double thn_grad_y = (thn_upper_y - thn_lower_y)/dx[1];
+
+                if (std::abs(thn_grad_x) > threshold || std::abs(thn_grad_y) > threshold){
+
+                    (*tagged_data)(idx) = 1;   
+
+                }
+            }   
+        }
+    return;
+} // applyGradientDetectorSpecialized
 
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialized(
