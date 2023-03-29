@@ -140,9 +140,7 @@ main(int argc, char* argv[])
             pout << "Simulation time is " << loop_time << "\n";
 
             dt = ins_integrator->getMaximumTimeStepSize();
-            ins_integrator->preprocessIntegrateHierarchy(loop_time, loop_time + dt, 1);
-            ins_integrator->integrateHierarchy(loop_time, loop_time + dt, 0);
-            ins_integrator->postprocessIntegrateHierarchy(loop_time, loop_time + dt, true, 1);
+            ins_integrator->advanceHierarchy(dt);
             loop_time += dt;
 
             pout << "\n";
@@ -176,7 +174,7 @@ main(int argc, char* argv[])
         Pointer<CellVariable<NDIM, double>> p_var = ins_integrator->getPressureVariable();
 
         auto var_db = VariableDatabase<NDIM>::getDatabase();
-        Pointer<VariableContext> ctx = ins_integrator->getContext();
+        Pointer<VariableContext> ctx = ins_integrator->getCurrentContext();
         const int un_idx = var_db->mapVariableAndContextToIndex(un_var, ctx);
         const int us_idx = var_db->mapVariableAndContextToIndex(us_var, ctx);
         const int p_idx = var_db->mapVariableAndContextToIndex(p_var, ctx);
@@ -219,22 +217,30 @@ main(int argc, char* argv[])
         pout << "Printing error norms\n\n";
         pout << "Newtork velocity\n";
         pout << "Un L1-norm:  " << hier_sc_data_ops.L1Norm(un_idx, wgt_sc_idx) << "\n";
-        pout << "Un L1-norm:  " << hier_sc_data_ops.L2Norm(un_idx, wgt_sc_idx) << "\n";
+        pout << "Un L2-norm:  " << hier_sc_data_ops.L2Norm(un_idx, wgt_sc_idx) << "\n";
         pout << "Un max-norm: " << hier_sc_data_ops.maxNorm(un_idx, wgt_sc_idx) << "\n\n";
 
         pout << "Solvent velocity\n";
         pout << "Us L1-norm:  " << hier_sc_data_ops.L1Norm(us_idx, wgt_sc_idx) << "\n";
-        pout << "Us L1-norm:  " << hier_sc_data_ops.L2Norm(us_idx, wgt_sc_idx) << "\n";
+        pout << "Us L2-norm:  " << hier_sc_data_ops.L2Norm(us_idx, wgt_sc_idx) << "\n";
         pout << "Us max-norm: " << hier_sc_data_ops.maxNorm(us_idx, wgt_sc_idx) << "\n\n";
 
         pout << "Pressure\n";
         pout << "P L1-norm:  " << hier_cc_data_ops.L1Norm(p_idx, wgt_cc_idx) << "\n";
-        pout << "P L1-norm:  " << hier_cc_data_ops.L2Norm(p_idx, wgt_cc_idx) << "\n";
+        pout << "P L2-norm:  " << hier_cc_data_ops.L2Norm(p_idx, wgt_cc_idx) << "\n";
         pout << "P max-norm: " << hier_cc_data_ops.maxNorm(p_idx, wgt_cc_idx) << "\n";
 
         // Print extra viz files for the error
         pout << "\nWriting visualization files...\n\n";
         ins_integrator->setupPlotData();
         visit_data_writer->writePlotData(patch_hierarchy, iteration_num + 1, loop_time);
+
+        for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
+            level->deallocatePatchData(un_exa_idx);
+            level->deallocatePatchData(us_exa_idx);
+            level->deallocatePatchData(p_exa_idx);
+        }
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
