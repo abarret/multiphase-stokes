@@ -90,8 +90,8 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
-        ins_integrator->setViscosityCoefficient(1.0, 1.0);
-        ins_integrator->setDragCoefficient(1.0, 1.0, 1.0);
+        ins_integrator->setViscosityCoefficient(0.04, 0.04);
+        ins_integrator->setDragCoefficient(250.0 * 0.04, 1.0, 1.0);
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
