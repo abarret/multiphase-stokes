@@ -43,33 +43,10 @@
 #include <string>
 #include <vector>
 
-namespace IBAMR
-{
-class ConvectiveOperator;
-} // namespace IBAMR
-namespace IBTK
-{
-class PoissonSolver;
-} // namespace IBTK
-namespace SAMRAI
-{
-namespace hier
-{
-template <int DIM>
-class BasePatchLevel;
-template <int DIM>
-class Patch;
-template <int DIM>
-class PatchHierarchy;
-template <int DIM>
-class BasePatchHierarchy;
-} // namespace hier
-namespace mesh
-{
-template <int DIM>
-class GriddingAlgorithm;
-} // namespace mesh
-} // namespace SAMRAI
+// Local includes
+#include "FullFACPreconditioner.h"
+#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "VCTwoFluidStaggeredStokesOperator.h"
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
@@ -130,11 +107,6 @@ public:
      * Get pressure velocity variable.
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getPressureVariable() const;
-
-    /*!
-     * Get the context used in the hierarchy.
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> getContext() const;
 
     /*!
      * Set initial conditions for the state variables
@@ -211,6 +183,22 @@ public:
 
     void synchronizeHierarchyDataSpecialized(IBTK::VariableContextType ctx_type) override;
 
+    /*!
+     * Reset cached hierarchy dependent data.
+     */
+    void resetHierarchyConfigurationSpecialized(SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
+                                                int coarsest_level,
+                                                int finest_level) override;
+
+    void applyGradientDetectorSpecialized(const SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
+                                          int level_num,
+                                          double error_data_time,
+                                          int tag_idx,
+                                          bool initial_time,
+                                          bool uses_richardson_extrapolation_too);
+
+    int getNumberOfCycles() const override;
+
 protected:
     void setupPlotDataSpecialized() override;
 
@@ -253,16 +241,25 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_us_sc_var;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_p_cc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_us_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_f_cc_var;
 
-    /*
-     * Variable context
+    /*!
+     * Gradient detector variables
      */
-    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_ctx;
+    bool d_use_grad_tagging = false;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_grad_thn_var;
+    SAMRAI::tbox::Array<double> d_abs_grad_thresh, d_rel_grad_thresh;
+    double d_max_grad_thn = std::numeric_limits<double>::quiet_NaN();
+
+    /*!
+     * Vectors
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
+    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
+    std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
 
     // Density
     double d_rho = std::numeric_limits<double>::quiet_NaN();
@@ -271,11 +268,15 @@ private:
      * Solver information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_solver_db;
+    SAMRAI::tbox::Pointer<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
+    SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesOperator> d_stokes_op;
 
     /*!
      * Preconditioner information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
+    SAMRAI::tbox::Pointer<IBTK::FullFACPreconditioner> d_stokes_precond;
+    SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;
 
@@ -283,6 +284,12 @@ private:
      * Velocity Drawing information.
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_un_draw_var, d_us_draw_var;
+
+    /*!
+     * Objects that can do the operations we need
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>> d_hier_cc_data_ops;
+    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>> d_hier_sc_data_ops;
 };
 } // namespace IBAMR
 
