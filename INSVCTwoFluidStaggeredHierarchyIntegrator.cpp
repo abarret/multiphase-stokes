@@ -159,6 +159,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
     if (input_db->keyExists("w")) d_w = input_db->getDouble("w");
     if (input_db->keyExists("use_preconditioner")) d_use_preconditioner = input_db->getBool("use_preconditioner");
+    if (input_db->keyExists("use_grad_tagging")) d_use_grad_tagging = input_db->getBool("use_grad_tagging");
+    if (input_db->keyExists("grad_rel_thresh")) input_db->getArray("grad_rel_thresh", d_rel_grad_thresh);
+    if (input_db->keyExists("grad_abs_thresh")) input_db->getArray("grad_abs_thresh", d_abs_grad_thresh);
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -248,8 +251,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "un_sc");
     d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "us_sc");
     d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "thn_cc");
-    d_grad_x_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_x_thn_cc");  // I thought about using a sideVariable
-    d_grad_y_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_y_thn_cc");  // but ultimately opted against it
+    d_grad_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_thn_cc", NDIM);
     d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_un_sc");
     d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_us_sc");
     d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "f_cc");
@@ -294,9 +296,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getScratchContext());
 
     // Register gradient of thn with the current context
-    int grad_x_thn_idx, grad_y_thn_idx;
-    registerVariable(grad_x_thn_idx, d_grad_x_thn_var, IntVector<NDIM>(1), getCurrentContext());
-    registerVariable(grad_y_thn_idx, d_grad_y_thn_var, IntVector<NDIM>(1), getCurrentContext());
+    int grad_thn_idx;
+    registerVariable(grad_thn_idx, d_grad_thn_var, IntVector<NDIM>(0), getCurrentContext());
 
     // Drawing variables. Velocities are node centered that get allocated with the current context.
     // Pressure is cell centered, so we can just use the current context for that.
@@ -359,35 +360,37 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
 {
     // Fill in the tag_idx with 1 if the cell index on a given level should be refined.
     // tag_idx corresponds to patch data CellData<NDIM, int>.
-    // TODO: Implement reasonable refinement criteria.
-    const double threshold = 1.0;  // set arbitrarily for now
-    Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(level_num);
-
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+    // Note: d_grad_thn_var is filled during postprocessHierarchyIntegrator.
+    if (d_use_grad_tagging)
+    {
+        // Determine thresholds for the level
+        double grad_rel_thresh = std::numeric_limits<double>::max();
+        double grad_abs_thresh = std::numeric_limits<double>::max();
+        if (d_abs_grad_thresh.size() > 0)
+            grad_abs_thresh = d_abs_grad_thresh[std::max(std::min(level_num, d_abs_grad_thresh.size() - 1), 0)];
+        if (d_rel_grad_thresh.size() > 0)
+            grad_rel_thresh = d_rel_grad_thresh[std::max(std::min(level_num, d_rel_grad_thresh.size() - 1), 0)];
+        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(level_num);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const int grad_x_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_x_thn_var, getCurrentContext());
-            const int grad_y_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_y_thn_var, getCurrentContext());
-            Pointer<CellData<NDIM, double>> grad_x_thn_data = patch->getPatchData(grad_x_thn_idx);
-            Pointer<CellData<NDIM, double>> grad_y_thn_data = patch->getPatchData(grad_y_thn_idx);
+            Pointer<CellData<NDIM, double>> grad_thn_data = patch->getPatchData(d_grad_thn_var, getCurrentContext());
             Pointer<CellData<NDIM, int> > tagged_data = patch->getPatchData(tag_idx);
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 const CellIndex<NDIM>& idx = ci();
 
-                if (std::abs((*grad_x_thn_data)(idx)) > threshold || std::abs((*grad_y_thn_data)(idx)) > threshold){
+                double grad_thn_norm = 0.0;
+                for (int d = 0; d < NDIM; ++d) grad_thn_norm += (*grad_thn_data)(idx, d) * (*grad_thn_data)(idx, d);
+                grad_thn_norm = std::sqrt(grad_thn_norm);
 
-                    (*tagged_data)(idx) = 1;   
-
-                }
-            }   
+                if (grad_thn_norm > grad_abs_thresh || (grad_thn_norm / d_max_grad_thn) > grad_rel_thresh)
+                    (*tagged_data)(idx) = 1;
+            }
         }
-
-        // deallocate the gradient patch data on dense hierarchy here?
-
+    }
     return;
 } // applyGradientDetectorSpecialized
 
@@ -431,8 +434,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
     const int us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getScratchContext());
     const int p_scr_idx = var_db->mapVariableAndContextToIndex(d_P_var, getScratchContext());
-    const int grad_x_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_x_thn_var, getCurrentContext());
-    const int grad_y_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_y_thn_var, getCurrentContext());
 
     // Allocate scratch and new data
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
@@ -570,8 +571,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         {
             Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
             if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, 0.0);
-            if (!level->checkAllocated(grad_x_thn_idx)) level->allocatePatchData(grad_x_thn_idx, 0.0);
-            if (!level->checkAllocated(grad_y_thn_idx)) level->allocatePatchData(grad_y_thn_idx, 0.0);
         }
         d_thn_fcn->setDataOnPatchHierarchy(
             thn_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
@@ -636,41 +635,25 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
 
-    // Calculate gradient of thn
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
-            const int grad_x_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_x_thn_var, getCurrentContext());
-            const int grad_y_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_y_thn_var, getCurrentContext());
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
-            Pointer<CellData<NDIM, double>> grad_x_thn_data = patch->getPatchData(grad_x_thn_idx);
-            Pointer<CellData<NDIM, double>> grad_y_thn_data = patch->getPatchData(grad_y_thn_idx);
-            IntVector<NDIM> xp(1, 0), yp(0, 1);
-
-           for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
-            {
-                const CellIndex<NDIM>& idx = ci();
-                SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
-                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-
-                // thn at sidess
-                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
-                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
-                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
-                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-
-                // Compute gradient of thn in x-dir
-                (*grad_x_thn_data) = (thn_upper_x - thn_lower_x)/dx[0];
-
-                // Compute gradient of thn in y-dir
-                (*grad_y_thn_data) = (thn_upper_y - thn_lower_y)/dx[1];
-            }
-        } //PatchLevel
+    // Calculate gradient of thn for grid cell tagging.
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int grad_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_thn_var, getCurrentContext());
+    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_cell_comp(1);
+    ghost_cell_comp[0] = ITC(thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, nullptr);
+    HierarchyGhostCellInterpolation hier_ghost_fill;
+    hier_ghost_fill.initializeOperatorState(
+        ghost_cell_comp, d_hierarchy, 0 /*coarsest_ln*/, d_hierarchy->getFinestLevelNumber());
+    d_hier_math_ops->grad(grad_thn_idx,
+                          d_grad_thn_var,
+                          1.0 /*alpha*/,
+                          thn_new_idx,
+                          d_thn_cc_var,
+                          Pointer<HierarchyGhostCellInterpolation>(&hier_ghost_fill, false),
+                          new_time);
+    // TODO: Replace this with a max over the L2 norm.
+    d_max_grad_thn = d_hier_cc_data_ops->maxNorm(grad_thn_idx, IBTK::invalid_index);
 
     // Deallocate patch data on the dense hierarchy
     if (d_use_preconditioner)
