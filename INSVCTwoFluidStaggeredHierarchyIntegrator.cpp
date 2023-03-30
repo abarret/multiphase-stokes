@@ -423,6 +423,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
     const double dt = new_time - current_time;
+    const double half_time = 0.5 * (new_time + current_time);
 
     // Pull out current solution components
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -496,9 +497,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 
     // Set the forcing data if applicable.
     d_rhs_vec->setToScalar(0.0);
-    if (d_f_un_fcn) d_f_un_fcn->setDataOnPatchHierarchy(f_un_idx, d_f_un_sc_var, d_hierarchy, current_time);
-    if (d_f_us_fcn) d_f_us_fcn->setDataOnPatchHierarchy(f_us_idx, d_f_us_sc_var, d_hierarchy, current_time);
-    if (d_f_p_fcn) d_f_p_fcn->setDataOnPatchHierarchy(f_p_idx, d_f_cc_var, d_hierarchy, current_time);
+    if (d_f_un_fcn) d_f_un_fcn->setDataOnPatchHierarchy(f_un_idx, d_f_un_sc_var, d_hierarchy, half_time);
+    if (d_f_us_fcn) d_f_us_fcn->setDataOnPatchHierarchy(f_us_idx, d_f_us_sc_var, d_hierarchy, half_time);
+    if (d_f_p_fcn) d_f_p_fcn->setDataOnPatchHierarchy(f_p_idx, d_f_cc_var, d_hierarchy, half_time);
 
     // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule:
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
@@ -538,6 +539,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Sum f_vec and f2_vec and store result in f_vec
     d_rhs_vec->add(d_rhs_vec, f2_vec, true);
     f2_vec->deallocateVectorData();
+    f2_vec->freeVectorComponents();
+    f2_vec.setNull();
 
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
@@ -571,10 +574,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
         {
             Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-            if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, 0.0);
+            if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, new_time);
         }
         d_thn_fcn->setDataOnPatchHierarchy(
-            thn_idx, d_thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
+            thn_idx, d_thn_cc_var, dense_hierarchy, new_time, false, 0, dense_hierarchy->getFinestLevelNumber());
         {
             // Also fill in theta ghost cells
             using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
@@ -603,13 +606,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                                                               const int cycle_num)
 {
     INSHierarchyIntegrator::integrateHierarchy(current_time, new_time, cycle_num);
-
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_new_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getNewContext());
     const int us_new_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getNewContext());
     const int p_new_idx = var_db->mapVariableAndContextToIndex(d_P_var, getNewContext());
-
-    const double dt = new_time - current_time;
 
     // Set the initial guess for the system to be the most recent approximation to t^{n+1}
     d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(0), un_new_idx);
@@ -670,6 +670,16 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
         }
     }
 
+    for (auto& nul_vec : d_nul_vecs)
+    {
+        if (nul_vec)
+        {
+            nul_vec->deallocateVectorData();
+            nul_vec->freeVectorComponents();
+        }
+    }
+    d_nul_vecs.clear();
+
     // Execute any registered callbacks.
     executePostprocessIntegrateHierarchyCallbackFcns(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
@@ -728,25 +738,22 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     hier_bdry_fill.fillData(0.0);
 
     // interpolate
-    HierarchyMathOps hier_math_ops("hier_math_ops", d_hierarchy);
-    hier_math_ops.setPatchHierarchy(d_hierarchy);
-    hier_math_ops.resetLevels(coarsest_ln, finest_ln);
-    hier_math_ops.interp(un_draw_idx,
-                         d_un_draw_var,
-                         synch_cf_interface,
-                         un_scr_idx,
-                         d_un_sc_var,
-                         nullptr,
-                         d_integrator_time,
-                         synch_cf_interface);
-    hier_math_ops.interp(us_draw_idx,
-                         d_us_draw_var,
-                         synch_cf_interface,
-                         us_scr_idx,
-                         d_us_sc_var,
-                         nullptr,
-                         d_integrator_time,
-                         synch_cf_interface);
+    d_hier_math_ops->interp(un_draw_idx,
+                            d_un_draw_var,
+                            synch_cf_interface,
+                            un_scr_idx,
+                            d_un_sc_var,
+                            nullptr,
+                            d_integrator_time,
+                            synch_cf_interface);
+    d_hier_math_ops->interp(us_draw_idx,
+                            d_us_draw_var,
+                            synch_cf_interface,
+                            us_scr_idx,
+                            d_us_sc_var,
+                            nullptr,
+                            d_integrator_time,
+                            synch_cf_interface);
 
     // Deallocate scratch data
     deallocatePatchData(un_scr_idx, coarsest_ln, finest_ln);
