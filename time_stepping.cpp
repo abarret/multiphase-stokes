@@ -99,7 +99,7 @@ main(int argc, char* argv[])
         // Set up Thn functions
         Pointer<CartGridFunction> thn_fcn =
             new muParserCartGridFunction("thn", app_initializer->getComponentDatabase("thn"), grid_geometry);
-        ins_integrator->setNetworkVolumeFractionFunction(thn_fcn);
+        ins_integrator->setNetworkVolumeFractionFunction(thn_fcn, true);
 
         // Set up forcing function
         Pointer<CartGridFunction> fn_fcn =
