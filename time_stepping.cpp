@@ -114,11 +114,39 @@ main(int argc, char* argv[])
         // Initialize the INS integrator
         ins_integrator->initializePatchHierarchy(patch_hierarchy, gridding_algorithm);
 
+        // Create exact indices
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        Pointer<NodeVariable<NDIM, double>> un_exact_var = new NodeVariable<NDIM, double>("un_exact", NDIM);
+        Pointer<NodeVariable<NDIM, double>> us_exact_var = new NodeVariable<NDIM, double>("us_exact", NDIM);
+        Pointer<CellVariable<NDIM, double>> p_exact_var = new CellVariable<NDIM, double>("p_exact");
+        const int un_exact_idx = var_db->registerVariableAndContext(un_exact_var, var_db->getContext("Exact"));
+        const int us_exact_idx = var_db->registerVariableAndContext(us_exact_var, var_db->getContext("Exact"));
+        const int p_exact_idx = var_db->registerVariableAndContext(p_exact_var, var_db->getContext("Exact"));
+
+        visit_data_writer->registerPlotQuantity("UN_exact", "VECTOR", un_exact_idx, 0, 1.0, "NODE");
+        for (unsigned int d = 0; d < NDIM; ++d)
+            visit_data_writer->registerPlotQuantity(
+                "UN_exact_" + std::to_string(d), "SCALAR", un_exact_idx, d, 1.0, "NODE");
+        visit_data_writer->registerPlotQuantity("US_exact", "VECTOR", us_exact_idx, 0, 1.0, "NODE");
+        for (unsigned int d = 0; d < NDIM; ++d)
+            visit_data_writer->registerPlotQuantity(
+                "US_exact_" + std::to_string(d), "SCALAR", us_exact_idx, d, 1.0, "NODE");
+        visit_data_writer->registerPlotQuantity("p_exact", "SCALAR", p_exact_idx, 0, 1.0, "CELL");
+
+        Pointer<CartGridFunction> un_exact_fcn =
+            new muParserCartGridFunction("UN_exact", app_initializer->getComponentDatabase("un_exact"), grid_geometry);
+        Pointer<CartGridFunction> us_exact_fcn =
+            new muParserCartGridFunction("US_exact", app_initializer->getComponentDatabase("us_exact"), grid_geometry);
+        Pointer<CartGridFunction> p_exact_fcn =
+            new muParserCartGridFunction("P_exact", app_initializer->getComponentDatabase("p_exact"), grid_geometry);
+
         // Get some time stepping information.
         unsigned int iteration_num = ins_integrator->getIntegratorStep();
         double loop_time = ins_integrator->getIntegratorTime();
         double time_end = ins_integrator->getEndTime();
         double dt = 0.0;
+
+        input_db->printClassData(plog);
 
         // Visualization files info.
         double viz_dump_time_interval = input_db->getDouble("VIZ_DUMP_TIME_INTERVAL");
@@ -128,7 +156,16 @@ main(int argc, char* argv[])
         {
             pout << "\nWriting visualization files...\n\n";
             ins_integrator->setupPlotData();
+            ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+            ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+            ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+            un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
+            us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
+            p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
             visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
+            ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+            ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+            ins_integrator->deallocatePatchData(p_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
             next_viz_dump_time += viz_dump_time_interval;
         }
         // Main time step loop
@@ -155,25 +192,27 @@ main(int argc, char* argv[])
             {
                 pout << "\nWriting visualization files...\n\n";
                 ins_integrator->setupPlotData();
+                ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+                ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+                ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+                un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
+                us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
+                p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
                 visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
+                ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+                ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+                ins_integrator->deallocatePatchData(p_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+
                 next_viz_dump_time += viz_dump_time_interval;
             }
         }
 
         // Compute errors.
-        Pointer<CartGridFunction> un_exact_fcn =
-            new muParserCartGridFunction("UN_exact", app_initializer->getComponentDatabase("un_exact"), grid_geometry);
-        Pointer<CartGridFunction> us_exact_fcn =
-            new muParserCartGridFunction("US_exact", app_initializer->getComponentDatabase("us_exact"), grid_geometry);
-        Pointer<CartGridFunction> p_exact_fcn =
-            new muParserCartGridFunction("P_exact", app_initializer->getComponentDatabase("p_exact"), grid_geometry);
-
         // Get the current data.
         Pointer<SideVariable<NDIM, double>> un_var = ins_integrator->getNetworkVariable();
         Pointer<SideVariable<NDIM, double>> us_var = ins_integrator->getSolventVariable();
         Pointer<CellVariable<NDIM, double>> p_var = ins_integrator->getPressureVariable();
 
-        auto var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = ins_integrator->getCurrentContext();
         const int un_idx = var_db->mapVariableAndContextToIndex(un_var, ctx);
         const int us_idx = var_db->mapVariableAndContextToIndex(us_var, ctx);
@@ -233,7 +272,16 @@ main(int argc, char* argv[])
         // Print extra viz files for the error
         pout << "\nWriting visualization files...\n\n";
         ins_integrator->setupPlotData();
+        ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+        ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+        ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
+        un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
+        us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
+        p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
         visit_data_writer->writePlotData(patch_hierarchy, iteration_num + 1, loop_time);
+        ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+        ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
+        ins_integrator->deallocatePatchData(p_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
 
         for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
         {

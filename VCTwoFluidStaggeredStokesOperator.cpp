@@ -655,6 +655,7 @@ VCTwoFluidStaggeredStokesOperator::deallocateOperatorState()
 
     // Deallocate scratch data.
     d_x->deallocateVectorData();
+    d_b->deallocateVectorData();
 
     // Delete the solution and rhs vectors.
     d_x->resetLevels(d_x->getCoarsestLevelNumber(),
