@@ -121,13 +121,41 @@
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
+namespace
+{
+// Copy data from a side-centered variable to a face-centered variable.
+void
+copy_side_to_face(const int u_fc_idx, const int u_sc_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
+{
+    const int coarsest_ln = 0;
+    const int finest_ln = hierarchy->getFinestLevelNumber();
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<FaceData<NDIM, double>> u_f_data = patch->getPatchData(u_fc_idx);
+            Pointer<SideData<NDIM, double>> u_s_data = patch->getPatchData(u_sc_idx);
+            const Box<NDIM> box = patch->getBox();
+            for (int axis = 0; axis < NDIM; ++axis)
+            {
+                for (SideIterator<NDIM> i(box, axis); i; i++)
+                {
+                    const SideIndex<NDIM>& si = i();
+                    FaceIndex<NDIM> fi(si.toCell(0), axis, 1);
+                    (*u_f_data)(fi) = (*u_s_data)(si);
+                }
+            }
+        }
+    }
+
+    return;
+} // copy_side_to_face
+} // namespace
+
 namespace IBAMR
 {
-static double
-convertToThs(const double thn)
-{
-    return 1.0 - thn;
-}
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
@@ -207,6 +235,21 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureVariable() const
 }
 
 void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
+{
+    d_eta_n = eta_n;
+    d_eta_s = eta_s;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
+{
+    d_xi = xi;
+    d_nu_n = nu_n;
+    d_nu_s = nu_s;
+}
+
+void
 INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
                                                           Pointer<CartGridFunction> us_fcn,
                                                           Pointer<CartGridFunction> p_fcn)
@@ -229,11 +272,34 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctions(Pointer<CartGridF
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Pointer<CartGridFunction> thn_fcn)
+INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialNetworkVolumeFraction(Pointer<CartGridFunction> thn_init_fcn)
+{
+    d_thn_init_fcn = thn_init_fcn;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Pointer<CartGridFunction> thn_fcn,
+                                                                            bool use_as_initial_data)
 {
     // Make sure we have a valid pointer.
     TBOX_ASSERT(thn_fcn);
     d_thn_fcn = thn_fcn;
+    if (use_as_initial_data) d_thn_init_fcn = thn_fcn;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
+    Pointer<AdvDiffHierarchyIntegrator> adv_diff_integrator)
+{
+    registerAdvDiffHierarchyIntegrator(adv_diff_integrator);
+    d_thn_integrator = adv_diff_integrator;
+
+    // Set up thn to be advected
+    d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
+    d_thn_integrator->registerTransportedQuantity(d_thn_cc_var, true /*output_Q*/);
+    d_thn_integrator->setAdvectionVelocity(d_thn_cc_var, d_U_adv_diff_var);
+    d_thn_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false); // Not divergence free in general.
+    d_thn_integrator->setInitialConditions(d_thn_cc_var, d_thn_init_fcn);
 }
 
 void
@@ -248,13 +314,14 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
 
     // First create the variables we need.
     // NOTE: d_P_var is a member variable of the base class.
-    d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "un_sc");
-    d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "us_sc");
-    d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "thn_cc");
+    d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
+    d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::us_sc");
+    // NOTE: This may have been created above with the advection diffusion integrator.
+    if (!d_thn_cc_var) d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
     d_grad_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_thn_cc", NDIM);
-    d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_un_sc");
-    d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "f_us_sc");
-    d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "f_cc");
+    d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::f_un_sc");
+    d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::f_us_sc");
+    d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "::f_cc");
 
     // Register variables with the integrator. Those with states (Velocities) have associated current, new, and scratch
     // indices. NOTE: Pressure is NOT a state variable, but we keep track of current and new values for initial guesses
@@ -289,11 +356,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
 
     // Everything else only gets a scratch context, which is deallocated at the end of each time step.
     // Note the forces need ghost cells for modifying the RHS to account for non-homogenous boundary conditions.
-    int thn_idx, f_p_idx, f_un_idx, f_us_idx;
-    registerVariable(thn_idx, d_thn_cc_var, IntVector<NDIM>(1), getScratchContext());
+    int thn_cur_idx, thn_new_idx, f_p_idx, f_un_idx, f_us_idx;
     registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getScratchContext());
+    registerVariable(thn_cur_idx, d_thn_cc_var, IntVector<NDIM>(1), getCurrentContext());
+    registerVariable(thn_new_idx, d_thn_cc_var, IntVector<NDIM>(1), getNewContext());
 
     // Register gradient of thn with the current context
     int grad_thn_idx;
@@ -320,7 +388,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         for (int d = 0; d < NDIM; ++d)
             d_visit_writer->registerPlotQuantity("Us_" + std::to_string(d), "SCALAR", us_draw_idx, d, 1.0, "NODE");
 
-        d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "NODE");
+        d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "CELL");
+
+        // Only need to plot this variable if we aren't advecting it.
+        // If we do advect theta, the advection integrator will plot it.
+        if (d_thn_fcn) d_visit_writer->registerPlotQuantity("Thn", "SCALAR", thn_cur_idx, 0, 1.0, "CELL");
     }
 
     // Create the hierarchy data operations
@@ -329,6 +401,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         hier_ops_manager->getOperationsDouble(new CellVariable<NDIM, double>("cc_var"), hierarchy, true /*get_unique*/);
     d_hier_sc_data_ops =
         hier_ops_manager->getOperationsDouble(new SideVariable<NDIM, double>("sc_var"), hierarchy, true /*get_unique*/);
+    d_hier_fc_data_ops =
+        hier_ops_manager->getOperationsDouble(new FaceVariable<NDIM, double>("fc_var"), hierarchy, true /*get_unique*/);
 
     d_integrator_is_initialized = true;
     return;
@@ -409,6 +483,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialize
 
     d_hier_sc_data_ops->setPatchHierarchy(hierarchy);
     d_hier_sc_data_ops->resetLevels(coarsest_level, finest_level);
+
+    d_hier_fc_data_ops->setPatchHierarchy(hierarchy);
+    d_hier_fc_data_ops->resetLevels(coarsest_level, finest_level);
 }
 
 void
@@ -471,11 +548,24 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     d_rhs_vec->addComponent(d_f_cc_var, f_p_idx, wgt_cc_idx, d_hier_cc_data_ops);
 
     // Grab the theta index
-    const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
-    // Set the correct data if applicable
+    const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
     if (d_thn_fcn)
+    {
+        // Set the correct data if applicable
         d_thn_fcn->setDataOnPatchHierarchy(
-            thn_idx, d_thn_cc_var, d_hierarchy, current_time, false, coarsest_ln, finest_ln);
+            thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, false, coarsest_ln, finest_ln);
+        d_thn_fcn->setDataOnPatchHierarchy(
+            thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, false, coarsest_ln, finest_ln);
+    }
+    else
+    {
+        const int thn_adv_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
+        // Otherwise set the new data to the best guess
+        d_hier_cc_data_ops->copyData(thn_new_idx, thn_adv_cur_idx);
+        d_hier_cc_data_ops->copyData(thn_cur_idx, thn_adv_cur_idx);
+    }
 
     // Set up null vectors (if applicable)
     d_nul_vecs.resize(1);
@@ -525,9 +615,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
     RHS_op.setCandDCoefficients(C, D1);
-    RHS_op.setDragCoefficient(1.0, 1.0, 1.0);
-    RHS_op.setViscosityCoefficient(1.0, 1.0);
-    RHS_op.setThnIdx(thn_idx);
+    RHS_op.setDragCoefficient(d_xi, d_nu_n, d_nu_s);
+    RHS_op.setViscosityCoefficient(d_eta_n, d_eta_s);
+    RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
 
     // Store results of applying stokes operator in f2_vec
     Pointer<SAMRAIVectorReal<NDIM, double>> f2_vec = d_rhs_vec->cloneVector("f2_vec");
@@ -544,9 +634,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
     d_stokes_op->setCandDCoefficients(C, D2);
-    d_stokes_op->setDragCoefficient(1.0, 1.0, 1.0);
-    d_stokes_op->setViscosityCoefficient(1.0, 1.0);
-    d_stokes_op->setThnIdx(thn_idx);
+    d_stokes_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
+    d_stokes_op->setViscosityCoefficient(d_eta_n, d_eta_s);
+    d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
 
     d_stokes_solver = new PETScKrylovLinearSolver("solver", d_solver_db, "solver_");
     d_stokes_solver->setOperator(d_stokes_op);
@@ -554,9 +644,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Now create a preconditioner
     if (d_use_preconditioner)
     {
-        d_precond_op = new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-            "KrylovPrecondStrategy", "Krylov_precond_", d_w, C, D2);
-        d_precond_op->setThnIdx(thn_idx);
+        d_precond_op =
+            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_");
+        d_precond_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
+        d_precond_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
+        d_precond_op->setViscosityCoefficient(d_eta_n, d_eta_s);
+        d_precond_op->setUnderRelaxationParamater(d_w);
+        d_precond_op->setCandDCoefficients(C, D2);
         d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
         d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);
@@ -569,30 +663,58 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     if (d_use_preconditioner)
     {
         Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
-        // Allocate data
-        for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+        if (d_thn_fcn)
         {
-            Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-            if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, new_time);
+            // Allocate data
+            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
+                if (!level->checkAllocated(thn_new_idx)) level->allocatePatchData(thn_new_idx, new_time);
+            }
+            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx,
+                                               d_thn_cc_var,
+                                               dense_hierarchy,
+                                               new_time,
+                                               false,
+                                               0,
+                                               dense_hierarchy->getFinestLevelNumber());
         }
-        d_thn_fcn->setDataOnPatchHierarchy(
-            thn_idx, d_thn_cc_var, dense_hierarchy, new_time, false, 0, dense_hierarchy->getFinestLevelNumber());
+        else
         {
-            // Also fill in theta ghost cells
-            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-            std::vector<ITC> ghost_cell_comp(1);
-            ghost_cell_comp[0] = ITC(thn_idx,
-                                     "CONSERVATIVE_LINEAR_REFINE",
-                                     false,
-                                     "NONE",
-                                     "LINEAR",
-                                     true,
-                                     nullptr); // defaults to fill corner
-            HierarchyGhostCellInterpolation ghost_cell_fill;
-            ghost_cell_fill.initializeOperatorState(
-                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-            ghost_cell_fill.fillData(0.0);
+            d_stokes_precond->transferToDense(thn_new_idx, true);
         }
+
+        // Also fill in ghost cells on the dense hierarchy
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(1);
+        ghost_cell_comp[0] = ITC(thn_new_idx,
+                                 "CONSERVATIVE_LINEAR_REFINE",
+                                 false,
+                                 "NONE",
+                                 "LINEAR",
+                                 true,
+                                 nullptr); // defaults to fill corner
+        HierarchyGhostCellInterpolation ghost_cell_fill;
+        ghost_cell_fill.initializeOperatorState(
+            ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+        ghost_cell_fill.fillData(0.0);
+    }
+
+    // Set up the advection diffusion integrator
+    for (const auto& adv_diff_integrator : d_adv_diff_hier_integrators)
+    {
+        const int U_adv_diff_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getCurrentContext());
+        const int U_adv_diff_scr_idx =
+            var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getScratchContext());
+        const int U_adv_diff_new_idx =
+            var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getNewContext());
+        if (isAllocatedPatchData(U_adv_diff_cur_idx)) copy_side_to_face(U_adv_diff_cur_idx, un_cur_idx, d_hierarchy);
+        adv_diff_integrator->preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
+        if (isAllocatedPatchData(U_adv_diff_scr_idx))
+            d_hier_fc_data_ops->copyData(U_adv_diff_scr_idx, U_adv_diff_cur_idx);
+        if (isAllocatedPatchData(U_adv_diff_new_idx))
+            d_hier_fc_data_ops->copyData(U_adv_diff_new_idx, U_adv_diff_cur_idx);
     }
 
     executePreprocessIntegrateHierarchyCallbackFcns(current_time, new_time, num_cycles);
@@ -609,6 +731,39 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     const int un_new_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getNewContext());
     const int us_new_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getNewContext());
     const int p_new_idx = var_db->mapVariableAndContextToIndex(d_P_var, getNewContext());
+    // Update the state of the advection diffusion integrator
+    for (const auto& adv_diff_integrator : d_adv_diff_hier_integrators)
+        adv_diff_integrator->integrateHierarchy(current_time, new_time, cycle_num);
+
+    // Update thn if necessary. We need to update it if we are using the preconditioner, which uses a different patch
+    // hierarchy.
+    if (d_thn_integrator)
+    {
+        const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
+        const int thn_adv_new_idx =
+            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
+        d_hier_cc_data_ops->copyData(thn_new_idx, thn_adv_new_idx);
+        if (d_use_preconditioner)
+        {
+            d_stokes_precond->transferToDense(thn_new_idx);
+            // Also fill in ghost cells on the dense hierarchy
+            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comp(1);
+            ghost_cell_comp[0] = ITC(thn_new_idx,
+                                     "CONSERVATIVE_LINEAR_REFINE",
+                                     false,
+                                     "NONE",
+                                     "LINEAR",
+                                     true,
+                                     nullptr); // defaults to fill corner
+            HierarchyGhostCellInterpolation ghost_cell_fill;
+            ghost_cell_fill.initializeOperatorState(
+                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+            ghost_cell_fill.fillData(0.0);
+        }
+    }
+    const double dt = new_time - current_time;
 
     // Set the initial guess for the system to be the most recent approximation to t^{n+1}
     d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(0), un_new_idx);
@@ -622,6 +777,32 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     d_hier_sc_data_ops->copyData(un_new_idx, d_sol_vec->getComponentDescriptorIndex(0));
     d_hier_sc_data_ops->copyData(us_new_idx, d_sol_vec->getComponentDescriptorIndex(1));
     d_hier_cc_data_ops->copyData(p_new_idx, d_sol_vec->getComponentDescriptorIndex(2));
+
+    // Do any more updates to the advection diffusion variables
+    for (const auto& adv_diff_hier_integrator : d_adv_diff_hier_integrators)
+    {
+        // Reset the velocities
+        const int U_adv_diff_new_idx =
+            var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_hier_integrator->getNewContext());
+        if (isAllocatedPatchData(U_adv_diff_new_idx)) copy_side_to_face(U_adv_diff_new_idx, un_new_idx, d_hierarchy);
+        const int U_adv_diff_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_hier_integrator->getCurrentContext());
+        const int U_adv_diff_scr_idx =
+            var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_hier_integrator->getScratchContext());
+        if (isAllocatedPatchData(U_adv_diff_scr_idx))
+            d_hier_fc_data_ops->linearSum(U_adv_diff_scr_idx, 0.5, U_adv_diff_new_idx, 0.5, U_adv_diff_cur_idx);
+
+        // Now update the state variables. Note that cycle 0 has already been performed
+        const int adv_diff_num_cycles = adv_diff_hier_integrator->getNumberOfCycles();
+        if (d_current_num_cycles != adv_diff_num_cycles)
+        {
+            for (int adv_diff_cycle_num = 1; adv_diff_cycle_num < adv_diff_num_cycles; ++adv_diff_cycle_num)
+                adv_diff_hier_integrator->integrateHierarchy(current_time, new_time, adv_diff_cycle_num);
+        }
+    }
+
+    // Execuate any registered callbacks
+    executeIntegrateHierarchyCallbackFcns(current_time, new_time, cycle_num);
     return;
 } // integrateHierarchy
 
@@ -638,7 +819,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     // Calculate gradient of thn for grid cell tagging.
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int grad_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_thn_var, getCurrentContext());
-    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp(1);
     ghost_cell_comp[0] = ITC(thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, nullptr);
@@ -655,18 +836,16 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     // TODO: Replace this with a max over the L2 norm.
     d_max_grad_thn = d_hier_cc_data_ops->maxNorm(grad_thn_idx, IBTK::invalid_index);
 
-    // Deallocate patch data on the dense hierarchy
-    if (d_use_preconditioner)
+    // Synchronize new state
+    if (!skip_synchronize_new_state_data) synchronizeHierarchyData(NEW_DATA);
+
+    // Note: Preconditioner should deallocate data as necessary.
+    // Deallocate scratch data
+    for (const auto& adv_diff_hier_integrator : d_adv_diff_hier_integrators)
     {
-        auto var_db = VariableDatabase<NDIM>::getDatabase();
-        const int thn_cc_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
-        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
-        for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-        {
-            Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-            if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
-            // deallocate the gradient thn patch data here?
-        }
+        const int adv_diff_num_cycles = adv_diff_hier_integrator->getNumberOfCycles();
+        adv_diff_hier_integrator->postprocessIntegrateHierarchy(
+            current_time, new_time, skip_synchronize_new_state_data, adv_diff_num_cycles);
     }
 
     for (auto& nul_vec : d_nul_vecs)
@@ -717,6 +896,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     const int us_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
     const int us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getScratchContext());
+    const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
 
     static const bool synch_cf_interface = true;
     const int coarsest_ln = 0;
@@ -753,6 +933,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
                             nullptr,
                             d_integrator_time,
                             synch_cf_interface);
+
+    // Set thn if necessary
+    if (d_thn_fcn)
+        d_thn_fcn->setDataOnPatchHierarchy(
+            thn_cur_idx, d_thn_cc_var, d_hierarchy, d_integrator_time, false, coarsest_ln, finest_ln);
 
     // Deallocate scratch data
     deallocatePatchData(un_scr_idx, coarsest_ln, finest_ln);

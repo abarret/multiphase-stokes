@@ -11,6 +11,7 @@
 //
 // ---------------------------------------------------------------------
 
+#include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
 #include <ibamr/app_namespaces.h>
@@ -65,7 +66,12 @@ main(int argc, char* argv[])
                 "FluidSolver",
                 app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
                 grid_geometry,
-                false);
+                true /*register_for_restart*/);
+
+        Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator =
+            new AdvDiffSemiImplicitHierarchyIntegrator("AdvDiffIntegrator",
+                                                       app_initializer->getComponentDatabase("AdvDiffIntegrator"),
+                                                       true /*register_for_restart*/);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
         grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables
@@ -84,8 +90,8 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
-        ins_integrator->setViscosityCoefficient(1.0, 1.0);
-        ins_integrator->setDragCoefficient(1.0, 1.0, 1.0);
+        ins_integrator->setViscosityCoefficient(0.04, 0.04);
+        ins_integrator->setDragCoefficient(250.0 * 0.04, 1.0, 1.0);
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
@@ -97,18 +103,17 @@ main(int argc, char* argv[])
         ins_integrator->setInitialData(un_init, us_init, p_init);
 
         // Set up Thn functions
-        Pointer<CartGridFunction> thn_fcn =
-            new muParserCartGridFunction("thn", app_initializer->getComponentDatabase("thn"), grid_geometry);
-        ins_integrator->setNetworkVolumeFractionFunction(thn_fcn, true);
+        Pointer<CartGridFunction> thn_init_fcn =
+            new muParserCartGridFunction("thn_init", app_initializer->getComponentDatabase("thn"), grid_geometry);
+        ins_integrator->setInitialNetworkVolumeFraction(thn_init_fcn);
+        ins_integrator->advectNetworkVolumeFraction(adv_diff_integrator);
 
         // Set up forcing function
         Pointer<CartGridFunction> fn_fcn =
             new muParserCartGridFunction("f_un", app_initializer->getComponentDatabase("f_un"), grid_geometry);
         Pointer<CartGridFunction> fs_fcn =
             new muParserCartGridFunction("f_us", app_initializer->getComponentDatabase("f_us"), grid_geometry);
-        Pointer<CartGridFunction> fp_fcn =
-            new muParserCartGridFunction("f_p", app_initializer->getComponentDatabase("f_p"), grid_geometry);
-        ins_integrator->setForcingFunctions(fn_fcn, fs_fcn, fp_fcn);
+        ins_integrator->setForcingFunctions(fn_fcn, fs_fcn, nullptr);
 
         // Set up visualizations
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
@@ -117,39 +122,11 @@ main(int argc, char* argv[])
         // Initialize the INS integrator
         ins_integrator->initializePatchHierarchy(patch_hierarchy, gridding_algorithm);
 
-        // Create exact indices
-        auto var_db = VariableDatabase<NDIM>::getDatabase();
-        Pointer<NodeVariable<NDIM, double>> un_exact_var = new NodeVariable<NDIM, double>("un_exact", NDIM);
-        Pointer<NodeVariable<NDIM, double>> us_exact_var = new NodeVariable<NDIM, double>("us_exact", NDIM);
-        Pointer<CellVariable<NDIM, double>> p_exact_var = new CellVariable<NDIM, double>("p_exact");
-        const int un_exact_idx = var_db->registerVariableAndContext(un_exact_var, var_db->getContext("Exact"));
-        const int us_exact_idx = var_db->registerVariableAndContext(us_exact_var, var_db->getContext("Exact"));
-        const int p_exact_idx = var_db->registerVariableAndContext(p_exact_var, var_db->getContext("Exact"));
-
-        visit_data_writer->registerPlotQuantity("UN_exact", "VECTOR", un_exact_idx, 0, 1.0, "NODE");
-        for (unsigned int d = 0; d < NDIM; ++d)
-            visit_data_writer->registerPlotQuantity(
-                "UN_exact_" + std::to_string(d), "SCALAR", un_exact_idx, d, 1.0, "NODE");
-        visit_data_writer->registerPlotQuantity("US_exact", "VECTOR", us_exact_idx, 0, 1.0, "NODE");
-        for (unsigned int d = 0; d < NDIM; ++d)
-            visit_data_writer->registerPlotQuantity(
-                "US_exact_" + std::to_string(d), "SCALAR", us_exact_idx, d, 1.0, "NODE");
-        visit_data_writer->registerPlotQuantity("p_exact", "SCALAR", p_exact_idx, 0, 1.0, "CELL");
-
-        Pointer<CartGridFunction> un_exact_fcn =
-            new muParserCartGridFunction("UN_exact", app_initializer->getComponentDatabase("un_exact"), grid_geometry);
-        Pointer<CartGridFunction> us_exact_fcn =
-            new muParserCartGridFunction("US_exact", app_initializer->getComponentDatabase("us_exact"), grid_geometry);
-        Pointer<CartGridFunction> p_exact_fcn =
-            new muParserCartGridFunction("P_exact", app_initializer->getComponentDatabase("p_exact"), grid_geometry);
-
         // Get some time stepping information.
         unsigned int iteration_num = ins_integrator->getIntegratorStep();
         double loop_time = ins_integrator->getIntegratorTime();
         double time_end = ins_integrator->getEndTime();
         double dt = 0.0;
-
-        input_db->printClassData(plog);
 
         // Visualization files info.
         double viz_dump_time_interval = input_db->getDouble("VIZ_DUMP_TIME_INTERVAL");
@@ -159,16 +136,7 @@ main(int argc, char* argv[])
         {
             pout << "\nWriting visualization files...\n\n";
             ins_integrator->setupPlotData();
-            ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-            ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-            ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-            un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
-            us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
-            p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
             visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
-            ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-            ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-            ins_integrator->deallocatePatchData(p_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
             next_viz_dump_time += viz_dump_time_interval;
         }
         // Main time step loop
@@ -195,27 +163,25 @@ main(int argc, char* argv[])
             {
                 pout << "\nWriting visualization files...\n\n";
                 ins_integrator->setupPlotData();
-                ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-                ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-                ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-                un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
-                us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
-                p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
                 visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
-                ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-                ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-                ins_integrator->deallocatePatchData(p_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-
                 next_viz_dump_time += viz_dump_time_interval;
             }
         }
 
         // Compute errors.
+        Pointer<CartGridFunction> un_exact_fcn =
+            new muParserCartGridFunction("UN_exact", app_initializer->getComponentDatabase("un_exact"), grid_geometry);
+        Pointer<CartGridFunction> us_exact_fcn =
+            new muParserCartGridFunction("US_exact", app_initializer->getComponentDatabase("us_exact"), grid_geometry);
+        Pointer<CartGridFunction> p_exact_fcn =
+            new muParserCartGridFunction("P_exact", app_initializer->getComponentDatabase("p_exact"), grid_geometry);
+
         // Get the current data.
         Pointer<SideVariable<NDIM, double>> un_var = ins_integrator->getNetworkVariable();
         Pointer<SideVariable<NDIM, double>> us_var = ins_integrator->getSolventVariable();
         Pointer<CellVariable<NDIM, double>> p_var = ins_integrator->getPressureVariable();
 
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = ins_integrator->getCurrentContext();
         const int un_idx = var_db->mapVariableAndContextToIndex(un_var, ctx);
         const int us_idx = var_db->mapVariableAndContextToIndex(us_var, ctx);
@@ -259,32 +225,23 @@ main(int argc, char* argv[])
         pout << "Printing error norms\n\n";
         pout << "Newtork velocity\n";
         pout << "Un L1-norm:  " << hier_sc_data_ops.L1Norm(un_idx, wgt_sc_idx) << "\n";
-        pout << "Un L2-norm:  " << hier_sc_data_ops.L2Norm(un_idx, wgt_sc_idx) << "\n";
+        pout << "Un L1-norm:  " << hier_sc_data_ops.L2Norm(un_idx, wgt_sc_idx) << "\n";
         pout << "Un max-norm: " << hier_sc_data_ops.maxNorm(un_idx, wgt_sc_idx) << "\n\n";
 
         pout << "Solvent velocity\n";
         pout << "Us L1-norm:  " << hier_sc_data_ops.L1Norm(us_idx, wgt_sc_idx) << "\n";
-        pout << "Us L2-norm:  " << hier_sc_data_ops.L2Norm(us_idx, wgt_sc_idx) << "\n";
+        pout << "Us L1-norm:  " << hier_sc_data_ops.L2Norm(us_idx, wgt_sc_idx) << "\n";
         pout << "Us max-norm: " << hier_sc_data_ops.maxNorm(us_idx, wgt_sc_idx) << "\n\n";
 
         pout << "Pressure\n";
         pout << "P L1-norm:  " << hier_cc_data_ops.L1Norm(p_idx, wgt_cc_idx) << "\n";
-        pout << "P L2-norm:  " << hier_cc_data_ops.L2Norm(p_idx, wgt_cc_idx) << "\n";
+        pout << "P L1-norm:  " << hier_cc_data_ops.L2Norm(p_idx, wgt_cc_idx) << "\n";
         pout << "P max-norm: " << hier_cc_data_ops.maxNorm(p_idx, wgt_cc_idx) << "\n";
 
         // Print extra viz files for the error
         pout << "\nWriting visualization files...\n\n";
         ins_integrator->setupPlotData();
-        ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-        ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-        ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-        un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
-        us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
-        p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
         visit_data_writer->writePlotData(patch_hierarchy, iteration_num + 1, loop_time);
-        ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-        ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
-        ins_integrator->deallocatePatchData(p_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
 
         for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
         {

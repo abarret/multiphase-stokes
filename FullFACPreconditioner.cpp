@@ -215,6 +215,12 @@ FullFACPreconditioner::deallocateSolverState()
 
     // Deallocate scratch data.
     d_fac_strategy->deallocateScratchData();
+    for (int ln = 0; ln <= d_dense_hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_dense_hierarchy->getPatchLevel(ln);
+        for (const auto& idx : d_allocated_idxs)
+            if (level->checkAllocated(idx)) level->deallocatePatchData(idx);
+    }
 
     // Destroy temporary vectors.
     if (d_f)
@@ -279,6 +285,73 @@ FullFACPreconditioner::generateDenseHierarchy(Pointer<PatchHierarchy<NDIM>> base
     Pointer<CartesianGridGeometry<NDIM>> cart_dense_geom = dense_geom;
     cart_dense_geom->addSpatialCoarsenOperator(new CartCellDoubleCubicCoarsen());
     cart_dense_geom->addSpatialCoarsenOperator(new CartSideDoubleCubicCoarsen());
+}
+
+void
+FullFACPreconditioner::transferToDense(const int idx, bool deallocate_data)
+{
+    std::set<int> idxs = { idx };
+    transferToDense(idxs, deallocate_data);
+}
+
+void
+FullFACPreconditioner::transferToDense(std::set<int> idxs, bool deallocate_data)
+{
+    // First allocate data on the dense hierarchy
+    for (int ln = 0; ln <= d_dense_hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_dense_hierarchy->getPatchLevel(ln);
+        for (const auto& idx : idxs)
+            if (!level->checkAllocated(idx)) level->allocatePatchData(idx);
+    }
+    Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
+    // We need to create refinement schedules to go from the base to dense hierarchy
+    // TODO: These schedules should be cached and saved between calls to solveSystem.
+    int level_diff = d_dense_hierarchy->getFinestLevelNumber() - d_hierarchy->getFinestLevelNumber();
+    Pointer<RefineAlgorithm<NDIM>> refine_alg = new RefineAlgorithm<NDIM>();
+    // First create the operators needed.
+    for (const auto& idx : idxs)
+    {
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        Pointer<Variable<NDIM>> var;
+        var_db->mapIndexToVariable(idx, var);
+        Pointer<RefineOperator<NDIM>> refine_op = grid_geom->lookupRefineOperator(var, "CONSERVATIVE_LINEAR_REFINE");
+        refine_alg->registerRefine(idx, idx, idx, refine_op);
+    }
+    std::vector<Pointer<RefineSchedule<NDIM>>> refine_scheds(d_hierarchy->getFinestLevelNumber() + 1);
+    // Now create schedules to fill in data.
+    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> base_level = d_hierarchy->getPatchLevel(ln);
+        Pointer<PatchLevel<NDIM>> dense_level = d_dense_hierarchy->getPatchLevel(ln + level_diff);
+        refine_scheds[ln] = refine_alg->createSchedule(dense_level, base_level);
+        refine_scheds[ln]->fillData(0.0, false);
+    }
+
+    // Now we need to coarsen the data from the dense hierarchy to the dense hierarchy.
+    // TODO: This isn't strictly necessary in multigrid because we will transfer the residual to the coarser grid
+    // anyway. What matters is that we transfer on the levels that are "uncovered" which is done in the above code. We
+    // should implement an option to skip this step.
+    Pointer<CoarsenAlgorithm<NDIM>> coarsen_alg = new CoarsenAlgorithm<NDIM>();
+    for (const auto& idx : idxs)
+    {
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        Pointer<Variable<NDIM>> var;
+        var_db->mapIndexToVariable(idx, var);
+        Pointer<CoarsenOperator<NDIM>> coarsen_op = grid_geom->lookupCoarsenOperator(var, "CUBIC_COARSEN");
+        coarsen_alg->registerCoarsen(idx, idx, coarsen_op);
+    }
+    std::vector<Pointer<CoarsenSchedule<NDIM>>> coarsen_scheds(level_diff);
+    for (int ln = level_diff - 1; ln >= 0; --ln)
+    {
+        Pointer<PatchLevel<NDIM>> dst_level = d_dense_hierarchy->getPatchLevel(ln);
+        Pointer<PatchLevel<NDIM>> src_level = d_dense_hierarchy->getPatchLevel(ln + 1);
+        coarsen_scheds[ln] = coarsen_alg->createSchedule(dst_level, src_level);
+        coarsen_scheds[ln]->coarsenData();
+    }
+
+    if (deallocate_data)
+        for (const auto& idx : idxs) d_allocated_idxs.insert(idx);
 }
 
 void

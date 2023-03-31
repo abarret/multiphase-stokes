@@ -51,10 +51,7 @@ public:
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
-                                                      const std::string& default_options_prefix,
-                                                      double w,
-                                                      double C,
-                                                      double D);
+                                                      const std::string& default_options_prefix);
 
     /*!
      * \brief Destructor.
@@ -172,22 +169,25 @@ public:
      */
     void deallocateOperatorState() override;
 
-protected:
-    int d_thn_idx = IBTK::invalid_index;
-    int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
-    double d_w = std::numeric_limits<double>::quiet_NaN(); // under relaxation factor
-    double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
-    double d_D = std::numeric_limits<double>::quiet_NaN(); // D depends on time stepping scheme
+    /*!
+     * \brief Set the under relaxation parameter.
+     */
+    void setUnderRelaxationParamater(double w);
 
-    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
-    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
-    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef = nullptr;
-    // Cached communications operators.
-    SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
-        d_P_fill_pattern;
-    std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> transaction_comps;
-    SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
+    /*!
+     * \brief Set the C and D coefficients.
+     */
+    void setCandDCoefficients(double C, double D);
+
+    /*!
+     * \brief Set the viscosity coefficients for the viscous stresses.
+     */
+    void setViscosityCoefficient(double eta_n, double eta_s);
+
+    /*!
+     * \brief Set the drag coefficients for each phase.
+     */
+    void setDragCoefficient(double xi, double nu_n, double nu_s);
 
 private:
     /*!
@@ -259,6 +259,27 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_prolong_scheds;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_restrict_scheds;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_ghostfill_no_restrict_scheds;
+
+    int d_thn_idx = IBTK::invalid_index;
+    int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
+    double d_w = 0.75;                                         // under relaxation factor
+    double d_C = std::numeric_limits<double>::quiet_NaN();     // C*u
+    double d_D = std::numeric_limits<double>::quiet_NaN();     // D depends on time stepping scheme
+    double d_eta_n = std::numeric_limits<double>::quiet_NaN(); // Network viscosity
+    double d_eta_s = std::numeric_limits<double>::quiet_NaN(); // Solvent viscosity
+    double d_xi = std::numeric_limits<double>::quiet_NaN();    // Drag coefficient
+    double d_nu_n = std::numeric_limits<double>::quiet_NaN();
+    double d_nu_s = std::numeric_limits<double>::quiet_NaN();
+
+    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef = nullptr;
+    // Cached communications operators.
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
+        d_P_fill_pattern;
+    std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> transaction_comps;
+    SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
 };
 } // namespace IBTK
 
