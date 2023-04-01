@@ -479,13 +479,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialize
 
     // Reset the hierarchy operations objects.
     d_hier_cc_data_ops->setPatchHierarchy(hierarchy);
-    d_hier_cc_data_ops->resetLevels(coarsest_level, finest_level);
+    d_hier_cc_data_ops->resetLevels(0, hierarchy->getFinestLevelNumber());
 
     d_hier_sc_data_ops->setPatchHierarchy(hierarchy);
-    d_hier_sc_data_ops->resetLevels(coarsest_level, finest_level);
+    d_hier_sc_data_ops->resetLevels(0, hierarchy->getFinestLevelNumber());
 
     d_hier_fc_data_ops->setPatchHierarchy(hierarchy);
-    d_hier_fc_data_ops->resetLevels(coarsest_level, finest_level);
+    d_hier_fc_data_ops->resetLevels(0, hierarchy->getFinestLevelNumber());
 }
 
 void
@@ -861,6 +861,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     // Execute any registered callbacks.
     executePostprocessIntegrateHierarchyCallbackFcns(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
+
+    d_stokes_op = nullptr;
+    d_stokes_solver = nullptr;
+    d_precond_op = nullptr;
+    d_stokes_precond = nullptr;
     return;
 } // postprocessIntegrateHierarchy
 
@@ -877,12 +882,6 @@ double
 INSVCTwoFluidStaggeredHierarchyIntegrator::getStableTimestep(Pointer<Patch<NDIM>> /*patch*/) const
 {
     return d_dt_init;
-}
-
-void
-INSVCTwoFluidStaggeredHierarchyIntegrator::synchronizeHierarchyDataSpecialized(VariableContextType ctx_type)
-{
-    // intentionally blank.
 }
 
 void

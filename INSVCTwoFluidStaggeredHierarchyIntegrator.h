@@ -206,8 +206,6 @@ public:
 
     double getStableTimestep(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch) const override;
 
-    void synchronizeHierarchyDataSpecialized(IBTK::VariableContextType ctx_type) override;
-
     /*!
      * Reset cached hierarchy dependent data.
      */
