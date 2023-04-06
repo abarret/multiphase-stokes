@@ -35,6 +35,7 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
+#include "FRMThnForcing.h"
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /*******************************************************************************
@@ -90,8 +91,13 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
-        ins_integrator->setViscosityCoefficient(0.04, 0.04);
-        ins_integrator->setDragCoefficient(250.0 * 0.04, 1.0, 1.0);
+        const double eta_n = input_db->getDouble("ETA_N");
+        const double eta_s = input_db->getDouble("ETA_S");
+        const double xi = input_db->getDouble("XI");
+        const double nu_n = input_db->getDouble("NU_N");
+        const double nu_s = input_db->getDouble("NU_S");
+        ins_integrator->setViscosityCoefficient(eta_n, eta_s);
+        ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
@@ -110,9 +116,9 @@ main(int argc, char* argv[])
 
         // Set up forcing function
         Pointer<CartGridFunction> fn_fcn =
-            new muParserCartGridFunction("f_un", app_initializer->getComponentDatabase("f_un"), grid_geometry);
+            new FRMThnForcing(ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator, true);
         Pointer<CartGridFunction> fs_fcn =
-            new muParserCartGridFunction("f_us", app_initializer->getComponentDatabase("f_us"), grid_geometry);
+            new FRMThnForcing(ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator, false);
         ins_integrator->setForcingFunctions(fn_fcn, fs_fcn, nullptr);
 
         // Set up visualizations

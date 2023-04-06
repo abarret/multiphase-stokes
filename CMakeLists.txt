@@ -25,7 +25,7 @@ TARGET_SOURCES(time_stepping PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwo
 TARGET_LINK_LIBRARIES(time_stepping IBAMR::IBAMR2d)
 
 ADD_EXECUTABLE(four_roll_mill four_roll_mill.cpp)
-TARGET_SOURCES(four_roll_mill PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp FullFACPreconditioner.cpp RBGS.f INSVCTwoFluidStaggeredHierarchyIntegrator.cpp)
+TARGET_SOURCES(four_roll_mill PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp FullFACPreconditioner.cpp RBGS.f INSVCTwoFluidStaggeredHierarchyIntegrator.cpp FRMThnForcing.cpp)
 TARGET_LINK_LIBRARIES(four_roll_mill IBAMR::IBAMR2d)
 
 ADD_SUBDIRECTORY(tests)
