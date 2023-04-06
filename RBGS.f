@@ -79,7 +79,7 @@ c
       double precision thn_lower_x, thn_lower_y
       double precision thn_upper_x, thn_upper_y
       double precision thn_imhalf_jphalf, thn_imhalf_jmhalf
-      double precisionthn_iphalf_jphalf, thn_iphalf_jmhalf
+      double precision thn_iphalf_jphalf, thn_iphalf_jmhalf
 c    
       double precision A_box(9,9)
       double precision b(9)
