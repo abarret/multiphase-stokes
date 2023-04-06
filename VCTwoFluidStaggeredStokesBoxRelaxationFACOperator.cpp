@@ -73,38 +73,38 @@
 
 extern "C"
 {
-    void R_B_G_S(const double*,  // dx
-                 const int&,     // ilower0
-                 const int&,     // iupper0
-                 const int&,     // ilower1
-                 const int&,     // iupper1
-                 double* const,  // un_data_0
-                 double* const,  // un_data_1
-                 const int&,     // un_gcw
-                 double* const,  // us_data_0
-                 double* const,  // us_data_0
-                 const int&,     // us_gcw
-                 double* const,  // p_data_
-                 const int&,     // p_gcw
-                 double* const,  // f_p_data
-                 const int&,     // f_p_gcw
-                 double* const,  // f_un_data_0
-                 double* const,  // f_un_data_1
-                 const int&,     // f_un_gcw
-                 double* const,  // f_us_data_0
-                 double* const,  // f_us_data_1
-                 const int&,     // f_us_gcw
-                 double* const,  // thn_data
-                 const int&,     // thn_gcw
-                 const double&,  // eta_n    // whatever will be passed in will be treated as a reference to a double
-                 const double&,  // eta_s    // telling the compiler that the function is expecting a reference
-                 const double&,  // nu_n
-                 const double&,  // nu_s
-                 const double&,  // xi
-                 const double&,  // w = under relaxation factor
-                 const double&,  // C in C*u term
+    void R_B_G_S(const double*, // dx
+                 const int&,    // ilower0
+                 const int&,    // iupper0
+                 const int&,    // ilower1
+                 const int&,    // iupper1
+                 double* const, // un_data_0
+                 double* const, // un_data_1
+                 const int&,    // un_gcw
+                 double* const, // us_data_0
+                 double* const, // us_data_0
+                 const int&,    // us_gcw
+                 double* const, // p_data_
+                 const int&,    // p_gcw
+                 double* const, // f_p_data
+                 const int&,    // f_p_gcw
+                 double* const, // f_un_data_0
+                 double* const, // f_un_data_1
+                 const int&,    // f_un_gcw
+                 double* const, // f_us_data_0
+                 double* const, // f_us_data_1
+                 const int&,    // f_us_gcw
+                 double* const, // thn_data
+                 const int&,    // thn_gcw
+                 const double&, // eta_n    // whatever will be passed in will be treated as a reference to a double
+                 const double&, // eta_s    // telling the compiler that the function is expecting a reference
+                 const double&, // nu_n
+                 const double&, // nu_s
+                 const double&, // xi
+                 const double&, // w = under relaxation factor
+                 const double&, // C in C*u term
                  const double&, // D
-                 const int&); // red_or_black
+                 const int&);   // red_or_black
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
@@ -330,9 +330,9 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     IBTK_TIMER_START(t_smooth_error);
 
     // Get the vector components. These pull out patch data indices
-    const int un_idx = error.getComponentDescriptorIndex(0); // network velocity, Un
-    const int us_idx = error.getComponentDescriptorIndex(1); // solvent velocity, Us
-    const int P_idx = error.getComponentDescriptorIndex(2);  // pressure
+    const int un_idx = error.getComponentDescriptorIndex(0);      // network velocity, Un
+    const int us_idx = error.getComponentDescriptorIndex(1);      // solvent velocity, Us
+    const int P_idx = error.getComponentDescriptorIndex(2);       // pressure
     const int thn_idx = d_thn_idx;
     const int f_un_idx = residual.getComponentDescriptorIndex(0); // RHS_Un
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
@@ -342,7 +342,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
 
     // outer for loop for number of sweeps
-    for (int sweep = 0; sweep < 2*num_sweeps; sweep++)
+    for (int sweep = 0; sweep < 2 * num_sweeps; sweep++)
     {
         // Fill in ghost cells. We only want to use values on our current level to fill in ghost cells.
         // TODO: d_ghostfill_no_restrict_scheds does not fill in ghost cells in at coarse fine interfaces. We need to
@@ -413,10 +413,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
             int red_or_black = sweep % 2; // red = 0 and black = 1
             R_B_G_S(dx,
-                    patch_lower(0), // ilower0
-                    patch_upper(0), // iupper0
-                    patch_lower(1), // ilower1
-                    patch_upper(1), // iupper1
+                    patch_lower(0),       // ilower0
+                    patch_upper(0),       // iupper0
+                    patch_lower(1),       // ilower1
+                    patch_upper(1),       // iupper1
                     un_data_0,
                     un_data_1,
                     un_gcw.min(),
@@ -533,7 +533,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
             const double* const xlow =
-                pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
+                pgeom->getXLower();                  // {xlow[0], xlow[1]} -> physical location of bottom left of box.
             const hier::Index<NDIM>& idx_low = patch->getBox().lower();
             Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
             Pointer<CellData<NDIM, double>> rhs_P_data =
@@ -553,9 +553,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 const CellIndex<NDIM>& idx = ci();
-                VectorNd x; // <- Eigen3 vector
-                for (int d = 0; d < NDIM; ++d)
-                    x[d] = xlow[d] + dx[d] * (idx(d) - idx_low(d) + 0.5); // Get's physical location of idx.
 
                 SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
                 SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
@@ -588,19 +585,17 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
-                const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
-                // pout << "\n At idx " << idx << " \n ";
+                const SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
 
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
-                SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
-                SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
+                SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
+                SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
+                SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
 
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
-                // pout << "thn_lower is " << thn_lower << "\n";
                 // thn at corners
                 double thn_imhalf_jphalf =
                     0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
@@ -657,18 +652,16 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
                      d_C * convertToThs(thn_lower) * (*us_data)(idx));
             }
 
-            // pout << "\n\n Looping over y-dir side-centers \n\n";
-
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
             {
-                const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
+                const SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
 
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
-                SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
-                SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
+                SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
+                SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
+                SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
 
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
