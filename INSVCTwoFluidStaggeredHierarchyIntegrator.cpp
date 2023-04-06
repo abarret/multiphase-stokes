@@ -421,7 +421,37 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointe
     // Do any kind of Hierarchy specific initialization on a given patch level.
     // Note: All initialization and regridding of state variables is managed by HierarchyIntegrator.
     // Example uses of this include mantaining a vorticity value to see where things should be refined or checking norms
-    // of quantities before and after regridding. intentionally blank.
+    // of quantities before and after regridding.
+    Pointer<PatchLevel<NDIM>> new_level = hierarchy->getPatchLevel(level_number);
+
+    // Compute gradient of theta for initial tagging
+    if (initial_time)
+    {
+        HierarchyDataOpsManager<NDIM>* hier_ops_manager = HierarchyDataOpsManager<NDIM>::getManager();
+        Pointer<HierarchyCellDataOpsReal<NDIM, double>> hier_cc_data_ops =
+            hier_ops_manager->getOperationsDouble(d_grad_thn_var, d_hierarchy, true);
+
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int grad_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_thn_var, getCurrentContext());
+        const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+
+        // Fill in with initial conditions.
+        d_thn_init_fcn->setDataOnPatchLevel(thn_idx, d_thn_cc_var, new_level, init_data_time, initial_time);
+
+        // Now fill in ghost cells
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(1);
+        ghost_cell_comp[0] = ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, nullptr);
+
+        Pointer<HierarchyGhostCellInterpolation> ghost_cell_fill = new HierarchyGhostCellInterpolation();
+        // Note: when we create a new level, the coarser levels should already be created. So we can use that data to
+        // fill ghost cells.
+        ghost_cell_fill->initializeOperatorState(ghost_cell_comp, hierarchy, 0, level_number);
+        HierarchyMathOps hier_math_ops("HierMathOps", hierarchy, 0, level_number);
+        hier_math_ops.grad(grad_thn_idx, d_grad_thn_var, 1.0, thn_idx, d_thn_cc_var, ghost_cell_fill, init_data_time);
+        // TODO: Replace this with a max over the L2 norm.
+        d_max_grad_thn = hier_cc_data_ops->maxNorm(grad_thn_idx, IBTK::invalid_index);
+    }
 }
 
 void
@@ -464,6 +494,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
                 if (grad_thn_norm > grad_abs_thresh || (grad_thn_norm / d_max_grad_thn) > grad_rel_thresh)
                     (*tagged_data)(idx) = 1;
             }
+            tagged_data->print(tagged_data->getBox());
         }
     }
     return;
