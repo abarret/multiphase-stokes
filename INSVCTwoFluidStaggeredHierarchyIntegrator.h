@@ -108,6 +108,11 @@ public:
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getPressureVariable() const;
 
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getNetworkVolumeFractionVariable() const
+    {
+        return d_thn_cc_var;
+    }
+
     /*!
      * \brief Set the viscosity coefficients for the viscous stresses.
      */
