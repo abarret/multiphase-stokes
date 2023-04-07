@@ -1,20 +1,27 @@
 RHO = 1.0
-MAX_MULTIGRID_LEVELS = 5
+MAX_MULTIGRID_LEVELS = 4
 START_TIME = 0.0
 END_TIME = 1.0
 NUM_CYCLES = 1
-DT_MAX = 0.005
+DT_MAX = 0.0001
 ENABLE_LOGGING = TRUE
 W = 0.75
 USE_PRECONDITIONER = TRUE
-N = 64
-VIZ_DUMP_TIME_INTERVAL = 0.01
+N = 16
+VIZ_DUMP_TIME_INTERVAL = 0.005
 DELTA = 0.175
+TAG_BUFFER = 1
 
 ADV_DIFF_NUM_CYCLES = 1
 ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
 ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
+
+ETA_S = 0.04
+ETA_N = 4.0
+NU_N = 1.0
+NU_S = 1.0
+XI = 250.0*ETA_S
 
 un {
    function_0 = "0.0"
@@ -28,21 +35,11 @@ us {
 
 p {
    function = "0.0"
-} // pressure has mean 0
-
-f_un {
-   function_0 = "0.0"
-   function_1 = "0.0"
-}
-
-f_us {
-   function_0 = "(2.0*PI*sin(2.0*PI*X_0)*cos(2.0*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1))"
-   function_1 = "(2.0*PI*cos(2.0*PI*X_0)*sin(2.0*PI*X_1) - 8*PI*PI*sin(2*PI*X_1)*cos(2*PI*X_0))"
 }
 
 thn {
    delta = DELTA
-   function = "0.05 + ((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
+   function = "0.25 + 0.25*((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
    //function = "0.5"
    //function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
 }
@@ -56,15 +53,18 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    enable_logging                = ENABLE_LOGGING
    w = W
    use_preconditioner = USE_PRECONDITIONER
+   grad_abs_thresh = 0.75
+   use_grad_tagging = TRUE
+   tag_buffer = TAG_BUFFER
 
    solver_db {
       ksp_type = "fgmres"
    }
 
    precond_db {
-      cycle_type = "F_CYCLE"
-      num_pre_sweeps = 18
-      num_post_sweeps = 18
+      cycle_type = "V_CYCLE"
+      num_pre_sweeps = 15
+      num_post_sweeps = 15
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
@@ -104,10 +104,12 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 1                 // Maximum number of levels in hierarchy.
+   max_levels = 4                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
-      level_1 = 2, 2              // vector ratio to next coarser level
+      level_1 = 4, 4              // vector ratio to next coarser level
+      level_2 = 2, 2
+      level_3 = 2, 2
    }
 
    largest_patch_size {
@@ -126,14 +128,7 @@ GriddingAlgorithm {
 }
 
 StandardTagAndInitialize {
-   tagging_method = "REFINE_BOXES"
-   RefineBoxes {
-    // level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
-    // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
-     level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
-    // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
-    // level_0 = [(1,1), (30,30)] 
-   }
+   tagging_method = "GRADIENT_DETECTOR"
 }
 
 LoadBalancer {
