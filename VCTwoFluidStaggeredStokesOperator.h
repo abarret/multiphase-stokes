@@ -59,24 +59,27 @@ namespace IBAMR
  * incompressible flow solver.
  *
  * This class knows how to apply the following operator:
- * [ C*thn + A_n + D*xi/nu_n*thn*ths   -D*xi/nu_n*thn*ths                 thn*grad ][un]
- * [ -D*xi/nu_s*thn*ths                 C*ths + A_s + D*xi/nu_s*thn*ths   ths*grad ][us]
- * [ div(thn)                          div(ths)                          0         ][p ]
+ * [ C*thn + A_n + D*xi/nu_n*thn*ths   -D*xi/nu_n*thn*ths                D_p*thn*grad ][un]
+ * [ -D*xi/nu_s*thn*ths                C*ths + A_s + D*xi/nu_s*thn*ths   D_p*ths*grad ][us]
+ * [ D_div*div(thn)                    D_div*div(ths)                    0            ][p ]
  * in which
  * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
- *   -- C: Constant, set via setVelocityPoissonSpecifications().
- *   -- D: Constant, set via setVelocityPoissonSpecifications().
+ *   -- C: Constant, set via setCandDCoefficients().
+ *   -- D: Constant, set via setCandDCoefficients().
  *   -- thn: Cell centered patch index for volume fraction, set via setThnIdx().
  *   -- xi: Constant drag coefficient, set via setDragCoefficient().
  *   -- eta_n: Constant viscosity, set via setViscosityCoefficient().
  *   -- eta_s: Constant viscosity, set via setViscosityCoefficient().
  *   -- nu_n: Constant, set via setDragCoefficient().
  *   -- nu_s: Constant, set via setDragCoefficient().
+ *   -- D_p: Constant, set via setCandDCoefficients(). A default value is set to -1.0.
+ *   -- D_div: Constant, set via setCandDCoefficients(). A default value is set to 1.0.
  *
  * Note that unlike StaggeredStokesOperator, xi, eta, and mu MUST be provided separately from C and D. C and D values
- * are typically set by the time stepping scheme.
+ * are typically set by the time stepping scheme. Default values for D_p and D_div are set for solving a standard linear
+ * system.
  *
  * \see INSStaggeredHierarchyIntegrator
  */
@@ -87,8 +90,8 @@ public:
      * \brief Class constructor.
      *
      * The optional database will search for the following strings:
-     *  -- "c" - double
-     *  -- "d" - double
+     *  -- "c" - double, sets C
+     *  -- "d" - double, sets D and D_p
      *  -- "xi" - double
      *  -- "eta_n" - double
      *  -- "eta_s" - double
@@ -111,7 +114,11 @@ public:
      */
     void setVelocityPoissonSpecifications(const SAMRAI::solv::PoissonSpecifications& coefs); // might be modified
 
-    void setCandDCoefficients(double C, double D);
+    /*!
+     * \brief Set coefficients used for relative magnitudes for evaluating the operators. This is usually used for time
+     * stepping schemes.
+     */
+    void setCandDCoefficients(double C, double D_u, double D_p = -1.0, double D_div = 1.0);
 
     /*!
      * \brief Set the viscosity coefficients for the viscous stresses.
@@ -307,7 +314,8 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
 
     /// Parameters
-    double d_C = std::numeric_limits<double>::quiet_NaN(), d_D = std::numeric_limits<double>::quiet_NaN();
+    double d_C = std::numeric_limits<double>::quiet_NaN(), d_D_u = std::numeric_limits<double>::quiet_NaN(),
+           d_D_p = -1.0, d_D_div = 1.0;
     int d_thn_idx = IBTK::invalid_index;
     double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
            d_nu_s = std::numeric_limits<double>::quiet_NaN();

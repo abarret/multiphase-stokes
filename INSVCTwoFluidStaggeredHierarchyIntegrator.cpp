@@ -620,10 +620,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     d_rhs_vec->setToScalar(0.0);
     if (d_f_un_fcn) d_f_un_fcn->setDataOnPatchHierarchy(f_un_idx, d_f_un_sc_var, d_hierarchy, half_time);
     if (d_f_us_fcn) d_f_us_fcn->setDataOnPatchHierarchy(f_us_idx, d_f_us_sc_var, d_hierarchy, half_time);
-    if (d_f_p_fcn) d_f_p_fcn->setDataOnPatchHierarchy(f_p_idx, d_f_cc_var, d_hierarchy, half_time);
+    // Divergence is not time-stepped. We need to prescribe the correct divergence at the time point for which we are
+    // solving.
+    if (d_f_p_fcn) d_f_p_fcn->setDataOnPatchHierarchy(f_p_idx, d_f_cc_var, d_hierarchy, new_time);
 
     // set-up RHS to treat viscosity and drag with backward Euler or Implicit Trapezoidal Rule:
-    // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(pressure + viscous + drag) for  i = n, s
+    // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(viscous + drag) for  i = n, s
     double D1 = std::numeric_limits<double>::signaling_NaN();
     double D2 = std::numeric_limits<double>::signaling_NaN();
     const double C = d_rho / dt;
@@ -646,7 +648,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     }
 
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
-    RHS_op.setCandDCoefficients(C, D1);
+    // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions in
+    // the RHS.
+    RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
     RHS_op.setDragCoefficient(d_xi, d_nu_n, d_nu_s);
     RHS_op.setViscosityCoefficient(d_eta_n, d_eta_s);
     RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n

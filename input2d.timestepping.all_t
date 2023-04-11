@@ -17,13 +17,13 @@ VISCOUS_TIME_STEPPING_TYPE = "TRAPEZOIDAL_RULE"
 
 // Inital conditions
 un {
-   function_0 = "cos(2*PI*X_0)"
-   function_1 = "cos(2*PI*X_1)"
+   function_0 = "cos(2*PI*X_0) + sin(2*PI*t)"
+   function_1 = "cos(2*PI*X_1) + sin(2*PI*t)"
 }
 
 us {
-   function_0 = "-cos(2*PI*X_0)"
-   function_1 = "-cos(2*PI*X_1)" 
+   function_0 = "-cos(2*PI*X_0) - sin(2*PI*t)"
+   function_1 = "-cos(2*PI*X_1) - sin(2*PI*t)"
 } 
 
 p {
@@ -47,20 +47,6 @@ f_p {
 thn {
    function = "0.5"
 }
-
-un_exact {
-   function_0 = "cos(2*PI*X_0) + sin(2*PI*t)"
-   function_1 = "cos(2*PI*X_1) + sin(2*PI*t)"
-}
-
-us_exact {
-   function_0 = "-cos(2*PI*X_0) - sin(2*PI*t)"
-   function_1 = "-cos(2*PI*X_1) - sin(2*PI*t)"
-} 
-
-p_exact {
-   function = "sin(2*PI*X_0)"
-} // pressure has mean 0
 
 INSVCTwoFluidStaggeredHierarchyIntegrator {
    rho                           = RHO
