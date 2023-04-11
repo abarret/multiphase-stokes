@@ -108,6 +108,9 @@ FRMThnForcing::setDataOnPatchHierarchy(const int data_idx,
         setDataOnPatchLevel(data_idx, var, hierarchy->getPatchLevel(level_num), data_time, initial_time);
     }
 
+    // Deallocate data if we allocated it.
+    if (!scr_is_allocated) d_adv_diff_hier_integrator->deallocatePatchData(thn_scr_idx);
+
     return;
 } // setDataOnPatchHierarchy
 
