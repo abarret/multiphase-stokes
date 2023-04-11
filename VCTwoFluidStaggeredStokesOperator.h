@@ -111,7 +111,7 @@ public:
      */
     void setVelocityPoissonSpecifications(const SAMRAI::solv::PoissonSpecifications& coefs); // might be modified
 
-    void setCandDCoefficients(double C, double D);
+    void setCandDCoefficients(double C, double D_u, double D_p, double D_div = 1.0);
 
     /*!
      * \brief Set the viscosity coefficients for the viscous stresses.
@@ -307,7 +307,8 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
 
     /// Parameters
-    double d_C = std::numeric_limits<double>::quiet_NaN(), d_D = std::numeric_limits<double>::quiet_NaN();
+    double d_C = std::numeric_limits<double>::quiet_NaN(), d_D_u = std::numeric_limits<double>::quiet_NaN(),
+           d_D_p = std::numeric_limits<double>::quiet_NaN(), d_D_div;
     int d_thn_idx = IBTK::invalid_index;
     double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
            d_nu_s = std::numeric_limits<double>::quiet_NaN();

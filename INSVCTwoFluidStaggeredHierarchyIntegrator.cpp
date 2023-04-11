@@ -357,9 +357,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     // Everything else only gets a scratch context, which is deallocated at the end of each time step.
     // Note the forces need ghost cells for modifying the RHS to account for non-homogenous boundary conditions.
     int thn_cur_idx, thn_new_idx, f_p_idx, f_un_idx, f_us_idx;
-    registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getScratchContext());
-    registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getScratchContext());
-    registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getScratchContext());
+    registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getCurrentContext());
+    registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getCurrentContext());
+    registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getCurrentContext());
     registerVariable(thn_cur_idx, d_thn_cc_var, IntVector<NDIM>(1), getCurrentContext());
     registerVariable(thn_new_idx, d_thn_cc_var, IntVector<NDIM>(1), getNewContext());
 
@@ -393,6 +393,22 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         // Only need to plot this variable if we aren't advecting it.
         // If we do advect theta, the advection integrator will plot it.
         if (d_thn_fcn) d_visit_writer->registerPlotQuantity("Thn", "SCALAR", thn_cur_idx, 0, 1.0, "CELL");
+
+        d_fn_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Fn_draw", NDIM);
+        d_fs_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Fs_draw", NDIM);
+        int fn_draw_idx, fs_draw_idx;
+        registerVariable(fn_draw_idx, d_fn_draw_var, IntVector<NDIM>(0), getCurrentContext());
+        registerVariable(fs_draw_idx, d_fs_draw_var, IntVector<NDIM>(0), getCurrentContext());
+
+        d_visit_writer->registerPlotQuantity("Fn", "VECTOR", fn_draw_idx, 0, 1.0, "NODE");
+        for (int d = 0; d < NDIM; ++d)
+            d_visit_writer->registerPlotQuantity("Fn_" + std::to_string(d), "SCALAR", fn_draw_idx, d, 1.0, "NODE");
+
+        d_visit_writer->registerPlotQuantity("Fs", "VECTOR", fs_draw_idx, 0, 1.0, "NODE");
+        for (int d = 0; d < NDIM; ++d)
+            d_visit_writer->registerPlotQuantity("Fs_" + std::to_string(d), "SCALAR", fs_draw_idx, d, 1.0, "NODE");
+
+        d_visit_writer->registerPlotQuantity("FP", "SCALAR", f_p_idx, 0, 1.0, "CELL");
     }
 
     // Create the hierarchy data operations
@@ -570,9 +586,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     d_sol_vec->addComponent(d_P_var, p_scr_idx, wgt_cc_idx, d_hier_cc_data_ops);
 
     // Set up the RHS vector
-    const int f_un_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getScratchContext());
-    const int f_us_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getScratchContext());
-    const int f_p_idx = var_db->mapVariableAndContextToIndex(d_f_cc_var, getScratchContext());
+    const int f_un_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+    const int f_us_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+    const int f_p_idx = var_db->mapVariableAndContextToIndex(d_f_cc_var, getCurrentContext());
     d_rhs_vec = new SAMRAIVectorReal<NDIM, double>(d_object_name + "::rhs_vec", d_hierarchy, coarsest_ln, finest_ln);
     d_rhs_vec->addComponent(d_f_un_sc_var, f_un_idx, wgt_sc_idx, d_hier_sc_data_ops);
     d_rhs_vec->addComponent(d_f_us_sc_var, f_us_idx, wgt_sc_idx, d_hier_sc_data_ops);
@@ -645,7 +661,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     }
 
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
-    RHS_op.setCandDCoefficients(C, D1);
+    RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
     RHS_op.setDragCoefficient(d_xi, d_nu_n, d_nu_s);
     RHS_op.setViscosityCoefficient(d_eta_n, d_eta_s);
     RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
@@ -664,7 +680,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
-    d_stokes_op->setCandDCoefficients(C, D2);
+    d_stokes_op->setCandDCoefficients(C, D2, -1.0);
     d_stokes_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
     d_stokes_op->setViscosityCoefficient(d_eta_n, d_eta_s);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
@@ -927,6 +943,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
     const int us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getScratchContext());
     const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+    const int fn_draw_idx = var_db->mapVariableAndContextToIndex(d_fn_draw_var, getCurrentContext());
+    const int fs_draw_idx = var_db->mapVariableAndContextToIndex(d_fs_draw_var, getCurrentContext());
+    const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+    const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
 
     static const bool synch_cf_interface = true;
     const int coarsest_ln = 0;
@@ -940,7 +960,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_comp = {
         ITC(un_scr_idx, un_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
-        ITC(us_scr_idx, us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr)
+        ITC(us_scr_idx, us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
+        ITC(fs_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
+        ITC(fn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr)
     };
     HierarchyGhostCellInterpolation hier_bdry_fill;
     hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
@@ -960,6 +982,22 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
                             synch_cf_interface,
                             us_scr_idx,
                             d_us_sc_var,
+                            nullptr,
+                            d_integrator_time,
+                            synch_cf_interface);
+    d_hier_math_ops->interp(fs_draw_idx,
+                            d_fs_draw_var,
+                            synch_cf_interface,
+                            fs_idx,
+                            d_f_us_sc_var,
+                            nullptr,
+                            d_integrator_time,
+                            synch_cf_interface);
+    d_hier_math_ops->interp(fn_draw_idx,
+                            d_fn_draw_var,
+                            synch_cf_interface,
+                            fn_idx,
+                            d_f_un_sc_var,
                             nullptr,
                             d_integrator_time,
                             synch_cf_interface);
