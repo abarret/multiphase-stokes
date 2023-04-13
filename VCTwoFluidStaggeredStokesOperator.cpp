@@ -415,11 +415,15 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                        ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
 
-                double drag_n =
-                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+                double drag_n_1 =
+                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * (*un_data)(idx);
+
+                double drag_n_2 =
+                    d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * (*us_data)(idx);
+
                 double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*A_un_data)(idx) = d_D_u * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n) +
-                                    d_D_p * (pressure_n) + d_C * thn_lower * (*un_data)(idx);
+                (*A_un_data)(idx) = d_D_u * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n_1) +
+                                    d_D_p * (pressure_n + drag_n_2) + d_C * thn_lower * (*un_data)(idx);
 
                 // solvent equation
                 double ddx_Ths_dx_us =
@@ -437,11 +441,15 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                     -d_eta_s / (dx[0] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
-                double drag_s =
-                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
+                double drag_s_1 =
+                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * (*us_data)(idx);
+
+                double drag_s_2 =
+                    d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * (*un_data)(idx);
+
                 double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*A_us_data)(idx) = d_D_u * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s) +
-                                    d_D_p * (pressure_s) + d_C * convertToThs(thn_lower) * (*us_data)(idx);
+                (*A_us_data)(idx) = d_D_u * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s_1) +
+                                    d_D_p * (pressure_s + drag_s_2) + d_C * convertToThs(thn_lower) * (*us_data)(idx);
             }
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
@@ -480,11 +488,15 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                        ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
                                         (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
 
-                double drag_n =
-                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+                double drag_n_1 =
+                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * (*un_data)(idx);
+
+                double drag_n_2 =
+                    d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * (*us_data)(idx);
+
                 double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*A_un_data)(idx) = d_D_u * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n) +
-                                    d_D_p * (pressure_n) + d_C * thn_lower * (*un_data)(idx);
+                (*A_un_data)(idx) = d_D_u * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n_1) +
+                                    d_D_p * (pressure_n + drag_n_2) + d_C * thn_lower * (*un_data)(idx);
 
                 // Solvent equation
                 double ddy_Ths_dy_us =
@@ -502,11 +514,15 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                     -d_eta_s / (dx[0] * dx[1]) *
                     (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
                      convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
-                double drag_s =
-                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
+                double drag_s_1 =
+                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * (*us_data)(idx);
+                
+                double drag_s_2 =
+                    d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * (*un_data)(idx);
+
                 double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*A_us_data)(idx) = d_D_u * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s) +
-                                    d_D_p * (pressure_s) + d_C * convertToThs(thn_lower) * (*us_data)(idx);
+                (*A_us_data)(idx) = d_D_u * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s_1) +
+                                    d_D_p * (pressure_s + drag_s_2) + d_C * convertToThs(thn_lower) * (*us_data)(idx);
             }
         }
     }
