@@ -494,7 +494,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
                 if (grad_thn_norm > grad_abs_thresh || (grad_thn_norm / d_max_grad_thn) > grad_rel_thresh)
                     (*tagged_data)(idx) = 1;
             }
-            tagged_data->print(tagged_data->getBox());
         }
     }
     return;

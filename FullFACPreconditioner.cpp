@@ -282,6 +282,22 @@ FullFACPreconditioner::generateDenseHierarchy(Pointer<PatchHierarchy<NDIM>> base
         Pointer<PatchLevel<NDIM>> dense_level = d_dense_hierarchy->getPatchLevel(ln);
     }
 
+    if (d_enable_logging)
+    {
+        plog << "Printing dense hierarchy info\n";
+        for (int ln = 0; ln <= d_dense_hierarchy->getFinestLevelNumber(); ++ln)
+        {
+            plog << "On level " << ln << " of " << d_dense_hierarchy->getFinestLevelNumber() << "\n";
+            Pointer<PatchLevel<NDIM>> level = d_dense_hierarchy->getPatchLevel(ln);
+            const BoxArray<NDIM>& boxes = level->getBoxes();
+            for (int box_num = 0; box_num < boxes.size(); ++box_num)
+            {
+                const Box<NDIM>& box = boxes[box_num];
+                plog << box << "\n";
+            }
+        }
+    }
+
     Pointer<CartesianGridGeometry<NDIM>> cart_dense_geom = dense_geom;
     cart_dense_geom->addSpatialCoarsenOperator(new CartCellDoubleCubicCoarsen());
     cart_dense_geom->addSpatialCoarsenOperator(new CartSideDoubleCubicCoarsen());
