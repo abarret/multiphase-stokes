@@ -35,7 +35,6 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "FRMThnForcing.h"
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /*******************************************************************************
@@ -99,6 +98,9 @@ main(int argc, char* argv[])
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
         ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
 
+        // Set up visualizations
+        Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
+
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
             new muParserCartGridFunction("un", app_initializer->getComponentDatabase("un"), grid_geometry);
@@ -116,16 +118,13 @@ main(int argc, char* argv[])
 
         // Set up forcing function
         Pointer<CartGridFunction> fn_fcn =
-            new FRMThnForcing(ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator, true);
+            new muParserCartGridFunction("FN_FCN", app_initializer->getComponentDatabase("FN_FCN"), grid_geometry);
         Pointer<CartGridFunction> fs_fcn =
-            new FRMThnForcing(ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator, false);
-        ins_integrator->setForcingFunctions(fn_fcn, fs_fcn, nullptr);
-
-        // Set up visualizations
-        Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
-        ins_integrator->registerVisItDataWriter(visit_data_writer);
+            new muParserCartGridFunction("FS_FCN", app_initializer->getComponentDatabase("FS_FCN"), grid_geometry);
+        ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
 
         // Initialize the INS integrator
+        ins_integrator->registerVisItDataWriter(visit_data_writer);
         ins_integrator->initializePatchHierarchy(patch_hierarchy, gridding_algorithm);
 
         // Get some time stepping information.

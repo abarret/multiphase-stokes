@@ -44,6 +44,16 @@ thn {
    //function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
 }
 
+FN_FCN {
+   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+}
+
+FS_FCN {
+   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+}
+
 INSVCTwoFluidStaggeredHierarchyIntegrator {
    rho                           = RHO
    start_time                    = START_TIME
