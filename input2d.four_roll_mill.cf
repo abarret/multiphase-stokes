@@ -1,0 +1,191 @@
+RHO = 1.0
+MAX_MULTIGRID_LEVELS = 6
+START_TIME = 0.0
+END_TIME = 4.0
+NUM_CYCLES = 1
+DT_MAX = 0.0005
+ENABLE_LOGGING = TRUE
+W = 0.2
+USE_PRECONDITIONER = TRUE
+N = 128
+VIZ_DUMP_TIME_INTERVAL = 0.0001
+DELTA = 0.175
+TAG_BUFFER = 4
+
+ADV_DIFF_NUM_CYCLES = 1
+ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
+ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
+ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
+
+// Complex Fluid parameters
+USE_CF = TRUE
+FLUID_MODEL = "OLDROYDB"
+EVOLVE_TYPE = "STANDARD"
+LOG_DETERMINANT     = TRUE
+CONVECTIVE_OPERATOR_TYPE     = "CUI"
+OUTPUT_CONFORMATION_TENSOR = TRUE
+OUTPUT_STRESS_TENSOR = FALSE
+OUTPUT_DIVERGENCE = TRUE
+RELAXATION_TIME = 0.1
+VISCOSITY = 4.0
+USING_EXACT_U = FALSE
+BDRY_INTERP_TYPE = "LINEAR"
+
+ETA_S = 0.04
+ETA_N = 0.04e2
+NU_N = 1.0
+NU_S = 1.0
+XI = 250.0*ETA_S
+
+un {
+   function_0 = "0.0"
+   function_1 = "0.0"
+}
+
+us {
+   function_0 = "0.0"
+   function_1 = "0.0"
+}
+
+p {
+   function = "0.0"
+}
+
+thn {
+   delta = DELTA
+   //function = "0.25 + 0.25*((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
+   function = "0.05 + ((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
+   //function = "0.5"
+   //function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
+}
+
+FN_FCN {
+   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+}
+
+FS_FCN {
+   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+}
+
+CFINSForcing {
+InitialConditions{
+ function_0 = "0.0"
+ function_1 = "0.0"
+ function_2 = "0.0"
+}
+relaxation_time = RELAXATION_TIME
+viscosity = VISCOSITY
+fluid_model         = FLUID_MODEL
+evolution_type = EVOLVE_TYPE
+log_determinant     = LOG_DETERMINANT
+convective_operator_type     = CONVECTIVE_OPERATOR_TYPE
+output_stress_tensor = OUTPUT_STRESS_TENSOR
+output_conformation_tensor = OUTPUT_CONFORMATION_TENSOR
+output_divergence = OUTPUT_DIVERGENCE
+interp_type = BDRY_INTERP_TYPE
+}
+
+INSVCTwoFluidStaggeredHierarchyIntegrator {
+   rho                           = RHO
+   start_time                    = START_TIME
+   end_time                      = END_TIME
+   num_cycles                    = NUM_CYCLES
+   dt_max                        = DT_MAX
+   enable_logging                = ENABLE_LOGGING
+   w = W
+   use_preconditioner = USE_PRECONDITIONER
+   grad_abs_thresh = 0.75
+   use_grad_tagging = TRUE
+   tag_buffer = TAG_BUFFER
+   regrid_interval = 10
+
+   solver_db {
+      ksp_type = "fgmres"
+   }
+
+   precond_db {
+      cycle_type = "F_CYCLE"
+      num_pre_sweeps = 20
+      num_post_sweeps = 20
+      enable_logging = TRUE
+      max_multigrid_levels = MAX_MULTIGRID_LEVELS
+   }
+}
+
+AdvDiffIntegrator {
+ start_time = START_TIME
+ end_time = END_TIME
+ num_cycles = ADV_DIFF_NUM_CYCLES
+ convective_time_stepping_type = ADV_DIFF_CONVECTIVE_TS_TYPE
+ convective_op_type = ADV_DIFF_CONVECTIVE_OP_TYPE
+ convective_difference_form = ADV_DIFF_CONVECTIVE_FORM
+ dt_max = DT_MAX
+ enable_logging = ENABLE_LOGGING
+}
+
+
+Main {
+// log file parameters
+   log_file_name = "output"
+   log_all_nodes = FALSE
+
+// visualization dump parameters
+   viz_writer = "VisIt"
+   viz_dump_dirname = "viz2d_frm_cf"
+   visit_number_procs_per_file = 1
+
+// timer dump parameters
+   timer_enabled = TRUE
+}
+
+CartesianGeometry {
+   domain_boxes       = [(0,0), (N - 1,N - 1)]
+   x_lo               = -0.5, -0.5      // lower end of computational domain.
+   x_up               = 0.5, 0.5      // upper end of computational domain.
+   periodic_dimension = 1, 1  
+}
+
+GriddingAlgorithm {
+   max_levels = 1                 // Maximum number of levels in hierarchy.
+
+   ratio_to_coarser {
+      level_1 = 4, 4              // vector ratio to next coarser level
+      level_2 = 2, 2
+      level_3 = 2, 2
+   }
+
+   largest_patch_size {
+      level_0 = 512, 512          // largest patch allowed in hierarchy
+                                  // all finer levels will use same values as level_0...
+   }
+
+   smallest_patch_size {
+      level_0 =   16,   16          // smallest patch allowed in hierarchy
+                                  // all finer levels will use same values as level_0...
+   }
+
+   efficiency_tolerance = 0.80e0  // min % of tag cells in new patch level
+   combine_efficiency   = 0.75e0  // chop box if sum of volumes of smaller
+                                  // boxes < efficiency * vol of large box
+
+   proper_nesting_buffer = 1
+   allow_patches_smaller_than_minimum_size_to_prevent_overlaps = TRUE
+}
+
+StandardTagAndInitialize {
+   tagging_method = "GRADIENT_DETECTOR"
+}
+
+LoadBalancer {
+   bin_pack_method = "SPATIAL"
+   max_workload_factor = 1
+}
+
+TimerManager{
+   print_exclusive = FALSE
+   print_total = TRUE
+   print_threshold = 1.0
+   timer_list = "IBTK::*::*"
+}

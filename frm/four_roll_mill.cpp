@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
+#include <ibamr/CFINSForcing.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
 #include <ibamr/app_namespaces.h>
@@ -37,6 +38,8 @@
 
 // Local includes
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "ScaleStress.h"
+#include "StressRelaxation.h"
 
 // Function prototypes
 void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
@@ -135,6 +138,31 @@ main(int argc, char* argv[])
         Pointer<CartGridFunction> fs_fcn =
             new muParserCartGridFunction("FS_FCN", app_initializer->getComponentDatabase("FS_FCN"), grid_geometry);
         ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
+
+        bool use_cf = input_db->getBool("USE_CF");
+        Pointer<CFINSForcing> cf_un_forcing;
+        Pointer<ScaleStress> stress_scale =
+            new ScaleStress("ScaleStress", ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator);
+        if (use_cf)
+        {
+            Pointer<INSHierarchyIntegrator> ins_cf_integrator = ins_integrator;
+            cf_un_forcing = new CFINSForcing("CFINSForcing",
+                                             app_initializer->getComponentDatabase("CFINSForcing"),
+                                             ins_cf_integrator,
+                                             grid_geometry,
+                                             adv_diff_integrator,
+                                             visit_data_writer);
+            cf_un_forcing->setSigmaScaleFcn(stress_scale);
+            Pointer<StressRelaxation> stress_relax =
+                new StressRelaxation("StressRelax",
+                                     app_initializer->getComponentDatabase("CFINSForcing"),
+                                     ins_integrator->getNetworkVariable(),
+                                     ins_integrator,
+                                     ins_integrator->getNetworkVolumeFractionVariable(),
+                                     adv_diff_integrator);
+            cf_un_forcing->registerRelaxationOperator(stress_relax);
+            ins_integrator->setForcingFunctions(cf_un_forcing, nullptr);
+        }
 
         // Initialize the INS integrator
         ins_integrator->registerVisItDataWriter(visit_data_writer);

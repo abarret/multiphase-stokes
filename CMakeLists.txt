@@ -7,6 +7,8 @@ FIND_PACKAGE(IBAMR REQUIRED)
 SET(MULTIPHASE_SRC
     src/FullFACPreconditioner.cpp
     src/INSVCTwoFluidStaggeredHierarchyIntegrator.cpp
+    src/ScaleStress.cpp
+    src/StressRelaxation.cpp
     src/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp
     src/VCTwoFluidStaggeredStokesOperator.cpp
     src/RBGS.f
