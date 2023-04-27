@@ -1,5 +1,7 @@
 #include <ibamr/app_namespaces.h>
 
+#include <ibtk/HierarchyGhostCellInterpolation.h>
+
 #include <HierarchyCellDataOpsReal.h>
 #include <SAMRAI_config.h>
 
@@ -42,17 +44,15 @@ ScaleStress::setDataOnPatchHierarchy(const int data_idx,
 
     HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(hierarchy, coarsest_ln, finest_ln);
     if (d_thn_integrator->isAllocatedPatchData(thn_new_idx, coarsest_ln, finest_ln))
-    {
-        pout << " Computing linear sum\n";
         hier_cc_data_ops.linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
-    }
     else
-    {
         hier_cc_data_ops.copyData(thn_scr_idx, thn_cur_idx);
-        pout << "Copying data\n";
-    }
 
-    pout << "Here\n";
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_cell_comps = { ITC(thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+    Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
+    hier_ghost_fill->initializeOperatorState(ghost_cell_comps, hierarchy, coarsest_ln, finest_ln);
+
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
         setDataOnPatchLevel(data_idx, var, hierarchy->getPatchLevel(ln), data_time, initial_time);
 

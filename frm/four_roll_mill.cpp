@@ -117,6 +117,13 @@ main(int argc, char* argv[])
         const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
         const string postproc_data_dump_dirname = app_initializer->getPostProcessingDataDumpDirectory();
 
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        Pointer<CellVariable<NDIM, double>> EE_var = new CellVariable<NDIM, double>("EE", 3);
+        const int EE_idx = var_db->registerVariableAndContext(EE_var, var_db->getContext("CTX"));
+        visit_data_writer->registerPlotQuantity("EE_0", "SCALAR", EE_idx, 0);
+        visit_data_writer->registerPlotQuantity("EE_1", "SCALAR", EE_idx, 1);
+        visit_data_writer->registerPlotQuantity("EE_2", "SCALAR", EE_idx, 2);
+
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
             new muParserCartGridFunction("un", app_initializer->getComponentDatabase("un"), grid_geometry);
@@ -168,6 +175,8 @@ main(int argc, char* argv[])
         ins_integrator->registerVisItDataWriter(visit_data_writer);
         ins_integrator->initializePatchHierarchy(patch_hierarchy, gridding_algorithm);
 
+        input_db->printClassData(plog);
+
         // Get some time stepping information.
         unsigned int iteration_num = ins_integrator->getIntegratorStep();
         double loop_time = ins_integrator->getIntegratorTime();
@@ -182,7 +191,26 @@ main(int argc, char* argv[])
         {
             pout << "\nWriting visualization files...\n\n";
             ins_integrator->setupPlotData();
+            int coarsest_ln = 0;
+            int finest_ln = patch_hierarchy->getFinestLevelNumber();
+            const int u_cur_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                       ins_integrator->getCurrentContext());
+            const int u_scr_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                       ins_integrator->getScratchContext());
+            ins_integrator->allocatePatchData(u_scr_idx, loop_time, coarsest_ln, finest_ln);
+            ins_integrator->allocatePatchData(EE_idx, loop_time, coarsest_ln, finest_ln);
+            HierarchyMathOps hier_math_ops("HierMathOps", patch_hierarchy);
+            hier_math_ops.resetLevels(coarsest_ln, finest_ln);
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comps = { ITC(
+                u_scr_idx, u_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, nullptr) };
+            Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
+            hier_ghost_fill->initializeOperatorState(ghost_cell_comps, patch_hierarchy, coarsest_ln, finest_ln);
+            hier_math_ops.strain_rate(
+                EE_idx, EE_var, u_scr_idx, ins_integrator->getNetworkVariable(), hier_ghost_fill, loop_time);
             visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
+            ins_integrator->deallocatePatchData(u_scr_idx, coarsest_ln, finest_ln);
+            ins_integrator->deallocatePatchData(EE_idx, coarsest_ln, finest_ln);
             next_viz_dump_time += viz_dump_time_interval;
         }
         // Main time step loop
@@ -209,7 +237,26 @@ main(int argc, char* argv[])
             {
                 pout << "\nWriting visualization files...\n\n";
                 ins_integrator->setupPlotData();
+                int coarsest_ln = 0;
+                int finest_ln = patch_hierarchy->getFinestLevelNumber();
+                const int u_cur_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                           ins_integrator->getCurrentContext());
+                const int u_scr_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                           ins_integrator->getScratchContext());
+                ins_integrator->allocatePatchData(u_scr_idx, loop_time, coarsest_ln, finest_ln);
+                ins_integrator->allocatePatchData(EE_idx, loop_time, coarsest_ln, finest_ln);
+                HierarchyMathOps hier_math_ops("HierMathOps", patch_hierarchy);
+                hier_math_ops.resetLevels(coarsest_ln, finest_ln);
+                using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+                std::vector<ITC> ghost_cell_comps = { ITC(
+                    u_scr_idx, u_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, nullptr) };
+                Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
+                hier_ghost_fill->initializeOperatorState(ghost_cell_comps, patch_hierarchy, coarsest_ln, finest_ln);
+                hier_math_ops.strain_rate(
+                    EE_idx, EE_var, u_scr_idx, ins_integrator->getNetworkVariable(), hier_ghost_fill, loop_time);
                 visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
+                ins_integrator->deallocatePatchData(u_scr_idx, coarsest_ln, finest_ln);
+                ins_integrator->deallocatePatchData(EE_idx, coarsest_ln, finest_ln);
                 next_viz_dump_time += viz_dump_time_interval;
             }
         }

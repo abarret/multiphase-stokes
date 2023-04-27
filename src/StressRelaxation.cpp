@@ -72,19 +72,13 @@ StressRelaxation::setDataOnPatchHierarchy(const int data_idx,
 
     HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(hierarchy, coarsest_ln, finest_ln);
     if (d_thn_integrator->isAllocatedPatchData(thn_new_idx, coarsest_ln, finest_ln))
-    {
-        pout << " Computing linear sum\n";
         hier_cc_data_ops.linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
-    }
     else
-    {
         hier_cc_data_ops.copyData(thn_scr_idx, thn_cur_idx);
-        pout << "Copying data\n";
-    }
 
     // Fill in ghost cells for u
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    std::vector<ITC> ghost_cell_comps = { ITC(u_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+    std::vector<ITC> ghost_cell_comps = { ITC(u_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true) };
     Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
     hier_ghost_fill->initializeOperatorState(ghost_cell_comps, hierarchy, coarsest_ln, finest_ln);
 
@@ -93,7 +87,6 @@ StressRelaxation::setDataOnPatchHierarchy(const int data_idx,
     hier_math_ops.resetLevels(coarsest_ln, finest_ln);
     hier_math_ops.strain_rate(d_EE_idx, d_EE_var, u_scr_idx, d_u_var, hier_ghost_fill, data_time);
 
-    pout << "Here\n";
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
         setDataOnPatchLevel(data_idx, var, hierarchy->getPatchLevel(ln), data_time, initial_time);
 
@@ -137,9 +130,9 @@ StressRelaxation::setDataOnPatch(const int data_idx,
 #endif
         mat = convertToConformation(mat);
 #if (NDIM == 2)
-        (*ret_data)(idx, 0) = l_inv * (-mat(0, 0)) + 4.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 0);
-        (*ret_data)(idx, 1) = l_inv * (-mat(1, 1)) + 4.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 1);
-        (*ret_data)(idx, 2) = l_inv * (-mat(1, 0)) + 4.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 2);
+        (*ret_data)(idx, 0) = l_inv * (-mat(0, 0)) + 2.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 0);
+        (*ret_data)(idx, 1) = l_inv * (-mat(1, 1)) + 2.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 1);
+        (*ret_data)(idx, 2) = l_inv * (-mat(1, 0)) + 2.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 2);
 #endif
 #if (NDIM == 3)
         (*ret_data)(idx, 0) = l_inv * (-mat(0, 0));

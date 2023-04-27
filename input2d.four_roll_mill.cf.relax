@@ -26,11 +26,11 @@ CONVECTIVE_OPERATOR_TYPE     = "CUI"
 OUTPUT_CONFORMATION_TENSOR = TRUE
 OUTPUT_STRESS_TENSOR = FALSE
 OUTPUT_DIVERGENCE = TRUE
-PROJECT_CONFORM_TENS = FALSE
 RELAXATION_TIME = 4.0
 VISCOSITY = 2.0
 USING_EXACT_U = FALSE
 BDRY_INTERP_TYPE = "LINEAR"
+PROJECT_CONFORM_TENS = FALSE
 
 ETA_S = 0.04
 ETA_N = 2.0
@@ -61,13 +61,13 @@ thn {
 }
 
 FN_FCN {
-   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+   function_0 = "(t < 0.15) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
+   function_1 = "(t < 0.15) ? (2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
 }
 
 FS_FCN {
-   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+   function_0 = "(t < 0.15) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
+   function_1 = "(t < 0.15) ? (2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
 }
 
 CFINSForcing {
@@ -130,12 +130,12 @@ AdvDiffIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "output_norm"
+   log_file_name = "output_relax"
    log_all_nodes = FALSE
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_frm_cf"
+   viz_dump_dirname = "viz2d_frm_cf_relax"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
