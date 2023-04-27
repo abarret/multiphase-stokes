@@ -145,7 +145,7 @@ multiply_sc_and_thn(const int dst_idx, const int sc_idx, const int thn_idx, Poin
                 {
                     const SideIndex<NDIM>& idx = si();
                     (*dst_data)(idx) =
-                        0.5 * ((*thn_data)(idx.toCell(1) + (*thn_data)(idx.toCell(0)))) * (*sc_data)(idx);
+                        0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0))) * (*sc_data)(idx);
                 }
             }
         }
@@ -173,7 +173,7 @@ multiply_sc_and_ths(const int dst_idx, const int sc_idx, const int thn_idx, Poin
                 {
                     const SideIndex<NDIM>& idx = si();
                     (*dst_data)(idx) =
-                        (1.0 - 0.5 * ((*thn_data)(idx.toCell(1) + (*thn_data)(idx.toCell(0))))) * (*sc_data)(idx);
+                        (1.0 - 0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0)))) * (*sc_data)(idx);
                 }
             }
         }
@@ -294,9 +294,74 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctions(Pointer<CartGridF
                                                                Pointer<CartGridFunction> fs_fcn,
                                                                Pointer<CartGridFunction> fp_fcn)
 {
-    d_f_un_fcn = fn_fcn;
-    d_f_us_fcn = fs_fcn;
-    d_f_p_fcn = fp_fcn;
+    if (fn_fcn)
+    {
+        if (d_f_un_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_un_fcn = d_f_un_fcn;
+            if (p_f_un_fcn)
+            {
+                p_f_un_fcn->addFunction(fn_fcn);
+            }
+            else
+            {
+                p_f_un_fcn = new CartGridFunctionSet(d_object_name + "::fn_fcn_set");
+                p_f_un_fcn->addFunction(d_f_un_fcn);
+                p_f_un_fcn->addFunction(fn_fcn);
+                d_f_un_fcn = p_f_un_fcn;
+            }
+        }
+        else
+        {
+            d_f_un_fcn = fn_fcn;
+        }
+    }
+
+    if (fs_fcn)
+    {
+        if (d_f_us_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_us_fcn = d_f_us_fcn;
+            if (p_f_us_fcn)
+            {
+                p_f_us_fcn->addFunction(fs_fcn);
+            }
+            else
+            {
+                p_f_us_fcn = new CartGridFunctionSet(d_object_name + "::fs_fcn_set");
+                p_f_us_fcn->addFunction(d_f_us_fcn);
+                p_f_us_fcn->addFunction(fs_fcn);
+                d_f_us_fcn = p_f_us_fcn;
+            }
+        }
+        else
+        {
+            d_f_us_fcn = fs_fcn;
+        }
+    }
+
+    if (fp_fcn)
+    {
+        if (d_f_p_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_p_fcn = d_f_p_fcn;
+            if (p_f_p_fcn)
+            {
+                p_f_p_fcn->addFunction(fp_fcn);
+            }
+            else
+            {
+                p_f_p_fcn = new CartGridFunctionSet(d_object_name + "::fp_fcn_set");
+                p_f_p_fcn->addFunction(d_f_p_fcn);
+                p_f_p_fcn->addFunction(fp_fcn);
+                d_f_p_fcn = p_f_p_fcn;
+            }
+        }
+        else
+        {
+            d_f_p_fcn = fp_fcn;
+        }
+    }
     return;
 }
 
