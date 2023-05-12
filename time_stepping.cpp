@@ -84,17 +84,22 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
-        ins_integrator->setViscosityCoefficient(1.0, 1.0);
-        ins_integrator->setDragCoefficient(1.0, 1.0, 1.0);
+        const double xi = input_db->getDouble("XI");
+        const double mu_n = input_db->getDouble("MU_N");
+        const double mu_s = input_db->getDouble("MU_S");
+        const double nu_n = input_db->getDouble("NU_N");
+        const double nu_s = input_db->getDouble("NU_S");
+        ins_integrator->setViscosityCoefficient(mu_n, mu_s);
+        ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
 
         // Setup velocity and pressures functions.
-        Pointer<CartGridFunction> un_init =
+        Pointer<CartGridFunction> un_fcn =
             new muParserCartGridFunction("un", app_initializer->getComponentDatabase("un"), grid_geometry);
-        Pointer<CartGridFunction> us_init =
+        Pointer<CartGridFunction> us_fcn =
             new muParserCartGridFunction("us", app_initializer->getComponentDatabase("us"), grid_geometry);
-        Pointer<CartGridFunction> p_init =
+        Pointer<CartGridFunction> p_fcn =
             new muParserCartGridFunction("p", app_initializer->getComponentDatabase("p"), grid_geometry);
-        ins_integrator->setInitialData(un_init, us_init, p_init);
+        ins_integrator->setInitialData(un_fcn, us_fcn, p_fcn);
 
         // Set up Thn functions
         Pointer<CartGridFunction> thn_fcn =
@@ -136,13 +141,6 @@ main(int argc, char* argv[])
                 "US_exact_" + std::to_string(d), "SCALAR", us_exact_idx, d, 1.0, "NODE");
         visit_data_writer->registerPlotQuantity("p_exact", "SCALAR", p_exact_idx, 0, 1.0, "CELL");
 
-        Pointer<CartGridFunction> un_exact_fcn =
-            new muParserCartGridFunction("UN_exact", app_initializer->getComponentDatabase("un_exact"), grid_geometry);
-        Pointer<CartGridFunction> us_exact_fcn =
-            new muParserCartGridFunction("US_exact", app_initializer->getComponentDatabase("us_exact"), grid_geometry);
-        Pointer<CartGridFunction> p_exact_fcn =
-            new muParserCartGridFunction("P_exact", app_initializer->getComponentDatabase("p_exact"), grid_geometry);
-
         // Get some time stepping information.
         unsigned int iteration_num = ins_integrator->getIntegratorStep();
         double loop_time = ins_integrator->getIntegratorTime();
@@ -162,9 +160,9 @@ main(int argc, char* argv[])
             ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
             ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
             ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-            un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
-            us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
-            p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
+            un_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
+            us_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
+            p_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
             visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
             ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
             ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
@@ -198,9 +196,9 @@ main(int argc, char* argv[])
                 ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
                 ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
                 ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-                un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
-                us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
-                p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
+                un_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
+                us_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
+                p_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
                 visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
                 ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
                 ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
@@ -239,12 +237,9 @@ main(int argc, char* argv[])
         }
 
         // Fill in exact values
-        un_exact_fcn->setDataOnPatchHierarchy(
-            un_exa_idx, un_var, patch_hierarchy, loop_time, false, coarsest_ln, finest_ln);
-        us_exact_fcn->setDataOnPatchHierarchy(
-            us_exa_idx, us_var, patch_hierarchy, loop_time, false, coarsest_ln, finest_ln);
-        p_exact_fcn->setDataOnPatchHierarchy(
-            p_exa_idx, p_var, patch_hierarchy, loop_time, false, coarsest_ln, finest_ln);
+        un_fcn->setDataOnPatchHierarchy(un_exa_idx, un_var, patch_hierarchy, loop_time, false, coarsest_ln, finest_ln);
+        us_fcn->setDataOnPatchHierarchy(us_exa_idx, us_var, patch_hierarchy, loop_time, false, coarsest_ln, finest_ln);
+        p_fcn->setDataOnPatchHierarchy(p_exa_idx, p_var, patch_hierarchy, loop_time, false, coarsest_ln, finest_ln);
 
         HierarchyMathOps hier_math_ops("hier_math_ops", patch_hierarchy, coarsest_ln, finest_ln);
         const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
@@ -278,9 +273,9 @@ main(int argc, char* argv[])
         ins_integrator->allocatePatchData(un_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
         ins_integrator->allocatePatchData(us_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
         ins_integrator->allocatePatchData(p_exact_idx, loop_time, 0, patch_hierarchy->getFinestLevelNumber());
-        un_exact_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
-        us_exact_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
-        p_exact_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
+        un_fcn->setDataOnPatchHierarchy(un_exact_idx, un_exact_var, patch_hierarchy, loop_time);
+        us_fcn->setDataOnPatchHierarchy(us_exact_idx, us_exact_var, patch_hierarchy, loop_time);
+        p_fcn->setDataOnPatchHierarchy(p_exact_idx, p_exact_var, patch_hierarchy, loop_time);
         visit_data_writer->writePlotData(patch_hierarchy, iteration_num + 1, loop_time);
         ins_integrator->deallocatePatchData(un_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
         ins_integrator->deallocatePatchData(us_exact_idx, 0, patch_hierarchy->getFinestLevelNumber());
