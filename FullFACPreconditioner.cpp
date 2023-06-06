@@ -18,6 +18,8 @@
 #include "ibtk/FACPreconditioner.h"
 #include "ibtk/FACPreconditionerStrategy.h"
 #include "ibtk/LinearSolver.h"
+#include "ibtk/SAMRAIScopedVectorCopy.h"
+#include "ibtk/SAMRAIScopedVectorDuplicate.h"
 #include "ibtk/ibtk_enums.h"
 #include "ibtk/namespaces.h" // IWYU pragma: keep
 
@@ -69,14 +71,13 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
 
     // We need to copy f into d_f
     transferToDense(f, *d_f);
-    d_r->copyVector(d_f, false);
+    SAMRAIScopedVectorCopy<double> r(*d_f);
 
     // Apply a single FAC cycle.
     if (d_cycle_type == V_CYCLE && d_num_pre_sweeps == 0)
     {
 #if !defined(NDEBUG)
         TBOX_ASSERT(d_f);
-        TBOX_ASSERT(d_r);
 #endif
         // V-cycle MG without presmoothing keeps the residual equal to the
         // initial right-hand-side vector f, so we can simply use that vector
@@ -87,21 +88,20 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
     {
 #if !defined(NDEBUG)
         TBOX_ASSERT(d_f);
-        TBOX_ASSERT(d_r);
 #endif
         switch (d_cycle_type)
         {
         case F_CYCLE:
-            FCycle(*d_u, *d_f, d_finest_ln);
+            FCycle(*d_u, *d_f, r, d_finest_ln);
             break;
         case FMG_CYCLE:
-            FMGCycle(*d_u, *d_f, d_finest_ln, 1);
+            FMGCycle(*d_u, *d_f, r, d_finest_ln, 1);
             break;
         case V_CYCLE:
-            muCycle(*d_u, *d_f, d_finest_ln, 1);
+            muCycle(*d_u, *d_f, r, d_finest_ln, 1);
             break;
         case W_CYCLE:
-            muCycle(*d_u, *d_f, d_finest_ln, 2);
+            muCycle(*d_u, *d_f, r, d_finest_ln, 2);
             break;
         default:
             TBOX_ERROR(d_object_name << "::solveSystem():\n"
@@ -196,10 +196,6 @@ FullFACPreconditioner::initializeSolverState(const SAMRAIVectorReal<NDIM, double
 
     d_fac_strategy->initializeOperatorState(*d_u, *d_f);
 
-    // Create temporary vectors.
-    d_r = d_f->cloneVector("");
-    d_r->allocateVectorData();
-
     // Allocate scratch data.
     d_fac_strategy->allocateScratchData();
 
@@ -227,13 +223,6 @@ FullFACPreconditioner::deallocateSolverState()
     {
         d_f->deallocateVectorData();
         d_f.setNull();
-    }
-
-    if (d_r)
-    {
-        d_r->deallocateVectorData();
-        d_r->freeVectorComponents();
-        d_r.setNull();
     }
 
     if (d_u)
