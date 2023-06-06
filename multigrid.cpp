@@ -326,7 +326,7 @@ main(int argc, char* argv[])
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
         fac_precondition_strategy->setViscosityCoefficient(1.0, 1.0);
-        fac_precondition_strategy->setViscosityCoefficient(1.0, 1.0);
+        fac_precondition_strategy->setDragCoefficient(1.0, 1.0, 1.0);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,
@@ -366,7 +366,13 @@ main(int argc, char* argv[])
                 ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
             ghost_cell_fill.fillData(0.0);
         }
+        hier_math_ops.setPatchHierarchy(patch_hierarchy);
+        hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
+        // just computes quadrature weights
+        const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
+        const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
+        visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
         krylov_solver->solveSystem(u_vec, f_vec);
 
         // Deallocate data
@@ -387,11 +393,7 @@ main(int argc, char* argv[])
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
 
-        hier_math_ops.setPatchHierarchy(patch_hierarchy);
-        hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
-        // just computes quadrature weights
-        const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
-        const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
+
 
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
@@ -423,7 +425,7 @@ main(int argc, char* argv[])
         hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
 
         // Output data for plotting.
-        visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+        visit_data_writer->writePlotData(patch_hierarchy, 1, 0.0);
         // Deallocate level data
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
