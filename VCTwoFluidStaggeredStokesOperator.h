@@ -320,6 +320,15 @@ private:
     double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
            d_nu_s = std::numeric_limits<double>::quiet_NaN();
     double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_thn_sc_var;
+    int d_thn_sc_idx = IBTK::invalid_index;
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_thn_nc_var;
+    int d_thn_nc_idx = IBTK::invalid_index;
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
+    int d_thn_cc_idx = IBTK::invalid_index;
 };
 } // namespace IBAMR
 
