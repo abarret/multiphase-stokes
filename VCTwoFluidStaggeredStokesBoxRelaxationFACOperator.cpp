@@ -13,6 +13,8 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
+#include "ibamr/namespaces.h" // IWYU pragma: keep
+
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/CartCellDoubleCubicCoarsen.h"
 #include "ibtk/CartCellDoubleQuadraticCFInterpolation.h"
@@ -29,7 +31,6 @@
 #include "ibtk/RobinPhysBdryPatchStrategy.h"
 #include "ibtk/SideNoCornersFillPattern.h"
 #include "ibtk/ibtk_utilities.h"
-#include "ibtk/namespaces.h" // IWYU pragma: keep
 #include <ibtk/CartCellDoubleQuadraticCFInterpolation.h>
 #include <ibtk/CartSideDoubleQuadraticCFInterpolation.h>
 
@@ -67,6 +68,7 @@
 
 // Local includes
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "utility_functions.h"
 
 // FORTRAN ROUTINES
 #define R_B_G_S IBTK_FC_FUNC_(rbgs, RBGS)
@@ -144,7 +146,6 @@ static const std::string BDRY_EXTRAP_TYPE = "LINEAR";
 // interface ghost cells; used only to evaluate composite grid residuals.
 static const bool CONSISTENT_TYPE_2_BDRY = false;
 } // namespace
-double convertToThs(double Thn);
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
@@ -788,12 +789,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     }
     IBTK_TIMER_STOP(t_compute_residual);
     return;
-}
-
-double
-convertToThs(double Thn)
-{
-    return 1.0 - Thn; // Thn+Ths = 1
 }
 
 void

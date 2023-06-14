@@ -45,6 +45,7 @@
 
 // Local includes
 #include "VCTwoFluidStaggeredStokesOperator.h"
+#include "utility_functions.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
@@ -81,43 +82,6 @@ static Timer* t_apply;
 static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
-
-double
-convertToThs(double Thn)
-{
-    return 1.0 - Thn; // Thn+Ths = 1
-}
-
-void
-pre_div_interp(const int dst_idx,
-               const int thn_idx,
-               const int un_idx,
-               const int us_idx,
-               Pointer<PatchHierarchy<NDIM>> hierarchy)
-{
-    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
-            Pointer<SideData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-            for (int axis = 0; axis < NDIM; ++axis)
-            {
-                for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
-                {
-                    const SideIndex<NDIM>& idx = si();
-                    double thn = 0.5 * ((*thn_data)(idx.toCell(0)) + (*thn_data)(idx.toCell(1)));
-                    double ths = convertToThs(thn);
-                    (*dst_data)(idx) = thn * (*un_data)(idx) + ths * (*us_data)(idx);
-                }
-            }
-        }
-    }
-}
 
 void
 convert_to_ndim_cc(const int dst_idx, const int cc_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
