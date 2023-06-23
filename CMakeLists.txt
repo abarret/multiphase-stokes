@@ -6,6 +6,8 @@ FIND_PACKAGE(IBAMR REQUIRED)
 
 SET(MULTIPHASE_SRC
     src/FullFACPreconditioner.cpp
+    src/IBMultiphaseEulerianForceFunction.cpp
+    src/IBMultiphaseHierarchyIntegrator.cpp
     src/INSVCTwoFluidStaggeredHierarchyIntegrator.cpp
     src/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp
     src/VCTwoFluidStaggeredStokesOperator.cpp
@@ -37,3 +39,5 @@ TARGET_LINK_LIBRARIES(time_stepping_thn MultiphaseLib)
 
 ADD_EXECUTABLE(four_roll_mill four_roll_mill.cpp)
 TARGET_LINK_LIBRARIES(four_roll_mill MultiphaseLib)
+
+ADD_SUBDIRECTORY(ib_ex)

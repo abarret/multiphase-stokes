@@ -27,6 +27,7 @@
 #include "ibamr/ibamr_enums.h"
 
 #include "ibtk/SideDataSynchronization.h"
+#include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/muParserCartGridFunction.h>
 
 #include "CellVariable.h"
@@ -65,11 +66,11 @@ public:
      * databases, and registers the integrator object with the restart manager
      * when requested.
      */
-    INSVCTwoFluidStaggeredHierarchyIntegrator(
-        std::string object_name,
-        SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-        SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianGridGeometry<NDIM>> grid_geometry,
-        bool register_for_restart = true);
+    INSVCTwoFluidStaggeredHierarchyIntegrator(std::string object_name,
+                                              SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                                              std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> u_dummy_coefs,
+                                              SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_dummy_coefs,
+                                              bool register_for_restart = true);
 
     /*!
      * The destructor for class INSVCTwoFluidStaggeredHierarchyIntegrator unregisters the
@@ -111,6 +112,16 @@ public:
     inline SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getNetworkVolumeFractionVariable() const
     {
         return d_thn_cc_var;
+    }
+
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> getNetworkBodyForceVariable() const
+    {
+        return d_f_un_sc_var;
+    }
+
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> getSolventBodyForceVariable() const
+    {
+        return d_f_us_sc_var;
     }
 
     /*!
@@ -265,6 +276,19 @@ private:
     INSVCTwoFluidStaggeredHierarchyIntegrator&
     operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
 
+    /*!
+     * \brief A helper function to set the volume fractions. Sets thn_scr_idx = 0.5 * (thn_cur_idx + thn_new_idx).
+     *
+     * If update_with_fcn = true, then this function will recalculate thn at current and new times. This parameter is
+     * ignored if thn is advected.
+     */
+    void setThnAtHalf(int& thn_cur_idx,
+                      int& thn_new_idx,
+                      int& thn_scr_idx,
+                      double current_time,
+                      double new_time,
+                      bool update_with_fcn = false);
+
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_fcn, d_f_us_ths_fcn;
 
@@ -341,6 +365,9 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
+
+    // Scratch force index.
+    int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
 };
 } // namespace IBAMR
 
