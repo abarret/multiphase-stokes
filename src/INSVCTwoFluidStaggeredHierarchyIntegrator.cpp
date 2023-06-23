@@ -23,6 +23,8 @@
 #include "ibamr/ibamr_enums.h"
 #include "ibamr/ibamr_utilities.h"
 #include "ibamr/namespaces.h" // IWYU pragma: keep
+#include <ibamr/INSVCStaggeredPressureBcCoef.h>
+#include <ibamr/INSVCStaggeredVelocityBcCoef.h>
 
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/CartCellDoubleBoundsPreservingConservativeLinearRefine.h"
@@ -116,7 +118,8 @@ namespace multiphase
 INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
     std::string object_name,
     Pointer<Database> input_db,
-    Pointer<CartesianGridGeometry<NDIM>> grid_geometry,
+    std::vector<RobinBcCoefStrategy<NDIM>*> u_dummy_coefs,
+    RobinBcCoefStrategy<NDIM>* p_dummy_coefs,
     bool register_for_restart)
     : INSHierarchyIntegrator(std::move(object_name),
                              input_db,
@@ -132,7 +135,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                              new CellVariable<NDIM, double>(object_name + "::Q"),
                              "CONSERVATIVE_COARSEN",
                              "CONSTANT_REFINE",
-                             register_for_restart)
+                             register_for_restart),
+      d_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "::un_sc")),
+      d_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "::us_sc")),
+      d_f_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "::f_un_sc")),
+      d_f_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "::f_us_sc")),
+      d_f_cc_var(new CellVariable<NDIM, double>(d_object_name + "::f_cc"))
 {
     if (input_db->keyExists("viscous_time_stepping_type"))
         d_viscous_time_stepping_type =
@@ -167,6 +175,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
         TBOX_ERROR(d_object_name + ": Viscous time step type " +
                    IBAMR::enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
                    " not valid. Must use BACKWARD_EULER or TRAPEZOIDAL_RULE");
+
+    d_U_var = d_us_sc_var;
+    d_U_bc_coefs = std::move(u_dummy_coefs);
+    d_P_bc_coef = p_dummy_coefs;
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -404,6 +416,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
 {
     if (d_integrator_is_initialized) return;
 
+    d_hierarchy = hierarchy;
+    d_gridding_alg = gridding_alg;
+
     // Here we do all we need to ensure that calls to advanceHierarchy() or integrateHierarchy() are valid.
     // NOTE: This function is called before the patch hierarchy has valid patch levels.
     // To set initial data, we should do this in initializeLevelDataSpecialized().
@@ -413,9 +428,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     // NOTE: This may have been created above with the advection diffusion integrator.
     if (!d_thn_cc_var) d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
     d_grad_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_thn_cc", NDIM);
-    d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::f_un_sc");
-    d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::f_us_sc");
-    d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "::f_cc");
     d_un_rhs_var = new SideVariable<NDIM, double>(d_object_name + "::un_rhs");
     d_us_rhs_var = new SideVariable<NDIM, double>(d_object_name + "::us_rhs");
     d_p_rhs_var = new CellVariable<NDIM, double>(d_object_name + "::p_rhs");
@@ -474,7 +486,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     registerVariable(us_rhs_idx, d_us_rhs_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(p_rhs_idx, d_p_rhs_var, IntVector<NDIM>(1), getScratchContext());
 
-    // Register a scratch force object
+    // Register a scratch force object.
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     d_fn_scr_idx = var_db->registerClonedPatchDataIndex(d_f_un_sc_var, f_un_idx);
     d_fs_scr_idx = var_db->registerClonedPatchDataIndex(d_f_us_sc_var, f_us_idx);
@@ -961,7 +973,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
     }
     const double dt = new_time - current_time;
 
-    // Now compute momentum forces
+    // Compute forces
     Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_temp");
     f_vec->allocateVectorData(current_time);
     f_vec->setToScalar(0.0);
@@ -1353,6 +1365,47 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorRe
         f_vec->getComponentDescriptorIndex(0), 1.0, f_vec->getComponentDescriptorIndex(0), -d_rho, d_fn_scr_idx);
     d_hier_sc_data_ops->linearSum(
         f_vec->getComponentDescriptorIndex(1), 1.0, f_vec->getComponentDescriptorIndex(1), -d_rho, d_fs_scr_idx);
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
+                                                        int& thn_new_idx,
+                                                        int& thn_scr_idx,
+                                                        const double current_time,
+                                                        const double new_time,
+                                                        const bool update_with_fcn)
+{
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+    thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
+    thn_scr_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+
+    if (d_thn_integrator)
+    {
+        // We are evolving thn, so use the integrator to copy data.
+        const int thn_evolve_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
+        const int thn_evolve_new_idx =
+            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
+        d_hier_cc_data_ops->copyData(thn_cur_idx, thn_evolve_cur_idx);
+        d_hier_cc_data_ops->copyData(thn_new_idx, thn_evolve_new_idx);
+        d_hier_cc_data_ops->linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
+    }
+    else if (update_with_fcn)
+    {
+        // Otherwise set the values with the function
+#ifndef NDEBUG
+        TBOX_ASSERT(d_thn_fcn);
+#endif
+        if (update_with_fcn)
+        {
+            d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, false);
+            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, false);
+        }
+        double half_time = 0.5 * (current_time + new_time);
+        d_thn_fcn->setDataOnPatchHierarchy(thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time, false);
+    }
+    return;
 }
 
 //////////////////////////////////////////////////////////////////////////////

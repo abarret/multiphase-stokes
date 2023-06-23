@@ -57,6 +57,10 @@ main(int argc, char* argv[])
         Pointer<AppInitializer> app_initializer = new AppInitializer(argc, argv, "stokes.log");
         Pointer<Database> input_db = app_initializer->getInputDatabase();
 
+        // Create dummy boundary conditions
+        std::vector<RobinBcCoefStrategy<NDIM>*> u_bc_coefs(NDIM, nullptr);
+        RobinBcCoefStrategy<NDIM>* p_bc_coef = nullptr;
+
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
@@ -65,7 +69,8 @@ main(int argc, char* argv[])
             new INSVCTwoFluidStaggeredHierarchyIntegrator(
                 "FluidSolver",
                 app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-                grid_geometry,
+                u_bc_coefs,
+                p_bc_coef,
                 true /*register_for_restart*/);
 
         Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator =
