@@ -28,4 +28,5 @@ ADD_EXECUTABLE(four_roll_mill four_roll_mill.cpp)
 TARGET_SOURCES(four_roll_mill PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp FullFACPreconditioner.cpp RBGS.f INSVCTwoFluidStaggeredHierarchyIntegrator.cpp FRMThnForcing.cpp)
 TARGET_LINK_LIBRARIES(four_roll_mill IBAMR::IBAMR2d)
 
+ADD_SUBDIRECTORY(ib_ex)
 ADD_SUBDIRECTORY(tests)
