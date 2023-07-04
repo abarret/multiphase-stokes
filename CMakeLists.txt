@@ -7,6 +7,7 @@ FIND_PACKAGE(IBAMR REQUIRED)
 SET(MULTIPHASE_SRC
     src/CFMultiphaseOldroydB.cpp
     src/FullFACPreconditioner.cpp
+    src/IBMultiphaseCrossLinks.cpp
     src/IBMultiphaseEulerianForceFunction.cpp
     src/IBMultiphaseHierarchyIntegrator.cpp
     src/INSVCTwoFluidConvectiveManager.cpp

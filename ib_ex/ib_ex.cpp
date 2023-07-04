@@ -13,6 +13,7 @@
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/IBExplicitHierarchyIntegrator.h>
+#include <ibamr/IBLagrangianForceStrategySet.h>
 #include <ibamr/IBMethod.h>
 #include <ibamr/IBRedundantInitializer.h>
 #include <ibamr/IBStandardForceGen.h>
@@ -40,6 +41,7 @@
 #include <array>
 
 // Local includes
+#include "IBMultiphaseCrossLinks.h"
 #include "IBMultiphaseHierarchyIntegrator.h"
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
@@ -219,19 +221,33 @@ main(int argc, char* argv[])
         num_node.resizeArray(1);
         N[0] = N[1] = input_db->getInteger("N");
         finest_ln = input_db->getInteger("MAX_LEVELS") - 1;
+        double beta = 0.35;
+        double alpha = 0.25 * 0.25 / beta;
+        double A = M_PI * alpha * beta; // Area of ellipse
+        double R = sqrt(A / M_PI);      // Radius of disc with equivalent area as ellipse
         ibn_initializer->setStructureNamesOnLevel(finest_ln, struct_list_network);
         ibn_initializer->registerInitStructureFunction(generate_structure);
         ibn_initializer->registerInitSpringDataFunction(generate_springs);
         ib_network_ops->registerLInitStrategy(ibn_initializer);
-        Pointer<IBStandardForceGen> ibn_force_fcn = new IBStandardForceGen();
+        Pointer<IBStandardForceGen> ibn_spring_forces = new IBStandardForceGen();
+        Pointer<IBMultiphaseCrossLinks> ibn_cross_forces = new IBMultiphaseCrossLinks(
+            ib_solvent_ops->getLDataManager(), input_db->getDouble("KAPPA") / (2.0 * M_PI * R / num_node[0]));
+        std::vector<Pointer<IBLagrangianForceStrategy>> net_forces = { ibn_spring_forces, ibn_cross_forces };
+        Pointer<IBLagrangianForceStrategySet> ibn_force_fcn =
+            new IBLagrangianForceStrategySet(net_forces.begin(), net_forces.end());
         ib_network_ops->registerIBLagrangianForceFunction(ibn_force_fcn);
 
         ibs_initializer->setStructureNamesOnLevel(finest_ln, struct_list_solvent);
         ibs_initializer->registerInitStructureFunction(generate_structure);
         ibs_initializer->registerInitSpringDataFunction(generate_springs);
         ib_solvent_ops->registerLInitStrategy(ibs_initializer);
-        Pointer<IBStandardForceGen> ibs_force_fcn = new IBStandardForceGen();
-        ib_network_ops->registerIBLagrangianForceFunction(ibs_force_fcn);
+        Pointer<IBStandardForceGen> ibs_spring_forces = new IBStandardForceGen();
+        Pointer<IBMultiphaseCrossLinks> ibs_cross_forces = new IBMultiphaseCrossLinks(
+            ib_network_ops->getLDataManager(), input_db->getDouble("KAPPA") / (2.0 * M_PI * R / num_node[0]));
+        std::vector<Pointer<IBLagrangianForceStrategy>> sol_forces = { ibs_spring_forces, ibs_cross_forces };
+        Pointer<IBLagrangianForceStrategySet> ibs_force_fcn =
+            new IBLagrangianForceStrategySet(sol_forces.begin(), sol_forces.end());
+        ib_solvent_ops->registerIBLagrangianForceFunction(ibs_force_fcn);
 
         // Set up coefficients
         const double eta_n = input_db->getDouble("ETA_N");
