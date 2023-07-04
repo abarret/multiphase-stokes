@@ -6,6 +6,7 @@ FIND_PACKAGE(IBAMR REQUIRED)
 
 SET(MULTIPHASE_SRC
     src/FullFACPreconditioner.cpp
+    src/IBMultiphaseCrossLinks.cpp
     src/IBMultiphaseEulerianForceFunction.cpp
     src/IBMultiphaseHierarchyIntegrator.cpp
     src/INSVCTwoFluidStaggeredHierarchyIntegrator.cpp
