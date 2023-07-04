@@ -6,6 +6,8 @@ L   = 1.0
 RHO = 1.0
 K   = 1.0
 
+KAPPA = 1.0//1*0.25
+
 ETA_S = 0.04
 ETA_N = 4.0
 NU_N = 1.0
@@ -96,7 +98,7 @@ INSIntegrator {
    num_cycles                    = NUM_CYCLES
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
-   w = 0.75
+   w = 0.9
    use_preconditioner = USE_PRECONDITIONER
    grad_abs_thresh = 0.75
    use_grad_tagging = TRUE
@@ -109,7 +111,7 @@ INSIntegrator {
    precond_db {
       cycle_type = "V_CYCLE"
       num_pre_sweeps = 0
-      num_post_sweeps = 5
+      num_post_sweeps = 2
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
@@ -170,7 +172,7 @@ Main {
 
 // visualization dump parameters
    viz_writer                  = "VisIt","Silo"
-   viz_dump_interval           = int(END_TIME/(50*DT_MAX))
+   viz_dump_interval           = 200
    viz_dump_dirname            = "viz_IB2d"
    visit_number_procs_per_file = 1
 
