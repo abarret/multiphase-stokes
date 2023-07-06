@@ -42,3 +42,4 @@ ADD_EXECUTABLE(four_roll_mill four_roll_mill.cpp)
 TARGET_LINK_LIBRARIES(four_roll_mill MultiphaseLib)
 
 ADD_SUBDIRECTORY(ib_ex)
+ADD_SUBDIRECTORY(ib_peristalsis)
