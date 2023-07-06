@@ -4,7 +4,7 @@
 #include "ibamr/IBSpringForceFunctions.h"
 #include "ibamr/IBSpringForceSpec.h"
 #include "ibamr/IBTargetPointForceSpec.h"
-#include "ibamr/namespaces.h" // IWYU pragma: keep
+#include "ibamr/app_namespaces.h" // IWYU pragma: keep
 
 #include "ibtk/IBTK_CHKERRQ.h"
 #include "ibtk/IBTK_MPI.h"
@@ -169,7 +169,7 @@ IBMultiphaseCrossLinks::computeCrossSpringForce(Pointer<LData> F_data,
     TBOX_ASSERT(l_data_manager->getNumberOfNodes(level_number) >= nodes.size());
 #endif
     std::vector<int> o_petsc_idxs(l_data_manager->getNumberOfNodes(level_number), -1);
-    for (int i = 0; i < nodes.size(); ++i)
+    for (size_t i = 0; i < nodes.size(); ++i)
         o_petsc_idxs[nodes[i]->getLagrangianIndex()] = nodes[i]->getLagrangianIndex();
     d_other_data_manager->mapLagrangianToPETSc(o_petsc_idxs, level_number);
 
