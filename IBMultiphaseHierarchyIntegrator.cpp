@@ -16,8 +16,8 @@
 #include "ibamr/IBHierarchyIntegrator.h"
 #include "ibamr/IBStrategy.h"
 #include "ibamr/INSHierarchyIntegrator.h"
+#include "ibamr/app_namespaces.h" // IWYU pragma: keep
 #include "ibamr/ibamr_enums.h"
-#include "ibamr/namespaces.h" // IWYU pragma: keep
 #include <ibamr/IBMethod.h>
 
 #include "ibtk/CartGridFunction.h"
@@ -105,9 +105,9 @@ IBMultiphaseHierarchyIntegrator::preprocessIntegrateHierarchy(const double curre
                                                               const int num_cycles)
 {
     // preprocess our dependencies...
+    d_ibn_method_ops->preprocessIntegrateData(current_time, new_time, num_cycles);
     IBHierarchyIntegrator::preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
 
-    d_ibn_method_ops->preprocessIntegrateData(current_time, new_time, num_cycles);
     // Compute the Lagrangian forces and spread them to the Eulerian grid.
     switch (d_time_stepping_type)
     {
@@ -485,7 +485,7 @@ IBMultiphaseHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHier
     d_un_ghostfill_op = nullptr;
     d_un_ghostfill_alg->registerRefine(d_un_idx, d_un_idx, d_un_idx, d_un_ghostfill_op);
     std::unique_ptr<RefinePatchStrategy<NDIM>> un_phys_bdry_op_unique(d_u_phys_bdry_op);
-    registerGhostfillRefineAlgorithm(d_object_name + "::un", d_u_ghostfill_alg, std::move(un_phys_bdry_op_unique));
+    registerGhostfillRefineAlgorithm(d_object_name + "::un", d_un_ghostfill_alg, std::move(un_phys_bdry_op_unique));
 
     d_un_coarsen_alg = new CoarsenAlgorithm<NDIM>();
     d_un_coarsen_op = grid_geom->lookupCoarsenOperator(d_un_var, "CONSERVATIVE_COARSEN");

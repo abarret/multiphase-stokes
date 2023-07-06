@@ -29,4 +29,5 @@ TARGET_SOURCES(four_roll_mill PRIVATE VCTwoFluidStaggeredStokesOperator.cpp VCTw
 TARGET_LINK_LIBRARIES(four_roll_mill IBAMR::IBAMR2d)
 
 ADD_SUBDIRECTORY(ib_ex)
+ADD_SUBDIRECTORY(ib_peristalsis)
 ADD_SUBDIRECTORY(tests)
