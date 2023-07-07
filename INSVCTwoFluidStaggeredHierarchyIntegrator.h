@@ -138,11 +138,17 @@ public:
     void setInitialNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> thn_init_fcn);
 
     /*!
-     * Register forcing functions. Any can be NULL
+     * Register forcing functions. These are not scaled by the volume fraction. Any can be NULL.
      */
-    void setForcingFunctions(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn = nullptr,
-                             SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn = nullptr,
+    void setForcingFunctions(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
+                             SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn,
                              SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fp_fcn = nullptr);
+
+    /*!
+     * Regiser forcing functions that should be scaled by the volume fraction.
+     */
+    void setForcingFunctionsScaled(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
+                                   SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
 
     /*!
      * Register the volume fraction function. If a function is not registered, the volume fraction is advected with the
@@ -260,6 +266,7 @@ private:
     operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
 
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_fcn, d_f_us_ths_fcn;
 
     // CartGridFunctions that set the initial values for state variables.
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn, d_thn_init_fcn;
@@ -269,6 +276,8 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_us_sc_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_rhs_var, d_us_rhs_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_p_rhs_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_un_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_f_us_sc_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_f_cc_var;
