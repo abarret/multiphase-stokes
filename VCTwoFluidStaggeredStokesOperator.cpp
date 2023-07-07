@@ -355,6 +355,9 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     d_hier_bdry_fill->resetTransactionComponents(d_transaction_comps);
 
+// TODO: These preprocessor flags need a permanent change associated with them. We need to determine which to keep and
+// which to throw away. If we want to keep the option of switching, we should replace the preprocessor flags with
+// run-time options.
 #define USE_DIV
 #define USE_SYNCHED_INTERP
 #define POST_SYNCH
