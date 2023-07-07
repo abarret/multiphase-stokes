@@ -37,6 +37,7 @@
 #include "FullFACPreconditioner.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "VCTwoFluidStaggeredStokesOperator.h"
+#include "utility_functions.h"
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -128,6 +129,9 @@ main(int argc, char* argv[])
         const int draw_fs_idx = var_db->registerVariableAndContext(draw_fs_var, ctx);
         const int draw_es_idx = var_db->registerVariableAndContext(draw_es_var, ctx);
 
+        Pointer<CellVariable<NDIM, double>> draw_div_var = new CellVariable<NDIM, double>("draw_div_var");
+        const int draw_div_idx = var_db->registerVariableAndContext(draw_div_var, ctx);
+
         // Register variables for plotting.
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
         TBOX_ASSERT(visit_data_writer);
@@ -136,6 +140,7 @@ main(int argc, char* argv[])
         visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_cc_idx);
         visit_data_writer->registerPlotQuantity("RHS_P", "SCALAR", f_cc_idx);
         visit_data_writer->registerPlotQuantity("error_p", "SCALAR", e_cc_idx);
+        visit_data_writer->registerPlotQuantity("Div", "SCALAR", draw_div_idx);
 
         visit_data_writer->registerPlotQuantity("Un", "VECTOR", draw_un_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
@@ -204,6 +209,7 @@ main(int argc, char* argv[])
             level->allocatePatchData(draw_us_idx, 0.0);
             level->allocatePatchData(draw_fs_idx, 0.0);
             level->allocatePatchData(draw_es_idx, 0.0);
+            level->allocatePatchData(draw_div_idx, 0.0);
         }
 
         // Setup vector objects.
@@ -326,7 +332,7 @@ main(int argc, char* argv[])
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
         fac_precondition_strategy->setViscosityCoefficient(1.0, 1.0);
-        fac_precondition_strategy->setViscosityCoefficient(1.0, 1.0);
+        fac_precondition_strategy->setDragCoefficient(1.0, 1.0, 1.0);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,
@@ -366,7 +372,13 @@ main(int argc, char* argv[])
                 ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
             ghost_cell_fill.fillData(0.0);
         }
+        hier_math_ops.setPatchHierarchy(patch_hierarchy);
+        hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
+        // just computes quadrature weights
+        const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
+        const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
+        visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
         krylov_solver->solveSystem(u_vec, f_vec);
 
         // Deallocate data
@@ -387,11 +399,7 @@ main(int argc, char* argv[])
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
 
-        hier_math_ops.setPatchHierarchy(patch_hierarchy);
-        hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
-        // just computes quadrature weights
-        const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
-        const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
+
 
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
@@ -422,8 +430,23 @@ main(int argc, char* argv[])
         hier_math_ops.interp(draw_fs_idx, draw_fs_var, f_us_sc_idx, f_us_sc_var, nullptr, 0.0, synch_cf_interface);
         hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
 
+        // Compute discrete divergence.
+        // Fill ghost cells for theta
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_fill_specs = { ITC(
+            thn_cc_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR") };
+        HierarchyGhostCellInterpolation ghost_fill;
+        ghost_fill.initializeOperatorState(ghost_fill_specs, patch_hierarchy);
+        ghost_fill.fillData(0.0);
+        pre_div_interp(un_sc_idx, thn_cc_idx, un_sc_idx, us_sc_idx, patch_hierarchy);
+        hier_math_ops.div(draw_div_idx, draw_div_var, 1.0, un_sc_idx, un_sc_var, nullptr, 0.0, true);
+        ghost_fill_specs = { ITC(draw_div_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
+        ghost_fill.deallocateOperatorState();
+        ghost_fill.initializeOperatorState(ghost_fill_specs, patch_hierarchy);
+        ghost_fill.fillData(0.0);
+
         // Output data for plotting.
-        visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+        visit_data_writer->writePlotData(patch_hierarchy, 1, 0.0);
         // Deallocate level data
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {

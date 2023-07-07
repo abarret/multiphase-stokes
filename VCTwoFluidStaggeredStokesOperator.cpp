@@ -45,6 +45,7 @@
 
 // Local includes
 #include "VCTwoFluidStaggeredStokesOperator.h"
+#include "utility_functions.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
@@ -60,12 +61,10 @@ static const int SIDEG = 1;
 
 // Types of refining and coarsening to perform prior to setting coarse-fine
 // boundary and physical boundary ghost cell values.
-static const std::string CC_DATA_REFINE_TYPE =
-    "CONSERVATIVE_LINEAR_REFINE"; // how to fill in fine cells from coarse cells, how to fill ghost cells on refine
-                                  // patch
-static const std::string SC_DATA_REFINE_TYPE =
-    "CONSERVATIVE_LINEAR_REFINE";              // how to fill in fine cells from coarse cells, how to fill ghost
-                                               // cells on refine patch
+static const std::string CC_DATA_REFINE_TYPE = "NONE"; // how to fill in fine cells from coarse cells, how to fill ghost
+                                                       // cells on refine patch
+static const std::string SC_DATA_REFINE_TYPE = "NONE"; // how to fill in fine cells from coarse cells, how to fill ghost
+                                                       // cells on refine patch
 static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation.
 static const std::string DATA_COARSEN_TYPE =
     "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
@@ -84,11 +83,26 @@ static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
 
-double
-convertToThs(double Thn)
+void
+convert_to_ndim_cc(const int dst_idx, const int cc_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
 {
-    return 1.0 - Thn; // Thn+Ths = 1
+    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<CellData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
+            Pointer<CellData<NDIM, double>> cc_data = patch->getPatchData(cc_idx);
+            for (CellIterator<NDIM> ci(dst_data->getGhostBox()); ci; ci++)
+            {
+                const CellIndex<NDIM>& idx = ci();
+                for (int d = 0; d < dst_data->getDepth(); ++d) (*dst_data)(idx, d) = (*cc_data)(idx);
+            }
+        }
+    }
 }
+
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
                                                                      bool homogeneous_bc,
@@ -103,7 +117,10 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
       d_default_P_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_P_bc_coef", Pointer<Database>(nullptr))),
       d_P_bc_coef(d_default_P_bc_coef),
-      d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable"))
+      d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable")),
+      d_thn_sc_var(new SideVariable<NDIM, double>(d_object_name + "::ThnSide", 1, false)),
+      d_thn_nc_var(new NodeVariable<NDIM, double>(d_object_name + "::ThnNode", 1, false)),
+      d_thn_cc_var(new CellVariable<NDIM, double>(d_object_name + "::ThnCell", NDIM))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -126,6 +143,19 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
     if (var_db->checkVariableExists(d_object_name + "::outerside_variable"))
         d_os_var = var_db->getVariable(d_object_name + "::outerside_variable");
     d_os_idx = var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"));
+
+    if (var_db->checkVariableExists(d_object_name + "::ThnSide"))
+        d_thn_sc_var = var_db->getVariable(d_object_name + "::ThnSide");
+    d_thn_sc_idx = var_db->registerVariableAndContext(d_thn_sc_var, var_db->getContext(d_object_name + "::CTX"));
+
+    if (var_db->checkVariableExists(d_object_name + "::ThnNode"))
+        d_thn_nc_var = var_db->getVariable(d_object_name + "::ThnNode");
+    d_thn_nc_idx = var_db->registerVariableAndContext(d_thn_nc_var, var_db->getContext(d_object_name + "::CTX"));
+
+    if (var_db->checkVariableExists(d_object_name + "::ThnCell"))
+        d_thn_cc_var = var_db->getVariable(d_object_name + "::ThnCell");
+    d_thn_cc_idx = var_db->registerVariableAndContext(
+        d_thn_cc_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(1));
 
     // Initialize the boundary conditions objects.
     setPhysicalBcCoefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef),
@@ -311,10 +341,10 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              d_P_bc_coef);
     transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
                                                              "CONSERVATIVE_LINEAR_REFINE",
-                                                             false,
-                                                             "CONSERVATIVE_COARSEN",
+                                                             USE_CF_INTERPOLATION,
+                                                             DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
-                                                             false,
+                                                             CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef); // defaults to fill corner
 
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
@@ -325,6 +355,27 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     d_hier_bdry_fill->resetTransactionComponents(d_transaction_comps);
 
+// TODO: These preprocessor flags need a permanent change associated with them. We need to determine which to keep and
+// which to throw away. If we want to keep the option of switching, we should replace the preprocessor flags with
+// run-time options.
+#define USE_DIV
+#define USE_SYNCHED_INTERP
+#define POST_SYNCH
+#ifdef USE_DIV
+    // Interpolate thn_cc to cell sides and multiply by u
+    pre_div_interp(d_thn_sc_idx, thn_idx, un_scratch_idx, us_scratch_idx, d_hierarchy);
+    d_hier_math_ops->div(
+        A_P_idx, y.getComponentVariable(2), d_D_div, d_thn_sc_idx, d_thn_sc_var, nullptr, d_new_time, true);
+#endif
+
+#ifdef USE_SYNCHED_INTERP
+    d_hier_math_ops->interp(
+        d_thn_nc_idx, d_thn_nc_var, true, thn_idx, Pointer<CellVariable<NDIM, double>>(nullptr), nullptr, d_new_time);
+
+    // Interpolate to cell sides
+    convert_to_ndim_cc(d_thn_cc_idx, thn_idx, d_hierarchy);
+    d_hier_math_ops->interp(d_thn_sc_idx, d_thn_sc_var, true, d_thn_cc_idx, d_thn_cc_var, nullptr, d_new_time);
+#endif
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -337,6 +388,8 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             Pointer<CellData<NDIM, double>> A_P_data =
                 patch->getPatchData(A_P_idx); // result of applying operator (eqn 3)
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<NodeData<NDIM, double>> thn_nc_data = patch->getPatchData(d_thn_nc_idx);
+            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(d_thn_sc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_scratch_idx);
             Pointer<SideData<NDIM, double>> A_un_data =
                 patch->getPatchData(A_un_idx); // result of applying operator (eqn 1)
@@ -345,6 +398,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 patch->getPatchData(A_us_idx); // result of applying operator (eqn 2)
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
+#ifndef USE_DIV
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
             {
                 const CellIndex<NDIM>& idx = ci();
@@ -376,6 +430,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double div_us_ths = div_us_dot_ths_dx + div_us_dot_ths_dy;
                 (*A_P_data)(idx) = d_D_div * (div_un_thn + div_us_ths);
             }
+#endif
 
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
@@ -388,6 +443,14 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
                 SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
 
+#ifdef USE_SYNCHED_INTERP
+                NodeIndex<NDIM> idx_n_l(idx.toCell(1), NodeIndex<NDIM>::LowerLeft);
+                NodeIndex<NDIM> idx_n_u(idx.toCell(1), NodeIndex<NDIM>::UpperLeft);
+
+                double thn_lower = (*thn_sc_data)(idx);
+                double thn_imhalf_jphalf = (*thn_nc_data)(idx_n_u);
+                double thn_imhalf_jmhalf = (*thn_nc_data)(idx_n_l);
+#else
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                 // thn at corners
@@ -397,7 +460,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double thn_imhalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
                             (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
-
+#endif
                 // components of first row (x-component of network vel) of network equation
                 double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
                                        ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
@@ -452,6 +515,14 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
                 SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
 
+                NodeIndex<NDIM> idx_n_l(idx.toCell(1), NodeIndex<NDIM>::LowerLeft);
+                NodeIndex<NDIM> idx_n_u(idx.toCell(1), NodeIndex<NDIM>::LowerRight);
+
+#ifdef USE_SYNCHED_INTERP
+                double thn_lower = (*thn_sc_data)(idx);
+                double thn_iphalf_jmhalf = (*thn_nc_data)(idx_n_u);
+                double thn_imhalf_jmhalf = (*thn_nc_data)(idx_n_l);
+#else
                 // thn at sides
                 double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
 
@@ -462,6 +533,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                 double thn_iphalf_jmhalf =
                     0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
                             (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
+#endif
 
                 // components of second row (y-component of network vel) of network equation
                 double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
@@ -508,6 +580,17 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
         }
     }
     if (d_bc_helper) d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
+
+#ifdef POST_SYNCH
+    {
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp = { ITC(A_us_idx, "NONE", false, "CONSERVATIVE_COARSEN"),
+                                             ITC(A_un_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
+        HierarchyGhostCellInterpolation ghost_cell_fill;
+        ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        ghost_cell_fill.fillData(d_new_time);
+    }
+#endif
 
     auto sync_fcn = [&](const int dst_idx) -> void
     {
@@ -563,6 +646,9 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         if (!level->checkAllocated(d_os_idx)) level->allocatePatchData(d_os_idx);
+        if (!level->checkAllocated(d_thn_sc_idx)) level->allocatePatchData(d_thn_sc_idx);
+        if (!level->checkAllocated(d_thn_nc_idx)) level->allocatePatchData(d_thn_nc_idx);
+        if (!level->checkAllocated(d_thn_cc_idx)) level->allocatePatchData(d_thn_cc_idx);
     }
 
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
@@ -604,7 +690,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_P_bc_coef); // noFillCorners
     d_transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                               CC_DATA_REFINE_TYPE,
+                                                               "CONSERVATIVE_LINEAR_REFINE",
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
@@ -678,6 +764,8 @@ VCTwoFluidStaggeredStokesOperator::deallocateOperatorState()
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         if (level->checkAllocated(d_os_idx)) level->deallocatePatchData(d_os_idx);
+        if (level->checkAllocated(d_thn_sc_idx)) level->deallocatePatchData(d_thn_sc_idx);
+        if (level->checkAllocated(d_thn_nc_idx)) level->deallocatePatchData(d_thn_nc_idx);
     }
     d_os_coarsen_scheds.clear();
     d_os_coarsen_alg = nullptr;

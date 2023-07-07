@@ -118,42 +118,9 @@
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "VCTwoFluidStaggeredStokesOperator.h"
+#include "utility_functions.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
-
-namespace
-{
-// Copy data from a side-centered variable to a face-centered variable.
-void
-copy_side_to_face(const int u_fc_idx, const int u_sc_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
-{
-    const int coarsest_ln = 0;
-    const int finest_ln = hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<FaceData<NDIM, double>> u_f_data = patch->getPatchData(u_fc_idx);
-            Pointer<SideData<NDIM, double>> u_s_data = patch->getPatchData(u_sc_idx);
-            const Box<NDIM> box = patch->getBox();
-            for (int axis = 0; axis < NDIM; ++axis)
-            {
-                for (SideIterator<NDIM> i(box, axis); i; i++)
-                {
-                    const SideIndex<NDIM>& si = i();
-                    FaceIndex<NDIM> fi(si.toCell(0), axis, 1);
-                    (*u_f_data)(fi) = (*u_s_data)(si);
-                }
-            }
-        }
-    }
-
-    return;
-} // copy_side_to_face
-} // namespace
-
 namespace IBAMR
 {
 
@@ -376,9 +343,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     {
         d_un_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Un_draw", NDIM);
         d_us_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Us_draw", NDIM);
-        int un_draw_idx, us_draw_idx;
+        d_div_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Div_Draw");
+        int un_draw_idx, us_draw_idx, div_draw_idx;
         registerVariable(un_draw_idx, d_un_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(us_draw_idx, d_us_draw_var, IntVector<NDIM>(0), getCurrentContext());
+        registerVariable(div_draw_idx, d_div_draw_var, IntVector<NDIM>(0), getCurrentContext());
 
         d_visit_writer->registerPlotQuantity("Un", "VECTOR", un_draw_idx, 0, 1.0, "NODE");
         for (int d = 0; d < NDIM; ++d)
@@ -389,6 +358,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
             d_visit_writer->registerPlotQuantity("Us_" + std::to_string(d), "SCALAR", us_draw_idx, d, 1.0, "NODE");
 
         d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "CELL");
+
+        d_visit_writer->registerPlotQuantity("Div", "SCALAR", div_draw_idx, 0, 1.0, "CELL");
 
         // Only need to plot this variable if we aren't advecting it.
         // If we do advect theta, the advection integrator will plot it.
@@ -805,7 +776,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     d_hier_cc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(2), p_new_idx);
 
     // Solve for un(n+1), us(n+1), p(n+1).
-    d_stokes_solver->solveSystem(*d_sol_vec, *d_rhs_vec);
+    bool converged = d_stokes_solver->solveSystem(*d_sol_vec, *d_rhs_vec);
+    if (d_enable_logging)
+        pout << "Stokes solver " << (converged ? "converged" : "failed to converge") << " after "
+             << d_stokes_solver->getNumIterations() << " iterations\n";
 
     // Reset the solve vector to copy the "scratch" data into the "new" data
     d_hier_sc_data_ops->copyData(un_new_idx, d_sol_vec->getComponentDescriptorIndex(0));
@@ -925,6 +899,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_draw_idx = var_db->mapVariableAndContextToIndex(d_un_draw_var, getCurrentContext());
     const int us_draw_idx = var_db->mapVariableAndContextToIndex(d_us_draw_var, getCurrentContext());
+    const int div_draw_idx = var_db->mapVariableAndContextToIndex(d_div_draw_var, getCurrentContext());
     const int un_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
     const int us_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
@@ -939,11 +914,24 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     allocatePatchData(un_scr_idx, 0.0, coarsest_ln, finest_ln);
     allocatePatchData(us_scr_idx, 0.0, coarsest_ln, finest_ln);
 
+    // Set thn if necessary
+    if (d_thn_fcn)
+        d_thn_fcn->setDataOnPatchHierarchy(
+            thn_cur_idx, d_thn_cc_var, d_hierarchy, d_integrator_time, false, coarsest_ln, finest_ln);
+    if (d_thn_integrator)
+    {
+        // Copy thn if necessary.
+        const int thn_adv_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
+        d_hier_cc_data_ops->copyData(thn_cur_idx, thn_adv_cur_idx);
+    }
+
     // We need ghost cells to interpolate to nodes.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_comp = {
         ITC(un_scr_idx, un_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
-        ITC(us_scr_idx, us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr)
+        ITC(us_scr_idx, us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
+        ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr)
     };
     HierarchyGhostCellInterpolation hier_bdry_fill;
     hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
@@ -967,10 +955,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
                             d_integrator_time,
                             synch_cf_interface);
 
-    // Set thn if necessary
-    if (d_thn_fcn)
-        d_thn_fcn->setDataOnPatchHierarchy(
-            thn_cur_idx, d_thn_cc_var, d_hierarchy, d_integrator_time, false, coarsest_ln, finest_ln);
+    // Compute divergence of velocity fields.
+    pre_div_interp(un_scr_idx, thn_cur_idx, un_scr_idx, us_scr_idx, d_hierarchy);
+    d_hier_math_ops->div(div_draw_idx, d_div_draw_var, 1.0, un_scr_idx, d_un_sc_var, nullptr, 0.0, true);
+    ghost_comp = { ITC(div_draw_idx, "NONE", false, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr) };
+    hier_bdry_fill.deallocateOperatorState();
+    hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
+    hier_bdry_fill.fillData(0.0);
 
     // Deallocate scratch data
     deallocatePatchData(un_scr_idx, coarsest_ln, finest_ln);
