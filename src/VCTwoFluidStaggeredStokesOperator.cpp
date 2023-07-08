@@ -65,7 +65,7 @@ static const std::string CC_DATA_REFINE_TYPE = "NONE"; // how to fill in fine ce
                                                        // cells on refine patch
 static const std::string SC_DATA_REFINE_TYPE = "NONE"; // how to fill in fine cells from coarse cells, how to fill ghost
                                                        // cells on refine patch
-static const bool USE_CF_INTERPOLATION = true; // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation.
+static const bool USE_CF_INTERPOLATION = true;         // Refine Patch Strategy: CartSideDoubleQuadraticCFInterpolation.
 static const std::string DATA_COARSEN_TYPE =
     "CUBIC_COARSEN"; // going from fine to coarse. fill in coarse cells by whatever is in the fine cells. synchronizing
                      // the hierarchies
@@ -434,14 +434,14 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
             for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
             {
-                const SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
+                const SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
 
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
-                SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
-                SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
+                SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
+                SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
+                SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
 
 #ifdef USE_SYNCHED_INTERP
                 NodeIndex<NDIM> idx_n_l(idx.toCell(1), NodeIndex<NDIM>::LowerLeft);
@@ -506,14 +506,14 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
             for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
             {
-                const SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
+                const SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
 
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
-                SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
-                SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
+                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
+                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
+                SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
+                SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
+                SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
+                SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
 
                 NodeIndex<NDIM> idx_n_l(idx.toCell(1), NodeIndex<NDIM>::LowerLeft);
                 NodeIndex<NDIM> idx_n_u(idx.toCell(1), NodeIndex<NDIM>::LowerRight);
