@@ -816,23 +816,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         ghost_cell_fill.fillData(0.0);
     }
 
-    // Set the forcing data if applicable.
-    Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_vec");
-    f_vec->allocateVectorData(current_time);
-    f_vec->setToScalar(0.0);
-    const int f_un_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getScratchContext());
-    const int f_us_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getScratchContext());
+    // Set the forcing data if applicable. We only do this for pressure. The momentum forces are applied in
+    // integrateHierarchy().
     const int f_p_idx = var_db->mapVariableAndContextToIndex(d_f_cc_var, getScratchContext());
-    if (d_f_un_fcn)
-    {
-        d_f_un_fcn->setDataOnPatchHierarchy(f_un_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(f_vec->getComponentDescriptorIndex(0), f_un_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_fcn)
-    {
-        d_f_us_fcn->setDataOnPatchHierarchy(f_us_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(f_vec->getComponentDescriptorIndex(1), f_us_idx, f_vec->getComponentDescriptorIndex(1));
-    }
     // Divergence is not time-stepped. We need to prescribe the correct divergence at the time point for which we are
     // solving.
     if (d_f_p_fcn)
@@ -841,40 +827,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         d_hier_cc_data_ops->add(
             d_rhs_vec->getComponentDescriptorIndex(2), f_p_idx, d_rhs_vec->getComponentDescriptorIndex(2));
     }
-
-    // Now we account for theta variable forces
-    // Fill in ghost cells for thn_scr_idx
-    {
-        // Also fill in ghost cells on the dense hierarchy
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(thn_scr_idx,
-                                 "CONSERVATIVE_LINEAR_REFINE",
-                                 false,
-                                 "NONE",
-                                 "LINEAR",
-                                 true,
-                                 nullptr); // defaults to fill corner
-        HierarchyGhostCellInterpolation ghost_cell_fill;
-        ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(half_time);
-    }
-    if (d_f_un_thn_fcn)
-    {
-        d_f_un_thn_fcn->setDataOnPatchHierarchy(f_un_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_thn(f_un_idx, f_un_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(f_vec->getComponentDescriptorIndex(0), f_un_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_ths_fcn)
-    {
-        d_f_us_ths_fcn->setDataOnPatchHierarchy(f_us_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_ths(f_us_idx, f_us_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(f_vec->getComponentDescriptorIndex(1), f_us_idx, f_vec->getComponentDescriptorIndex(1));
-    }
-
-    d_rhs_vec->add(d_rhs_vec, f_vec);
-    f_vec->deallocateVectorData();
-    f_vec->freeVectorComponents();
 
     // Set up the advection diffusion integrator
     for (const auto& adv_diff_integrator : d_adv_diff_hier_integrators)
@@ -1199,7 +1151,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
                                                         int& thn_scr_idx,
                                                         const double current_time,
                                                         const double new_time,
-                                                        const bool update_with_fcn)
+                                                        const bool start_of_ts)
 {
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
@@ -1214,16 +1166,16 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
         const int thn_evolve_new_idx =
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
         d_hier_cc_data_ops->copyData(thn_cur_idx, thn_evolve_cur_idx);
-        d_hier_cc_data_ops->copyData(thn_new_idx, thn_evolve_new_idx);
+        d_hier_cc_data_ops->copyData(thn_new_idx, start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx);
         d_hier_cc_data_ops->linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
     }
-    else if (update_with_fcn)
+    else if (start_of_ts)
     {
         // Otherwise set the values with the function
 #ifndef NDEBUG
         TBOX_ASSERT(d_thn_fcn);
 #endif
-        if (update_with_fcn)
+        if (start_of_ts)
         {
             d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, false);
             d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, false);
