@@ -1373,7 +1373,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
                                                         int& thn_scr_idx,
                                                         const double current_time,
                                                         const double new_time,
-                                                        const bool update_with_fcn)
+                                                        const bool start_of_ts)
 {
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
@@ -1388,16 +1388,16 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
         const int thn_evolve_new_idx =
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
         d_hier_cc_data_ops->copyData(thn_cur_idx, thn_evolve_cur_idx);
-        d_hier_cc_data_ops->copyData(thn_new_idx, thn_evolve_new_idx);
+        d_hier_cc_data_ops->copyData(thn_new_idx, start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx);
         d_hier_cc_data_ops->linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
     }
-    else if (update_with_fcn)
+    else if (start_of_ts)
     {
         // Otherwise set the values with the function
 #ifndef NDEBUG
         TBOX_ASSERT(d_thn_fcn);
 #endif
-        if (update_with_fcn)
+        if (start_of_ts)
         {
             d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, false);
             d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, false);

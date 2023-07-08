@@ -287,15 +287,15 @@ private:
     /*!
      * \brief A helper function to set the volume fractions. Sets thn_scr_idx = 0.5 * (thn_cur_idx + thn_new_idx).
      *
-     * If update_with_fcn = true, then this function will recalculate thn at current and new times. This parameter is
-     * ignored if thn is advected.
+     * If start_of_ts = true, then this function will recalculate thn at current and new times if a function is
+     * prescribed. If thn is advected, then we set thn_new_idx to thn_cur_idx.
      */
     void setThnAtHalf(int& thn_cur_idx,
                       int& thn_new_idx,
                       int& thn_scr_idx,
                       double current_time,
                       double new_time,
-                      bool update_with_fcn = false);
+                      bool start_of_ts = false);
 
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_fcn, d_f_us_ths_fcn;
