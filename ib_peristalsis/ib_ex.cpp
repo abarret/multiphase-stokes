@@ -1,4 +1,5 @@
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
+#include <ibamr/CFINSForcing.h>
 #include <ibamr/IBExplicitHierarchyIntegrator.h>
 #include <ibamr/IBLagrangianForceStrategySet.h>
 #include <ibamr/IBMethod.h>
@@ -32,6 +33,8 @@
 #include "IBMultiphaseCrossLinks.h"
 #include "IBMultiphaseHierarchyIntegrator.h"
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "ScaleStress.h"
+#include "StressRelaxation.h"
 
 int finest_ln;
 std::array<int, NDIM> N;
@@ -287,6 +290,22 @@ main(int argc, char* argv[])
             new IBLagrangianForceStrategySet(sol_forces.begin(), sol_forces.end());
         ib_solvent_ops->registerIBLagrangianForceFunction(ibs_force_fcn);
 
+        // Set up visualization plot file writers.
+        Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
+        Pointer<LSiloDataWriter> solvent_data_writer = new LSiloDataWriter(
+            "SolventDataWriter", input_db->getDatabase("Main")->getString("viz_dump_dirname") + "/solvent", false);
+        Pointer<LSiloDataWriter> network_data_writer = new LSiloDataWriter(
+            "NetworkDataWriter", input_db->getDatabase("Main")->getString("viz_dump_dirname") + "/network", false);
+        if (uses_visit)
+        {
+            ibn_initializer->registerLSiloDataWriter(network_data_writer);
+            ib_network_ops->registerLSiloDataWriter(network_data_writer);
+            time_integrator->registerVisItDataWriter(visit_data_writer);
+            ibs_initializer->registerLSiloDataWriter(solvent_data_writer);
+            ib_solvent_ops->registerLSiloDataWriter(solvent_data_writer);
+            adv_diff_integrator->registerVisItDataWriter(visit_data_writer);
+        }
+
         // Set up coefficients
         const double eta_n = input_db->getDouble("ETA_N");
         const double eta_s = input_db->getDouble("ETA_S");
@@ -318,19 +337,28 @@ main(int argc, char* argv[])
             "p_init", app_initializer->getComponentDatabase("PressureInitialConditions"), grid_geometry);
         ins_integrator->registerPressureInitialConditions(p_init);
 
-        // Set up visualization plot file writers.
-        Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
-        Pointer<LSiloDataWriter> solvent_data_writer = new LSiloDataWriter(
-            "SolventDataWriter", input_db->getDatabase("Main")->getString("viz_dump_dirname") + "/solvent", false);
-        Pointer<LSiloDataWriter> network_data_writer = new LSiloDataWriter(
-            "NetworkDataWriter", input_db->getDatabase("Main")->getString("viz_dump_dirname") + "/network", false);
-        if (uses_visit)
+        Pointer<CFINSForcing> cf_forcing;
+        Pointer<ScaleStress> stress_scale =
+            new ScaleStress("ScaleStress", ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator);
+        if (input_db->getBool("USE_CF"))
         {
-            ibn_initializer->registerLSiloDataWriter(network_data_writer);
-            ib_network_ops->registerLSiloDataWriter(network_data_writer);
-            time_integrator->registerVisItDataWriter(visit_data_writer);
-            ibs_initializer->registerLSiloDataWriter(solvent_data_writer);
-            ib_solvent_ops->registerLSiloDataWriter(solvent_data_writer);
+            Pointer<INSHierarchyIntegrator> ins_cf_integrator = ins_integrator;
+            cf_forcing = new CFINSForcing("CFINSForcing",
+                                          app_initializer->getComponentDatabase("CFINSForcing"),
+                                          ins_cf_integrator,
+                                          grid_geometry,
+                                          adv_diff_integrator,
+                                          visit_data_writer);
+            cf_forcing->setSigmaScaleFcn(stress_scale);
+            Pointer<StressRelaxation> stress_relax =
+                new StressRelaxation("StressRelax",
+                                     app_initializer->getComponentDatabase("CFINSForcing"),
+                                     ins_integrator->getNetworkVariable(),
+                                     ins_integrator,
+                                     ins_integrator->getNetworkVolumeFractionVariable(),
+                                     adv_diff_integrator);
+            cf_forcing->registerRelaxationOperator(stress_relax);
+            ins_integrator->setForcingFunctions(cf_forcing, nullptr);
         }
 
         // Initialize hierarchy configuration and data on all patches.

@@ -57,6 +57,22 @@ ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
 ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
+// Complex Fluid parameters
+USE_CF = TRUE
+FLUID_MODEL = "USER_DEFINED"
+EVOLVE_TYPE = "STANDARD"
+LOG_DETERMINANT     = TRUE
+CONVECTIVE_OPERATOR_TYPE     = "CUI"
+OUTPUT_CONFORMATION_TENSOR = TRUE
+OUTPUT_STRESS_TENSOR = FALSE
+OUTPUT_DIVERGENCE = TRUE
+PROJECT_CONFORM_TENS = FALSE
+RELAXATION_TIME = 4.0
+VISCOSITY = 2.0
+USING_EXACT_U = FALSE
+BDRY_INTERP_TYPE = "LINEAR"
+
+
 VelocityInitialConditions {
    function_0 = "0.0"
    function_1 = "0.0"
@@ -68,6 +84,25 @@ PressureInitialConditions {
 
 thn {
    function = "0.5"//"0.25*sin(2*PI*(X_0 - t))*sin(2*PI*(X_1 - t)) + 0.5"
+}
+
+CFINSForcing {
+   InitialConditions{
+      function_0 = "0.0"
+      function_1 = "0.0"
+      function_2 = "0.0"
+   }
+   relaxation_time = RELAXATION_TIME
+   viscosity = VISCOSITY
+   fluid_model         = FLUID_MODEL
+   evolution_type = EVOLVE_TYPE
+   log_determinant     = LOG_DETERMINANT
+   convective_operator_type     = CONVECTIVE_OPERATOR_TYPE
+   output_stress_tensor = OUTPUT_STRESS_TENSOR
+   output_conformation_tensor = OUTPUT_CONFORMATION_TENSOR
+   output_divergence = OUTPUT_DIVERGENCE
+   interp_type = BDRY_INTERP_TYPE
+   project_conformation_tensor = PROJECT_CONFORM_TENS
 }
 
 IBHierarchyIntegrator {
