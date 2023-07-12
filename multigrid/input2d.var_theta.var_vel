@@ -1,37 +1,60 @@
-USE_PRECOND = TRUE
+USE_PRECOND = FALSE
 w = 0.75
+C = 1.0
+D = -1.0
+IS_VEL_NULLSPACE = FALSE
+
+XI = 1.0
+ETAN = 1.0
+ETAS = 1.0
+NU = 1.0
+
+MAX_MULTIGRID_LEVELS = 5
 
 un {
-   function_0 = "cos(2*PI*X_0)"
-   function_1 = "cos(2*PI*X_1)"
+   function_0 = "sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "cos(2*PI*X_0)*sin(2*PI*X_1)"
 }
 
 us {
-   function_0 = "-cos(2*PI*X_0)"
-   function_1 = "-cos(2*PI*X_1)"
+   function_0 = "-sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_0)*sin(2*PI*X_1)"
 } // so that average of un + us is 0
 
 p {
    function = "0.0"
 } // pressure has mean 0
 
-f_un {
-   function_0 = "-1/8*cos(2*PI*X_0)*(4+12*PI*PI+4*PI*PI*cos(4*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI-sin(2*PI*X_0)*sin(2*PI*X_1)))"
-   function_1 = "1/8*cos(2*PI*X_1)*(-4-16*PI*PI-16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI+sin(2*PI*X_1)*sin(2*PI*X_1)))"
-}
-
-f_us {
-   function_0 = "-1/8*cos(2*PI*X_0)*(-4-20*PI*PI+4*PI*PI*cos(4*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1)))"
-   function_1 = "1/8*cos(2*PI*X_1)*(4+16*PI*PI-16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI-sin(2*PI*X_1)*sin(2*PI*X_1)))"
-}
-
-f_p {
-   function = "0.5*PI*(sin(2*PI*(X_0-2*X_1))+sin(2*PI*(2*X_0+X_1))+sin(2*PI*(X_0+2*X_1))-sin(4*PI*X_0-2*PI*X_1))"
-}
-
 thn {
    function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
 }
+
+f_un {
+   c = C
+   d = D
+   nu = NU
+   etan = ETAN
+   xi = XI
+   etas = ETAS
+   function_0 = "(1/(8*nu))*cos(2*PI*X_1)*sin(2*PI*X_0)*(4*c*nu-4*d*(8*etan*nu*PI^2+xi)+2*nu*(c-16*d*etan*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
+   function_1 = "(1/(8*nu))*cos(2*PI*X_0)*sin(2*PI*X_1)*(4*c*nu-4*d*(8*etan*nu*PI^2+xi)+2*nu*(c-16*d*etan*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
+}
+
+f_us {
+   c = C
+   d = D
+   nu = NU
+   etan = ETAN
+   xi = XI
+   etas = ETAS
+   function_0 = "(1/(8*nu))*cos(2*PI*X_1)*sin(2*PI*X_0)*(-4*c*nu+4*d*(8*etas*nu*PI^2+xi)+2*nu*(c-16*d*etas*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
+   function_1 = "(1/(8*nu))*cos(2*PI*X_0)*sin(2*PI*X_1)*(-4*c*nu+4*d*(8*etas*nu*PI^2+xi)+2*nu*(c-16*d*etas*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
+}
+
+f_p {
+   function = "PI*sin(4*PI*X_0)*sin(4*PI*X_1)"
+}
+
 
 KrylovSolver {
 
@@ -41,13 +64,12 @@ KrylovPrecondStrategy {
 
 }
 
-multigrid_max_levels = 6
-
 KrylovPrecond {
-   cycle_type = "F_CYCLE"
-   num_pre_sweeps = 5
+   cycle_type = "V_CYCLE"
+   num_pre_sweeps = 0
    num_post_sweeps = 5
    enable_logging = TRUE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
 Main {
@@ -64,7 +86,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 64
+N = 32
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
@@ -84,7 +106,7 @@ MultigridAlg {
 }
 
 GriddingAlgorithm {
-   max_levels = 1                 // Maximum number of levels in hierarchy.
+   max_levels = 2                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 2, 2              // vector ratio to next coarser level
@@ -109,8 +131,8 @@ StandardTagAndInitialize {
    tagging_method = "REFINE_BOXES"
    RefineBoxes {
     // level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
-    // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
-     level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
+     level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+    // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
     // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
     // level_0 = [(1,1), (30,30)] 
    }

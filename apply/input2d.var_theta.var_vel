@@ -1,53 +1,55 @@
-USE_PRECOND = TRUE
-w = 0.75
+C = 1.0
+D = -1.0
+
+XI = 1.0
+ETAN = 1.0
+ETAS = 1.0
+NU = 1.0
+
+N = 32
 
 un {
-   function_0 = "cos(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "cos(2*PI*X_1)*cos(2*PI*X_0)"
+   function_0 = "sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "cos(2*PI*X_0)*sin(2*PI*X_1)"
 }
 
 us {
-   function_0 = "-cos(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "-cos(2*PI*X_1)*cos(2*PI*X_0)"
+   function_0 = "-sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_0)*sin(2*PI*X_1)"
 } // so that average of un + us is 0
 
 p {
    function = "0.0"
 } // pressure has mean 0
 
+thn {
+   function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
+}
+
 f_un {
-   function_0 = "-0.5 * (1 + 8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "-0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)"
+   c = C
+   d = D
+   nu = NU
+   etan = ETAN
+   xi = XI
+   etas = ETAS
+   function_0 = "(cos(2*PI*X_1)*sin(2*PI*X_0)*(4*c*nu-4*d*(8*etan*nu*PI^2+xi)+2*nu*(c-16*d*etan*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2))/(8*nu)"
+   function_1 = "(cos(2*PI*X_0)*sin(2*PI*X_1)*(4*c*nu-4*d*(8*etan*nu*PI^2+xi)+2*nu*(c-16*d*etan*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2))/(8*nu)"
 }
 
 f_us {
-   function_0 = "0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)"
+   c = C
+   d = D
+   nu = NU
+   etan = ETAN
+   xi = XI
+   etas = ETAS
+   function_0 = "(cos(2*PI*X_1)*sin(2*PI*X_0)*(-4*c*nu+4*d*(8*etas*nu*PI^2+xi)+2*nu*(c-16*d*etas*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2))/(8*nu)"
+   function_1 = "(cos(2*PI*X_0)*sin(2*PI*X_1)*(-4*c*nu+4*d*(8*etas*nu*PI^2+xi)+2*nu*(c-16*d*etas*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2))/(8*nu)"
 }
 
 f_p {
-   function = "0.0"
-}
-
-thn {
-   function = "0.5"
-}
-
-KrylovSolver {
-
-}
-
-KrylovPrecondStrategy {
-
-}
-
-multigrid_max_levels = 6
-
-KrylovPrecond {
-   cycle_type = "F_CYCLE"
-   num_pre_sweeps = 5
-   num_post_sweeps = 5
-   enable_logging = TRUE
+   function = "0.5"//-PI*sin(4*PI*X_0)*sin(4*PI*X_1)"
 }
 
 Main {
@@ -57,14 +59,12 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_multigrid"
+   viz_dump_dirname = "viz2d"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
    timer_enabled = TRUE
 }
-
-N = 64
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
@@ -73,21 +73,11 @@ CartesianGeometry {
    periodic_dimension = 1, 1  
 }
 
-MultigridCartesianGeometry {
-   domain_boxes       = [(0,0), (N - 1,N - 1)]
-   x_lo               = 0, 0      // lower end of computational domain.
-   x_up               = 1, 1      // upper end of computational domain.
-   periodic_dimension = 1, 1  
-}
-
-MultigridAlg {
-}
-
 GriddingAlgorithm {
-   max_levels = 1                 // Maximum number of levels in hierarchy.
+   max_levels = 2                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
-      level_1 = 2, 2              // vector ratio to next coarser level
+      level_1 = 4, 4              // vector ratio to next coarser level
    }
 
    largest_patch_size {
@@ -109,10 +99,8 @@ StandardTagAndInitialize {
    tagging_method = "REFINE_BOXES"
    RefineBoxes {
     // level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
-    // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
-     level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
-    // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
-    // level_0 = [(1,1), (30,30)] 
+     level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+    // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
    }
 }
 
