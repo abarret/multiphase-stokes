@@ -378,40 +378,39 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     {
         if (level_num > 0)
         {
-            // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
-            int patch_counter = 0;
-            for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++patch_counter)
+            // 1 here because we do red-black ordering.
+            if (sweep > 1)
             {
-                Pointer<Patch<NDIM>> patch = level->getPatch(p());
-
-                Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-                Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-                Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
-
-                Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(d_un_scr_idx);
-                Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(d_us_scr_idx);
-                Pointer<CellData<NDIM, double>> p_scr_data = patch->getPatchData(d_p_scr_idx);
-
-#if (1)
-                for (unsigned int axis = 0; axis < NDIM; ++axis)
+                // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
+                int patch_counter = 0;
+                for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++patch_counter)
                 {
-                    un_data->getArrayData(axis).copy(un_scr_data->getArrayData(axis),
-                                                     d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
-                                                     IntVector<NDIM>(0));
-                    us_data->getArrayData(axis).copy(us_scr_data->getArrayData(axis),
-                                                     d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
-                                                     IntVector<NDIM>(0));
-                }
+                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
 
-                p_data->getArrayData().copy(p_scr_data->getArrayData(),
-                                            d_patch_cell_bc_box_overlap[level_num][patch_counter],
-                                            IntVector<NDIM>(0));
-#endif
+                    Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+                    Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+                    Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
+
+                    Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(d_un_scr_idx);
+                    Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(d_us_scr_idx);
+                    Pointer<CellData<NDIM, double>> p_scr_data = patch->getPatchData(d_p_scr_idx);
+
+                    for (unsigned int axis = 0; axis < NDIM; ++axis)
+                    {
+                        un_data->getArrayData(axis).copy(un_scr_data->getArrayData(axis),
+                                                         d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                         IntVector<NDIM>(0));
+                        us_data->getArrayData(axis).copy(us_scr_data->getArrayData(axis),
+                                                         d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                         IntVector<NDIM>(0));
+                    }
+
+                    p_data->getArrayData().copy(p_scr_data->getArrayData(),
+                                                d_patch_cell_bc_box_overlap[level_num][patch_counter],
+                                                IntVector<NDIM>(0));
+                }
             }
             // Fill in ghost cells. We only want to use values on our current level to fill in ghost cells.
-            // TODO: d_ghostfill_no_restrict_scheds does not fill in ghost cells in at coarse fine interfaces. We need
-            // to set that up. One way of doing that is using the existing operators in IBAMR to compute the "normal
-            // extension."
             performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
 
             // Compute the normal extension of the solution at coarse fine interfaces if we are not on the coarsest
