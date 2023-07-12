@@ -71,7 +71,7 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
 
     // We need to copy f into d_f
     transferToDense(f, *d_f);
-    SAMRAIScopedVectorCopy<double> r(*d_f);
+    SAMRAIScopedVectorDuplicate<double> r(d_f);
 
     // Apply a single FAC cycle.
     if (d_cycle_type == V_CYCLE && d_num_pre_sweeps == 0)

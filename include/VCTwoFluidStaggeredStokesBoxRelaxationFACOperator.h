@@ -253,12 +253,16 @@ private:
      */
     SAMRAI::tbox::Pointer<CoarseFineBoundaryRefinePatchStrategy> d_sc_bdry_op, d_cc_bdry_op;
 
-    // Cache the prolongation and restriction schedules
+    // Cache the prolongation and restriction schedules. Note we also cache the algorithms so that we can reset the
+    // schedules to their previous state.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineOperator<NDIM>> d_un_prolong_op, d_us_prolong_op, d_p_prolong_op;
     SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenOperator<NDIM>> d_un_restrict_op, d_us_restrict_op, d_p_restrict_op;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_prolong_scheds;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_prolong_alg;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_restrict_scheds;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenAlgorithm<NDIM>> d_restrict_alg;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_ghostfill_no_restrict_scheds;
+    SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_ghostfill_no_restrict_alg;
 
     int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
