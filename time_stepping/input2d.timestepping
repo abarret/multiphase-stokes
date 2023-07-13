@@ -5,18 +5,18 @@ D = 1.0
 IS_VEL_NULLSPACE = FALSE
 
 un {
-   function_0 = "0.0"
-   function_1 = "0.0"
+   function_0 = "cos(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "cos(2*PI*X_1)*cos(2*PI*X_0)"
 }
 
 us {
-   function_0 = "0.0"
-   function_1 = "0.0"
-} // so that average of un + us is 0
+   function_0 = "-cos(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_1)*cos(2*PI*X_0)"
+} 
 
 p {
    function = "0.0"
-} // pressure has mean 0
+} 
 
 f_un {
    function_0 = "-0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)-PI*PI*cos(2*PI*X_1)*cos(2*PI*X_1)*sin(2*PI*X_0)*sin(2*PI*X_0)+PI*PI*cos(2*PI*X_0)*cos(2*PI*X_0)*sin(2*PI*X_1)*sin(2*PI*X_1)+1/32*sin(4*PI*X_0)*(-32*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1))*sin(4*PI*X_1)"
