@@ -1,8 +1,24 @@
-USE_PRECOND = TRUE
-w = 0.75
-C = 0.0
-D = 1.0
-IS_VEL_NULLSPACE = FALSE
+USE_PRECONDITIONER =  TRUE
+W = 0.75  // under relaxation factor for box relaxation scheme
+RHO = 1.0
+N = 16
+MAX_MULTIGRID_LEVELS = 3
+START_TIME = 0.0
+END_TIME = 1.0
+NUM_CYCLES = 1
+DX = 1.0 / N 
+U_MAX = 1.0 
+CFL = 0.3
+DT_MAX = CFL * DX / U_MAX 
+ENABLE_LOGGING = TRUE
+DIR_NAME = "viz2d"
+VIZ_DUMP_TIME_INTERVAL = 0.02
+VISCOUS_TIME_STEPPING_TYPE = "TRAPEZOIDAL_RULE"
+
+ETA_S = 1.0
+ETA_N = 1.0
+NU = 1.0
+XI = 1.0
 
 un {
    function_0 = "cos(2*PI*X_0)*cos(2*PI*X_1)"
@@ -36,16 +52,6 @@ thn {
    function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
 }
 
-RHO = 1.0
-MAX_MULTIGRID_LEVELS = 5
-START_TIME = 0.0
-END_TIME = 1.0
-NUM_CYCLES = 1
-DT_MAX = 0.0005
-ENABLE_LOGGING = TRUE
-W = 0.75
-
-VIZ_DUMP_TIME_INTERVAL = 0.01
 
 Main {
 // log file parameters
@@ -60,8 +66,6 @@ Main {
 // timer dump parameters
    timer_enabled = TRUE
 }
-
-N = 64
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
