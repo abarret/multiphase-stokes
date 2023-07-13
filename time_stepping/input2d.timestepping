@@ -21,13 +21,13 @@ NU = 1.0
 XI = 1.0
 
 un {
-   function_0 = "cos(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "cos(2*PI*X_1)*cos(2*PI*X_0)"
+   function_0 = "0.0"
+   function_1 = "0.0"
 }
 
 us {
-   function_0 = "-cos(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "-cos(2*PI*X_1)*cos(2*PI*X_0)"
+   function_0 = "0.0"
+   function_1 = "0.0"
 } 
 
 p {
