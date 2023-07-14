@@ -1,32 +1,42 @@
-USE_PRECOND = TRUE
+USE_PRECOND = FALSE
 w = 0.75
+C = -10.0
+D = 1.0
+IS_VEL_NULLSPACE = FALSE
+
+XI = 1.0
+ETAN = 1.0
+ETAS = 1.0
+NU = 1.0
+
+MAX_MULTIGRID_LEVELS = 3
 
 un {
-   function_0 = "cos(2*PI*X_0)"
-   function_1 = "cos(2*PI*X_1)"
+   function_0 = "cos(2*PI*X_1)"
+   function_1 = "cos(2*PI*X_0)"
 }
 
 us {
-   function_0 = "-cos(2*PI*X_0)"
-   function_1 = "-cos(2*PI*X_1)"
-} // so that average of un + us is 0
+   function_0 = "-cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_0)"
+} 
 
 p {
    function = "0.0"
-} // pressure has mean 0
+} 
 
 f_un {
-   function_0 = "-1/8*cos(2*PI*X_0)*(4+12*PI*PI+4*PI*PI*cos(4*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI-sin(2*PI*X_0)*sin(2*PI*X_1)))"
-   function_1 = "1/8*cos(2*PI*X_1)*(-4-16*PI*PI-16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI+sin(2*PI*X_1)*sin(2*PI*X_1)))"
+   function_0 = "-1/8*cos(2*PI*X_1)*(4+16*PI*PI+16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI-sin(2*PI*X_1)*sin(2*PI*X_1)))"
+   function_1 = "-1/8*cos(2*PI*X_0)*(4+16*PI*PI+16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+(8*PI*PI-sin(2*PI*X_0)*sin(2*PI*X_0))*sin(2*PI*X_1)*sin(2*PI*X_1))"
 }
 
 f_us {
-   function_0 = "-1/8*cos(2*PI*X_0)*(-4-20*PI*PI+4*PI*PI*cos(4*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1)))"
-   function_1 = "1/8*cos(2*PI*X_1)*(4+16*PI*PI-16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI-sin(2*PI*X_1)*sin(2*PI*X_1)))"
+   function_0 = "-1/8*cos(2*PI*X_1)*(-4-16*PI*PI+16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI+sin(2*PI*X_1)*sin(2*PI*X_1)))"
+   function_1 = "1/8*cos(2*PI*X_0)*(4+12*PI*PI+4*PI*PI*cos(4*PI*X_1)-sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1)))"
 }
 
 f_p {
-   function = "0.5*PI*(sin(2*PI*(X_0-2*X_1))+sin(2*PI*(2*X_0+X_1))+sin(2*PI*(X_0+2*X_1))-sin(4*PI*X_0-2*PI*X_1))"
+   function = "PI*cos(2*PI*X_0)*cos(2*PI*X_1)*(sin(2*PI*X_0)+sin(2*PI*X_1))"
 }
 
 thn {
@@ -41,14 +51,14 @@ KrylovPrecondStrategy {
 
 }
 
-multigrid_max_levels = 6
-
 KrylovPrecond {
-   cycle_type = "F_CYCLE"
-   num_pre_sweeps = 5
+   cycle_type = "V_CYCLE"
+   num_pre_sweeps = 0
    num_post_sweeps = 5
    enable_logging = TRUE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
+
 
 Main {
 // log file parameters
@@ -64,7 +74,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 64
+N = 16
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]

@@ -378,40 +378,39 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
     {
         if (level_num > 0)
         {
-            // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
-            int patch_counter = 0;
-            for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++patch_counter)
+            // 1 here because we do red-black ordering.
+            if (sweep > 1)
             {
-                Pointer<Patch<NDIM>> patch = level->getPatch(p());
-
-                Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-                Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-                Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
-
-                Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(d_un_scr_idx);
-                Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(d_us_scr_idx);
-                Pointer<CellData<NDIM, double>> p_scr_data = patch->getPatchData(d_p_scr_idx);
-
-#if (1)
-                for (unsigned int axis = 0; axis < NDIM; ++axis)
+                // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
+                int patch_counter = 0;
+                for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++patch_counter)
                 {
-                    un_data->getArrayData(axis).copy(un_scr_data->getArrayData(axis),
-                                                     d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
-                                                     IntVector<NDIM>(0));
-                    us_data->getArrayData(axis).copy(us_scr_data->getArrayData(axis),
-                                                     d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
-                                                     IntVector<NDIM>(0));
-                }
+                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
 
-                p_data->getArrayData().copy(p_scr_data->getArrayData(),
-                                            d_patch_cell_bc_box_overlap[level_num][patch_counter],
-                                            IntVector<NDIM>(0));
-#endif
+                    Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+                    Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+                    Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
+
+                    Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(d_un_scr_idx);
+                    Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(d_us_scr_idx);
+                    Pointer<CellData<NDIM, double>> p_scr_data = patch->getPatchData(d_p_scr_idx);
+
+                    for (unsigned int axis = 0; axis < NDIM; ++axis)
+                    {
+                        un_data->getArrayData(axis).copy(un_scr_data->getArrayData(axis),
+                                                         d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                         IntVector<NDIM>(0));
+                        us_data->getArrayData(axis).copy(us_scr_data->getArrayData(axis),
+                                                         d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                         IntVector<NDIM>(0));
+                    }
+
+                    p_data->getArrayData().copy(p_scr_data->getArrayData(),
+                                                d_patch_cell_bc_box_overlap[level_num][patch_counter],
+                                                IntVector<NDIM>(0));
+                }
             }
             // Fill in ghost cells. We only want to use values on our current level to fill in ghost cells.
-            // TODO: d_ghostfill_no_restrict_scheds does not fill in ghost cells in at coarse fine interfaces. We need
-            // to set that up. One way of doing that is using the existing operators in IBAMR to compute the "normal
-            // extension."
             performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
 
             // Compute the normal extension of the solution at coarse fine interfaces if we are not on the coarsest
@@ -858,10 +857,10 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     const int us_sol_idx = sol.getComponentDescriptorIndex(1);
     const int p_sol_idx = sol.getComponentDescriptorIndex(2);
 
-    RefineAlgorithm<NDIM> refine_alg;
-    refine_alg.registerRefine(d_un_scr_idx, un_sol_idx, d_un_scr_idx, d_un_prolong_op);
-    refine_alg.registerRefine(d_us_scr_idx, us_sol_idx, d_us_scr_idx, d_us_prolong_op);
-    refine_alg.registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, d_p_prolong_op);
+    d_prolong_alg = new RefineAlgorithm<NDIM>();
+    d_prolong_alg->registerRefine(d_un_scr_idx, un_sol_idx, d_un_scr_idx, d_un_prolong_op);
+    d_prolong_alg->registerRefine(d_us_scr_idx, us_sol_idx, d_us_scr_idx, d_us_prolong_op);
+    d_prolong_alg->registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, d_p_prolong_op);
 
     d_prolong_scheds.resize(finest_ln - coarsest_ln + 1);
     // Note start from zero because you can't prolong to the coarsest level.
@@ -869,11 +868,11 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     {
         // TODO: The last argument should be the refine patch strategies. These should be, e.g. physical boundary
         // routines and fix-ups related to coarse fine interfaces.
-        d_prolong_scheds[dst_ln] = refine_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln),
-                                                             Pointer<PatchLevel<NDIM>>(),
-                                                             dst_ln - 1,
-                                                             d_hierarchy,
-                                                             nullptr /* Refine patch strategy*/);
+        d_prolong_scheds[dst_ln] = d_prolong_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln),
+                                                                 Pointer<PatchLevel<NDIM>>(),
+                                                                 dst_ln - 1,
+                                                                 d_hierarchy,
+                                                                 nullptr /* Refine patch strategy*/);
     }
 
     // Cache restriction operators.
@@ -882,24 +881,26 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     d_us_restrict_op = grid_geom->lookupCoarsenOperator(us_sol_var, "CONSERVATIVE_COARSEN");
     d_p_restrict_op = grid_geom->lookupCoarsenOperator(p_sol_var, "CONSERVATIVE_COARSEN");
 
-    CoarsenAlgorithm<NDIM> coarsen_alg;
-    coarsen_alg.registerCoarsen(d_un_scr_idx, un_sol_idx, d_un_restrict_op);
-    coarsen_alg.registerCoarsen(d_us_scr_idx, us_sol_idx, d_us_restrict_op);
-    coarsen_alg.registerCoarsen(d_p_scr_idx, p_sol_idx, d_p_restrict_op);
+    d_restrict_alg = new CoarsenAlgorithm<NDIM>();
+    d_restrict_alg->registerCoarsen(d_un_scr_idx, un_sol_idx, d_un_restrict_op);
+    d_restrict_alg->registerCoarsen(d_us_scr_idx, us_sol_idx, d_us_restrict_op);
+    d_restrict_alg->registerCoarsen(d_p_scr_idx, p_sol_idx, d_p_restrict_op);
 
     d_restrict_scheds.resize(finest_ln - coarsest_ln);
     // Note don't create one for finest_ln because you can't restrict to the finest level.
     for (int dst_ln = coarsest_ln; dst_ln < finest_ln; ++dst_ln)
     {
         d_restrict_scheds[dst_ln] =
-            coarsen_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_hierarchy->getPatchLevel(dst_ln + 1));
+            d_restrict_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_hierarchy->getPatchLevel(dst_ln + 1));
     }
 
     // Create operators for only filling ghost cels.
-    RefineAlgorithm<NDIM> ghostfill_alg;
-    ghostfill_alg.registerRefine(d_un_scr_idx, un_sol_idx, d_un_scr_idx, Pointer<RefineOperator<NDIM>>());
-    ghostfill_alg.registerRefine(d_us_scr_idx, us_sol_idx, d_us_scr_idx, Pointer<RefineOperator<NDIM>>());
-    ghostfill_alg.registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, Pointer<RefineOperator<NDIM>>());
+    d_ghostfill_no_restrict_alg = new RefineAlgorithm<NDIM>();
+    d_ghostfill_no_restrict_alg->registerRefine(
+        d_un_scr_idx, un_sol_idx, d_un_scr_idx, Pointer<RefineOperator<NDIM>>());
+    d_ghostfill_no_restrict_alg->registerRefine(
+        d_us_scr_idx, us_sol_idx, d_us_scr_idx, Pointer<RefineOperator<NDIM>>());
+    d_ghostfill_no_restrict_alg->registerRefine(d_p_scr_idx, p_sol_idx, d_p_scr_idx, Pointer<RefineOperator<NDIM>>());
     d_ghostfill_no_restrict_scheds.resize(finest_ln - coarsest_ln + 1);
     for (int dst_ln = coarsest_ln; dst_ln <= finest_ln; ++dst_ln)
     {
@@ -907,7 +908,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         // TODO: the second argument here should fill in physical boundary conditions. This only works for periodic
         // conditions.
         d_ghostfill_no_restrict_scheds[dst_ln] =
-            ghostfill_alg.createSchedule(d_hierarchy->getPatchLevel(dst_ln), nullptr);
+            d_ghostfill_no_restrict_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln), nullptr);
     }
 
     // Coarse-fine boundary operators
@@ -967,16 +968,21 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
 void
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
 {
-    // Delete the operators and schedules
+    // Delete the operators, schedules, and algorithms
     d_un_restrict_op.setNull();
     d_us_restrict_op.setNull();
     d_p_restrict_op.setNull();
     d_restrict_scheds.resize(0);
+    d_restrict_alg.setNull();
 
     d_un_prolong_op.setNull();
     d_us_prolong_op.setNull();
     d_p_prolong_op.setNull();
     d_prolong_scheds.resize(0);
+    d_prolong_alg.setNull();
+
+    d_ghostfill_no_restrict_scheds.resize(0);
+    d_ghostfill_no_restrict_alg.setNull();
 
     // Deallocate any data associated with the operator
     int coarsest_ln = 0;
@@ -1035,6 +1041,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std
 
     refine_alg.resetSchedule(d_prolong_scheds[dst_ln]);
     d_prolong_scheds[dst_ln]->fillData(d_new_time);
+    d_prolong_alg->resetSchedule(d_prolong_scheds[dst_ln]);
     return;
 }
 
@@ -1050,6 +1057,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std:
 
     coarsen_alg.resetSchedule(d_restrict_scheds[dst_ln]);
     d_restrict_scheds[dst_ln]->coarsenData();
+    d_restrict_alg->resetSchedule(d_restrict_scheds[dst_ln]);
 }
 
 void
@@ -1063,6 +1071,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std
 
     refine_alg.resetSchedule(d_ghostfill_no_restrict_scheds[dst_ln]);
     d_ghostfill_no_restrict_scheds[dst_ln]->fillData(d_new_time);
+    d_ghostfill_no_restrict_alg->resetSchedule(d_ghostfill_no_restrict_scheds[dst_ln]);
 }
 
 /////////////////////////////// PRIVATE //////////////////////////////////////

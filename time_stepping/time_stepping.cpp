@@ -48,6 +48,7 @@ main(int argc, char* argv[])
 {
     // Initialize IBAMR and libraries. Deinitialization is handled by this object as well.
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
+    SAMRAIManager::setMaxNumberPatchDataEntries(8192);
 
     { // cleanup dynamically allocated objects prior to shutdown
 
@@ -85,12 +86,11 @@ main(int argc, char* argv[])
                                         load_balancer);
 
         const double xi = input_db->getDouble("XI");
-        const double mu_n = input_db->getDouble("MU_N");
-        const double mu_s = input_db->getDouble("MU_S");
-        const double nu_n = input_db->getDouble("NU_N");
-        const double nu_s = input_db->getDouble("NU_S");
-        ins_integrator->setViscosityCoefficient(mu_n, mu_s);
-        ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
+        const double eta_n = input_db->getDouble("ETA_N");
+        const double eta_s = input_db->getDouble("ETA_S");
+        const double nu = input_db->getDouble("NU");
+        ins_integrator->setViscosityCoefficient(eta_n, eta_s);
+        ins_integrator->setDragCoefficient(xi, nu, nu);
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_fcn =

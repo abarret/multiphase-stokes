@@ -1,51 +1,64 @@
-USE_PRECOND = TRUE
+USE_PRECOND = FALSE
 w = 0.75
-C = 0.0
+C = -10.0
 D = 1.0
 IS_VEL_NULLSPACE = FALSE
 
+XI = 1.0
+ETAN = 1.0
+ETAS = 1.0
+NU = 1.0
+
+MAX_MULTIGRID_LEVELS = 3
+
 un {
-   function_0 = "0.0"
-   function_1 = "0.0"
+   function_0 = "cos(2*PI*X_0)"
+   function_1 = "cos(2*PI*X_1)"
 }
 
 us {
-   function_0 = "0.0"
-   function_1 = "0.0"
-} // so that average of un + us is 0
+   function_0 = "-cos(2*PI*X_0)"
+   function_1 = "-cos(2*PI*X_1)"
+} 
 
 p {
    function = "0.0"
-} // pressure has mean 0
+} 
 
 f_un {
-   function_0 = "-0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)-PI*PI*cos(2*PI*X_1)*cos(2*PI*X_1)*sin(2*PI*X_0)*sin(2*PI*X_0)+PI*PI*cos(2*PI*X_0)*cos(2*PI*X_0)*sin(2*PI*X_1)*sin(2*PI*X_1)+1/32*sin(4*PI*X_0)*(-32*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1))*sin(4*PI*X_1)"
-   function_1 = "-0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)+PI*PI*cos(2*PI*X_1)*cos(2*PI*X_1)*sin(2*PI*X_0)*sin(2*PI*X_0)-PI*PI*cos(2*PI*X_0)*cos(2*PI*X_0)*sin(2*PI*X_1)*sin(2*PI*X_1)+1/32*sin(4*PI*X_0)*(-32*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1))*sin(4*PI*X_1)"
+   function_0 = "-1/8*cos(2*PI*X_0)*(4+12*PI*PI+4*PI*PI*cos(4*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI-sin(2*PI*X_0)*sin(2*PI*X_1)))"
+   function_1 = "1/8*cos(2*PI*X_1)*(-4-16*PI*PI-16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI+sin(2*PI*X_1)*sin(2*PI*X_1)))"
 }
 
 f_us {
-   function_0 = "0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)-PI*PI*cos(2*PI*X_1)*cos(2*PI*X_1)*sin(2*PI*X_0)*sin(2*PI*X_0)+PI*PI*cos(2*PI*X_0)*cos(2*PI*X_0)*sin(2*PI*X_1)*sin(2*PI*X_1)-1/32*sin(4*PI*X_0)*(32*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1))*sin(4*PI*X_1)"
-   function_1 = "0.5*(1+8*PI*PI)*cos(2*PI*X_0)*cos(2*PI*X_1)+PI*PI*cos(2*PI*X_1)*cos(2*PI*X_1)*sin(2*PI*X_0)*sin(2*PI*X_0)-PI*PI*cos(2*PI*X_0)*cos(2*PI*X_0)*sin(2*PI*X_1)*sin(2*PI*X_1)-1/32*sin(4*PI*X_0)*(32*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1))*sin(4*PI*X_1)"
+   function_0 = "-1/8*cos(2*PI*X_0)*(-4-20*PI*PI+4*PI*PI*cos(4*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_1)*(16*PI*PI+sin(2*PI*X_0)*sin(2*PI*X_1)))"
+   function_1 = "1/8*cos(2*PI*X_1)*(4+16*PI*PI-16*PI*PI*sin(2*PI*X_0)*sin(2*PI*X_1)+sin(2*PI*X_0)*sin(2*PI*X_0)*(8*PI*PI-sin(2*PI*X_1)*sin(2*PI*X_1)))"
 }
 
 f_p {
-   function = "0.5*PI*sin(4*PI*(X_0 + X_1))"
+   function = "0.5*PI*(sin(2*PI*(X_0-2*X_1))+sin(2*PI*(2*X_0+X_1))+sin(2*PI*(X_0+2*X_1))-sin(4*PI*X_0-2*PI*X_1))"
 }
 
 thn {
    function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
 }
 
-RHO = 1.0
-MAX_MULTIGRID_LEVELS = 5
-START_TIME = 0.0
-END_TIME = 1.0
-NUM_CYCLES = 1
-DT_MAX = 0.0005
-ENABLE_LOGGING = TRUE
-W = 0.75
+KrylovSolver {
 
-VIZ_DUMP_TIME_INTERVAL = 0.01
+}
+
+KrylovPrecondStrategy {
+
+}
+
+KrylovPrecond {
+   cycle_type = "V_CYCLE"
+   num_pre_sweeps = 0
+   num_post_sweeps = 5
+   enable_logging = TRUE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
+}
+
 
 Main {
 // log file parameters
@@ -54,14 +67,14 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_multigrid1"
+   viz_dump_dirname = "viz2d_multigrid"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
    timer_enabled = TRUE
 }
 
-N = 64
+N = 16
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
@@ -77,28 +90,6 @@ MultigridCartesianGeometry {
    periodic_dimension = 1, 1  
 }
 
-INSVCTwoFluidStaggeredHierarchyIntegrator {
-   rho                           = RHO
-   start_time                    = START_TIME
-   end_time                      = END_TIME
-   num_cycles                    = NUM_CYCLES
-   dt_max                        = DT_MAX
-   enable_logging                = ENABLE_LOGGING
-   w = W
-
-   solver_db {
-      ksp_type = "fgmres"
-   }
-
-   precond_db {
-      cycle_type = "V_CYCLE"
-      num_pre_sweeps = 5
-      num_post_sweeps = 5
-      enable_logging = TRUE
-      max_multigrid_levels = MAX_MULTIGRID_LEVELS
-   }
-}
-
 MultigridAlg {
 }
 
@@ -106,7 +97,7 @@ GriddingAlgorithm {
    max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
-      level_1 = 4, 4              // vector ratio to next coarser level
+      level_1 = 2, 2              // vector ratio to next coarser level
    }
 
    largest_patch_size {

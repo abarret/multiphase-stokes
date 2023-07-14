@@ -3,7 +3,10 @@ MAX_MULTIGRID_LEVELS = 4
 START_TIME = 0.0
 END_TIME = 1.0
 NUM_CYCLES = 1
-DT_MAX = 0.0001
+DX = 1.0 / N
+U_MAX = 1.0
+CFL = 0.3
+DT_MAX = CFL * DX / U_MAX
 ENABLE_LOGGING = TRUE
 W = 0.75
 USE_PRECONDITIONER = TRUE
@@ -17,10 +20,9 @@ ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
 ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
-MU_S = 0.04
-MU_N = 4.0
-NU_N = 1.0
-NU_S = 1.0
+ETA_S = 0.04
+ETA_N = 4.0
+NU = 1.0
 XI = 250.0*MU_S
 
 un {
@@ -39,18 +41,18 @@ p {
 
 f_un {
    xi = XI
-   nu = NU_N
-   etan = MU_N
-   etas = MU_S
+   nu = NU
+   etan = ETA_N
+   etas = ETA_S
    function_0 = "(1/(8*nu))*(8*nu*PI*sin(2*PI*(t-X_0))*sin(2*PI*(t-X_1))-4*nu*PI*cos(4*PI*(t-X_0))*sin(2*PI*(t-X_1))^2-1/4*xi*cos(6*PI*(t-X_0))*sin(2*PI*(t-X_1))^3+2*nu*PI*sin(4*PI*(t-X_0))*(4*etan*PI*cos(4*PI*(t-X_1))-sin(4*PI*(t-X_1)))-1/16*cos(2*PI*(t-X_0))*(128*nu*PI*cos(2*PI*(t-X_1))+(512*etan*nu*PI^2+61*xi)*sin(2*PI*(t-X_1))+xi*sin(6*PI*(t-X_1))))"
    function_1 = "-PI*cos(2*PI*(-t+X_0))*cos(2*PI*(-t+X_1))+(sin(2*PI*(-t+X_0))*((256*etan*nu*PI^2+31*xi+xi*cos(4*PI*(t-X_0)))*cos(2*PI*(t-X_1))+32*nu*PI*cos(4*PI*(t-X_1))*sin(2*PI*(t-X_0))+2*xi*cos(6*PI*(t-X_1))*sin(2*PI*(t-X_0))^2+64*nu*PI*sin(2*PI*(-t+X_1))))/(64*nu)-1/4*PI*(4*etan*PI*cos(4*PI*(-t+X_0))+sin(4*PI*(-t+X_0)))*sin(4*PI*(-t+X_1))"
 }
 
 f_us {
    xi = XI
-   nu = NU_N
-   etan = MU_N
-   etas = MU_S
+   nu = NU
+   etan = ETA_N
+   etas = ETA_S
    function_0 = "(1/(8*nu))*(-4*nu*PI*cos(2*PI*(-t+X_0))^2*sin(2*PI*(-t+X_1))^2+cos(2*PI*(-t+X_0))*(8*nu*PI*cos(2*PI*(-t+X_1))+4*(8*etas*nu*PI^2+xi)*sin(2*PI*(t-X_1))+xi*sin(2*PI*(-t+X_0))^2*sin(2*PI*(-t+X_1))^3)-1/2*nu*PI*(-2+2*cos(4*PI*(-t+X_0))+8*cos(2*PI*(X_0-X_1))+cos(4*PI*(X_0-X_1))+2*cos(4*PI*(-t+X_1))-8*cos(2*PI*(-2*t+X_0+X_1))-3*cos(4*PI*(-2*t+X_0+X_1))+8*etas*PI*(sin(4*PI*(X_0-X_1))+sin(4*PI*(-2*t+X_0+X_1)))))"
 
    function_1 = "PI*cos(2*PI*(t-X_0))*cos(2*PI*(t-X_1))+(sin(2*PI*(t-X_0))*((256*etas*nu*PI^2+31*xi+xi*cos(4*PI*(t-X_0)))*cos(2*PI*(t-X_1))-32*nu*PI*cos(4*PI*(t-X_1))*sin(2*PI*(t-X_0))+2*xi*cos(6*PI*(t-X_1))*sin(2*PI*(t-X_0))^2-64*nu*PI*sin(2*PI*(t-X_1))))/(64*nu)+1/4*PI*(4*etas*PI*cos(4*PI*(t-X_0))-sin(4*PI*(t-X_0)))*sin(4*PI*(t-X_1))"
@@ -112,7 +114,7 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_advect"
+   viz_dump_dirname = "viz2d"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
@@ -131,9 +133,6 @@ MultigridCartesianGeometry {
    x_lo               = 0, 0      // lower end of computational domain.
    x_up               = 1, 1      // upper end of computational domain.
    periodic_dimension = 1, 1  
-}
-
-MultigridAlg {
 }
 
 GriddingAlgorithm {
