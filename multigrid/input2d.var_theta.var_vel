@@ -147,5 +147,5 @@ TimerManager{
    print_exclusive = FALSE
    print_total = TRUE
    print_threshold = 1.0
-   timer_list = "IBTK::*::*"
+   timer_list = "IBTK::*::*","IBAMR::*::*","*::*::*"
 }

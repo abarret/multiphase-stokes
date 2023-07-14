@@ -60,6 +60,10 @@ main(int argc, char* argv[])
         // file, and enable file logging.
         Pointer<AppInitializer> app_initializer = new AppInitializer(argc, argv, "stokes.log");
         Pointer<Database> input_db = app_initializer->getInputDatabase();
+        // For some reason app_initializer isn't creating the TimerManager with the correct database. We'll create one
+        // ourself.
+        TimerManager::freeManager();
+        TimerManager::createManager(input_db->getDatabase("TimerManager"));
 
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database.
@@ -488,5 +492,8 @@ main(int argc, char* argv[])
             level->deallocatePatchData(draw_fs_idx);
             level->deallocatePatchData(draw_es_idx);
         }
+
+        // Write timer data
+        TimerManager::getManager()->print(plog);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main

@@ -36,6 +36,14 @@
 #include <utility>
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
+namespace
+{
+static Timer* t_solve = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::solveSystem()");
+static Timer* t_initialize =
+    TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::initializeSolverState()");
+static Timer* t_deallocate =
+    TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::deallocateSolverState()");
+} // namespace
 
 namespace IBTK
 {
@@ -50,6 +58,11 @@ FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
     : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix)
 {
     d_multigrid_max_levels = input_db->getInteger("max_multigrid_levels");
+
+    IBTK_DO_ONCE(
+        t_solve = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::solveSystem()");
+        t_initialize = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::initializeSolverState()");
+        t_deallocate = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::deallocateSolverState()"););
     return;
 } // FACPreconditioner
 
@@ -65,6 +78,8 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
     // Initialize the solver, when necessary.
     const bool deallocate_after_solve = !d_is_initialized;
     if (deallocate_after_solve) initializeSolverState(u, f);
+
+    IBTK_TIMER_START(t_solve);
 
     // Set the initial guess to equal zero.
     d_u->setToScalar(0.0, /*interior_only*/ false);
@@ -121,6 +136,8 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
         u.linearSum(1.0, Pointer<SAMRAIVectorReal<NDIM, double>>(&u, false), -dot_prod, null_vec);
     }
 
+    IBTK_TIMER_STOP(t_solve);
+
     // Deallocate the solver, when necessary.
     if (deallocate_after_solve) deallocateSolverState();
     return true;
@@ -135,6 +152,8 @@ FullFACPreconditioner::initializeSolverState(const SAMRAIVectorReal<NDIM, double
     {
         deallocateSolverState();
     }
+
+    IBTK_TIMER_START(t_initialize);
 
     // Setup operator state.
     d_hierarchy = solution.getPatchHierarchy();
@@ -201,6 +220,8 @@ FullFACPreconditioner::initializeSolverState(const SAMRAIVectorReal<NDIM, double
 
     // Indicate the operator is initialized.
     d_is_initialized = true;
+
+    IBTK_TIMER_STOP(t_initialize);
     return;
 } // initializeSolverState
 
@@ -208,6 +229,8 @@ void
 FullFACPreconditioner::deallocateSolverState()
 {
     if (!d_is_initialized) return;
+
+    IBTK_TIMER_START(t_deallocate);
 
     // Deallocate scratch data.
     d_fac_strategy->deallocateScratchData();
@@ -236,6 +259,8 @@ FullFACPreconditioner::deallocateSolverState()
 
     // Indicate that the operator is NOT initialized.
     d_is_initialized = false;
+
+    IBTK_TIMER_STOP(t_deallocate);
     return;
 } // deallocateSolverState
 
