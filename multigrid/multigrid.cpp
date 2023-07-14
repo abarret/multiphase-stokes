@@ -33,6 +33,8 @@
 #include <SAMRAI_config.h>
 #include <StandardTagAndInitialize.h>
 
+#include <chrono>
+
 // Local includes
 #include "FullFACPreconditioner.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
@@ -395,7 +397,11 @@ main(int argc, char* argv[])
         }
 
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         krylov_solver->solveSystem(u_vec, f_vec);
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        pout << "Solve took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()
+             << " milliseconds\n";
 
         // Deallocate data
         if (use_precond)
