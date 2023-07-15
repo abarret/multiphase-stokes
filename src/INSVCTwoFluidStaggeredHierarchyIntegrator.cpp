@@ -159,6 +159,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
     if (input_db->keyExists("use_grad_tagging")) d_use_grad_tagging = input_db->getBool("use_grad_tagging");
     if (input_db->keyExists("grad_rel_thresh")) input_db->getArray("grad_rel_thresh", d_rel_grad_thresh);
     if (input_db->keyExists("grad_abs_thresh")) input_db->getArray("grad_abs_thresh", d_abs_grad_thresh);
+    if (input_db->keyExists("make_div_rhs_sum_to_zero"))
+        d_make_div_rhs_sum_to_zero = input_db->getBool("make_div_rhs_sum_to_zero");
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
     d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::us_sc");
     return;
@@ -941,6 +943,19 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         }
     }
     const double dt = new_time - current_time;
+
+    // Compute weighted sum for rhs divergence.
+    // TODO: This needs a permanent home, rather than an if statement.
+    if (d_make_div_rhs_sum_to_zero)
+    {
+        const int rhs_p_idx = d_rhs_vec->getComponentDescriptorIndex(2);
+        HierarchyCellDataOpsReal<NDIM, double> hier_sc_data_ops(d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        double integral = hier_sc_data_ops.integral(rhs_p_idx, d_hier_math_ops->getCellWeightPatchDescriptorIndex());
+        plog << "Weighted integral = " << integral << "\n";
+        hier_sc_data_ops.addScalar(rhs_p_idx, rhs_p_idx, -1.0 * integral);
+        integral = hier_sc_data_ops.integral(rhs_p_idx, d_hier_math_ops->getCellWeightPatchDescriptorIndex());
+        plog << "Weighted integral = " << integral << "\n";
+    }
 
     // Set the initial guess for the system to be the most recent approximation to t^{n+1}
     d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(0), un_new_idx);

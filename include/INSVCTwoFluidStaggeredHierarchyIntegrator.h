@@ -341,6 +341,8 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
+
+    bool d_make_div_rhs_sum_to_zero = true;
 };
 } // namespace IBAMR
 

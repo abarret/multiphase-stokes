@@ -92,7 +92,7 @@ main(int argc, char* argv[])
         const double xi = input_db->getDouble("XI");
         const double eta_n = input_db->getDouble("ETA_N");
         const double eta_s = input_db->getDouble("ETA_S");
-        const double nu_n = input_db->getDouble("NU");
+        const double nu = input_db->getDouble("NU");
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
         ins_integrator->setDragCoefficient(xi, nu, nu);
 

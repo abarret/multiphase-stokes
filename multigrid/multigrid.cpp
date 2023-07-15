@@ -33,6 +33,8 @@
 #include <SAMRAI_config.h>
 #include <StandardTagAndInitialize.h>
 
+#include <chrono>
+
 // Local includes
 #include "FullFACPreconditioner.h"
 #include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
@@ -58,6 +60,10 @@ main(int argc, char* argv[])
         // file, and enable file logging.
         Pointer<AppInitializer> app_initializer = new AppInitializer(argc, argv, "stokes.log");
         Pointer<Database> input_db = app_initializer->getInputDatabase();
+        // For some reason app_initializer isn't creating the TimerManager with the correct database. We'll create one
+        // ourself.
+        TimerManager::freeManager();
+        TimerManager::createManager(input_db->getDatabase("TimerManager"));
 
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database.
@@ -395,7 +401,11 @@ main(int argc, char* argv[])
         }
 
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         krylov_solver->solveSystem(u_vec, f_vec);
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        pout << "Solve took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()
+             << " milliseconds\n";
 
         // Deallocate data
         if (use_precond)
@@ -482,5 +492,8 @@ main(int argc, char* argv[])
             level->deallocatePatchData(draw_fs_idx);
             level->deallocatePatchData(draw_es_idx);
         }
+
+        // Write timer data
+        TimerManager::getManager()->print(plog);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
