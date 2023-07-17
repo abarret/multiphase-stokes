@@ -102,6 +102,10 @@ Main {
    viz_dump_dirname = "viz2d_four_roll_mill"
    visit_number_procs_per_file = 1
 
+   // hierarchy data dump parameters
+   data_dump_interval          = 1      
+   data_dump_dirname           = "hier_data_four_roll_mill"
+
 // timer dump parameters
    timer_enabled = TRUE
 }

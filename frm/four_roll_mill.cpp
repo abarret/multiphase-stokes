@@ -21,6 +21,7 @@
 #include "ibtk/PETScKrylovLinearSolver.h"
 #include <ibtk/AppInitializer.h>
 #include <ibtk/IBTKInit.h>
+#include <ibtk/IBTK_MPI.h>
 #include <ibtk/LinearOperator.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
@@ -36,6 +37,14 @@
 
 // Local includes
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+
+// Function prototypes
+void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
+                 Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
+                 Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+                 const int iteration_num,
+                 const double loop_time,
+                 const string& data_dump_dirname);
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -100,6 +109,10 @@ main(int argc, char* argv[])
 
         // Set up visualizations
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
+        
+        // Hierarchy data dumps
+        const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
+        const string postproc_data_dump_dirname = app_initializer->getPostProcessingDataDumpDirectory();
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
@@ -172,5 +185,40 @@ main(int argc, char* argv[])
                 next_viz_dump_time += viz_dump_time_interval;
             }
         }
+        // At specified intervals, store hierarchy data for post processing.
+        output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, iteration_num, loop_time, postproc_data_dump_dirname);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
+
+void
+output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
+                 Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
+                 Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+                 const int iteration_num,
+                 const double loop_time,
+                 const string& data_dump_dirname)
+{
+    plog << "writing hierarchy data at iteration " << iteration_num << " to disk" << endl;
+    plog << "simulation time is " << loop_time << endl;
+    string file_name = data_dump_dirname;
+    char temp_buf[128];
+    sprintf(temp_buf, ".%05d.samrai.%05d", iteration_num, IBTK_MPI::getRank());
+    file_name += temp_buf;
+    Pointer<HDFDatabase> hier_db = new HDFDatabase("hier_db");
+    hier_db->create(file_name);
+    VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
+    ComponentSelector hier_data;
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),    // Network velocity
+                                                        ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(),    // Solvent velocity
+                                                        ins_integrator->getCurrentContext()));                                                    
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(),   // Pressure
+                                                        ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction 
+                                                        adv_diff_integrator->getCurrentContext()));                                             
+    patch_hierarchy->putToDatabase(hier_db->putDatabase("PatchHierarchy"), hier_data);
+    hier_db->putDouble("loop_time", loop_time);
+    hier_db->putInteger("iteration_num", iteration_num);
+    hier_db->close();
+    return;
+} // output_data
