@@ -184,14 +184,9 @@ main(int argc, char* argv[])
                 visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
                 next_viz_dump_time += viz_dump_time_interval;
             }
-
-            // At specified intervals, store hierarchy data for post processing.
-            const bool last_step = !ins_integrator->stepsRemaining();
-            if (dump_postproc_data && last_step)   
-            {
-                output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, iteration_num, loop_time, postproc_data_dump_dirname);
-            }
         }
+        // At specified intervals, store hierarchy data for post processing.
+        output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, iteration_num, loop_time, postproc_data_dump_dirname);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
 
