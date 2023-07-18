@@ -1,16 +1,3 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2014 - 2022 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "ibamr/IBHierarchyIntegrator.h"
@@ -49,12 +36,12 @@
 #include <utility>
 
 // Local includes
-#include "IBMultiphaseHierarchyIntegrator.h"
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/IBMultiphaseHierarchyIntegrator.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /////////////////////////////// STATIC ///////////////////////////////////////
 
@@ -142,7 +129,8 @@ IBMultiphaseHierarchyIntegrator::preprocessIntegrateHierarchy(const double curre
         TBOX_ERROR(
             d_object_name
             << "::preprocessIntegrateHierarchy():\n"
-            << "  unsupported time stepping type: " << enum_to_string<TimeSteppingType>(d_time_stepping_type) << "\n"
+            << "  unsupported time stepping type: " << IBAMR::enum_to_string<TimeSteppingType>(d_time_stepping_type)
+            << "\n"
             << "  supported time stepping types are: FORWARD_EULER, BACKWARD_EULER, MIDPOINT_RULE, TRAPEZOIDAL_RULE\n");
     }
 
@@ -232,7 +220,8 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
         TBOX_ERROR(
             d_object_name
             << "::integrateHierarchy():\n"
-            << "  unsupported time stepping type: " << enum_to_string<TimeSteppingType>(d_time_stepping_type) << "\n"
+            << "  unsupported time stepping type: " << IBAMR::enum_to_string<TimeSteppingType>(d_time_stepping_type)
+            << "\n"
             << "  supported time stepping types are: FORWARD_EULER, BACKWARD_EULER, MIDPOINT_RULE, TRAPEZOIDAL_RULE\n");
     }
 
@@ -328,7 +317,8 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
         TBOX_ERROR(
             d_object_name
             << "::integrateHierarchy():\n"
-            << "  unsupported time stepping type: " << enum_to_string<TimeSteppingType>(d_time_stepping_type) << "\n"
+            << "  unsupported time stepping type: " << IBAMR::enum_to_string<TimeSteppingType>(d_time_stepping_type)
+            << "\n"
             << "  supported time stepping types are: FORWARD_EULER, BACKWARD_EULER, MIDPOINT_RULE, TRAPEZOIDAL_RULE\n");
     }
 
@@ -366,7 +356,7 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
         default:
             TBOX_ERROR(d_object_name << "::integrateHierarchy():\n"
                                      << "  unsupported time stepping type: "
-                                     << enum_to_string<TimeSteppingType>(d_time_stepping_type) << "\n"
+                                     << IBAMR::enum_to_string<TimeSteppingType>(d_time_stepping_type) << "\n"
                                      << "  supported time stepping types are: FORWARD_EULER, BACKWARD_EULER, "
                                         "MIDPOINT_RULE, TRAPEZOIDAL_RULE\n");
         }

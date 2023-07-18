@@ -13,8 +13,8 @@
 
 /////////////////////////////// INCLUDE GUARD ////////////////////////////////
 
-#ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
-#define included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
+#ifndef included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
+#define included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -45,19 +45,19 @@
 #include <vector>
 
 // Local includes
-#include "FullFACPreconditioner.h"
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /*!
  * \brief Class INSVCTwoFluidStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
  */
-class INSVCTwoFluidStaggeredHierarchyIntegrator : public INSHierarchyIntegrator
+class INSVCTwoFluidStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
 {
 public:
     /*!
@@ -338,7 +338,7 @@ private:
      * Preconditioner information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
-    SAMRAI::tbox::Pointer<IBTK::FullFACPreconditioner> d_stokes_precond;
+    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
     SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;
@@ -369,7 +369,7 @@ private:
     // Scratch force index.
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
 };
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

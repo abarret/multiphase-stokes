@@ -30,11 +30,12 @@
 #include <array>
 
 // Local includes
-#include "IBMultiphaseCrossLinks.h"
-#include "IBMultiphaseHierarchyIntegrator.h"
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
-#include "ScaleStress.h"
-#include "StressRelaxation.h"
+#include "multiphase/IBMultiphaseCrossLinks.h"
+#include "multiphase/IBMultiphaseHierarchyIntegrator.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/ScaleStress.h"
+#include "multiphase/StressRelaxation.h"
+using namespace multiphase;
 
 int finest_ln;
 std::array<int, NDIM> N;

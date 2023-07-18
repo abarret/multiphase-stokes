@@ -8,10 +8,10 @@
 #include <array>
 
 // Local includes
-#include "ScaleStress.h"
+#include "multiphase/ScaleStress.h"
 
-/////////////////////////////// STATIC ///////////////////////////////////////
-
+namespace multiphase
+{
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
 ScaleStress::ScaleStress(std::string object_name,
@@ -83,3 +83,4 @@ ScaleStress::setDataOnPatch(const int data_idx,
 } // setDataOnPatch
 
 //////////////////////////////////////////////////////////////////////////////
+} // namespace multiphase

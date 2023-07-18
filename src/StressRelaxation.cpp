@@ -8,8 +8,10 @@
 #include "tbox/Database.h"
 
 // Local includes
-#include "StressRelaxation.h"
+#include "multiphase/StressRelaxation.h"
 
+namespace multiphase
+{
 StressRelaxation::StressRelaxation(const std::string& object_name,
                                    Pointer<Database> input_db,
                                    Pointer<SideVariable<NDIM, double>> u_var,
@@ -136,3 +138,4 @@ StressRelaxation::setDataOnPatch(const int data_idx,
 #endif
     }
 } // setDataOnPatch
+} // namespace multiphase

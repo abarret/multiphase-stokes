@@ -34,8 +34,9 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+using namespace multiphase;
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *

@@ -1,20 +1,5 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2014 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
-/////////////////////////////// INCLUDE GUARD ////////////////////////////////
-
-#ifndef included_IBAMR_StaggeredStokesOperator
-#define included_IBAMR_StaggeredStokesOperator
+#ifndef included_multiphase_StaggeredStokesOperator
+#define included_multiphase_StaggeredStokesOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -37,18 +22,9 @@
 #include <string>
 #include <vector>
 
-namespace SAMRAI
-{
-namespace solv
-{
-template <int DIM>
-class RobinBcCoefStrategy;
-} // namespace solv
-} // namespace SAMRAI
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /*!
  * \brief Class StaggeredStokesOperator is a concrete IBTK::LinearOperator which
@@ -161,7 +137,8 @@ public:
     /*!
      * \brief Set the physical boundary condition helper object.
      */
-    virtual void setPhysicalBoundaryHelper(SAMRAI::tbox::Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper);
+    virtual void
+    setPhysicalBoundaryHelper(SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> bc_helper);
 
     /*!
      * \name Linear operator functionality.
@@ -267,7 +244,7 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
 
     // Boundary condition helper object.
-    SAMRAI::tbox::Pointer<StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;
+    SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;
 
     // Cached communications operators.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
@@ -330,7 +307,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     int d_thn_cc_idx = IBTK::invalid_index;
 };
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

@@ -13,8 +13,8 @@
 
 /////////////////////////////// INCLUDE GUARD ////////////////////////////////
 
-#ifndef included_FullFACPreconditioner
-#define included_FullFACPreconditioner
+#ifndef included_multiphase_FullFACPreconditioner
+#define included_multiphase_FullFACPreconditioner
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -35,16 +35,9 @@
 
 #include <string>
 
-/////////////////////////////// FORWARD DECLARATIONS /////////////////////////
-
-namespace IBTK
-{
-class FACPreconditionerStrategy;
-} // namespace IBTK
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBTK
+namespace multiphase
 {
 /*!
  * \brief Class FACPreconditioner is a concrete LinearSolver for implementing
@@ -66,7 +59,7 @@ namespace IBTK
  enable_logging = FALSE  // see setLoggingEnabled()
  \endverbatim
 */
-class FullFACPreconditioner : public FACPreconditioner
+class FullFACPreconditioner : public IBTK::FACPreconditioner
 {
 public:
     /*!
@@ -248,7 +241,7 @@ private:
 
     std::set<int> d_allocated_idxs;
 };
-} // namespace IBTK
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

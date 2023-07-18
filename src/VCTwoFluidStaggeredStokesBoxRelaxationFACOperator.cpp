@@ -1,16 +1,3 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2015 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "ibamr/namespaces.h" // IWYU pragma: keep
@@ -67,8 +54,8 @@
 #include <vector>
 
 // Local includes
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "utility_functions.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/utility_functions.h"
 
 // FORTRAN ROUTINES
 #define R_B_G_S IBTK_FC_FUNC_(rbgs, RBGS)
@@ -109,7 +96,7 @@ extern "C"
                  const int&);   // red_or_black
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
-namespace IBTK
+namespace multiphase
 {
 /////////////////////////////// STATIC ///////////////////////////////////////
 namespace

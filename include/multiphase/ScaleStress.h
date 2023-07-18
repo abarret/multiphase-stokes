@@ -1,5 +1,5 @@
-#ifndef included_ScaleStress
-#define included_ScaleStress
+#ifndef included_multiphase_ScaleStress
+#define included_multiphase_ScaleStress
 
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/HierarchyIntegrator.h>
@@ -7,7 +7,8 @@
 
 #include <CartesianGridGeometry.h>
 
-// Local includes
+namespace multiphase
+{
 /*!
  * \brief Method to initialize the value of the advected scalar Q.
  */
@@ -85,11 +86,5 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_var;
     SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> d_thn_integrator;
 };
-
-/////////////////////////////// INLINE ///////////////////////////////////////
-
-// #include "ScaleStress.I"
-
-//////////////////////////////////////////////////////////////////////////////
-
+} // namespace multiphase
 #endif // #ifndef included_ScaleStress

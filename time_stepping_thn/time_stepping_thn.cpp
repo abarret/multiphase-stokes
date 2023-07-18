@@ -1,16 +1,3 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2017 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -35,7 +22,8 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+using namespace multiphase;
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -97,7 +85,7 @@ main(int argc, char* argv[])
         const double xi = input_db->getDouble("XI");
         const double eta_n = input_db->getDouble("ETA_N");
         const double eta_s = input_db->getDouble("ETA_S");
-        const double nu_n = input_db->getDouble("NU");
+        const double nu = input_db->getDouble("NU");
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
         ins_integrator->setDragCoefficient(xi, nu, nu);
 

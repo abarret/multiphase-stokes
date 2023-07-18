@@ -1,16 +1,3 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2014 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "ibtk/CartCellDoubleCubicCoarsen.h"
@@ -23,7 +10,6 @@
 #include "ibtk/ibtk_enums.h"
 #include "ibtk/namespaces.h" // IWYU pragma: keep
 
-#include "FullFACPreconditioner.h"
 #include "MultiblockDataTranslator.h"
 #include "PatchHierarchy.h"
 #include "SAMRAIVectorReal.h"
@@ -35,12 +21,13 @@
 #include <string>
 #include <utility>
 
+// Local includes
+#include "multiphase/FullFACPreconditioner.h"
+
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
-namespace IBTK
+namespace multiphase
 {
-/////////////////////////////// STATIC ///////////////////////////////////////
-
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
 FullFACPreconditioner::FullFACPreconditioner(std::string object_name,

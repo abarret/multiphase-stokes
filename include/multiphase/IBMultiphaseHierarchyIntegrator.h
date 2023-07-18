@@ -13,8 +13,8 @@
 
 /////////////////////////////// INCLUDE GUARD ////////////////////////////////
 
-#ifndef included_IBAMR_IBMultiphaseHierarchyIntegrator
-#define included_IBAMR_IBMultiphaseHierarchyIntegrator
+#ifndef included_multiphase_IBMultiphaseHierarchyIntegrator
+#define included_multiphase_IBMultiphaseHierarchyIntegrator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -30,11 +30,11 @@
 #include <string>
 
 // Local includes
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /*!
  * \brief Class IBMultiphaseHierarchyIntegrator is an implementation of a formally
@@ -46,7 +46,7 @@ namespace IBAMR
      viz_dump_dirname
  * - Set marker point positions with setMarkerPoints()
  */
-class IBMultiphaseHierarchyIntegrator : public IBHierarchyIntegrator
+class IBMultiphaseHierarchyIntegrator : public IBAMR::IBHierarchyIntegrator
 {
 public:
     /*!
@@ -58,8 +58,8 @@ public:
     IBMultiphaseHierarchyIntegrator(
         std::string object_name,
         SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-        SAMRAI::tbox::Pointer<IBStrategy> ib_method_ops,
-        SAMRAI::tbox::Pointer<IBStrategy> ibn_method_ops,
+        SAMRAI::tbox::Pointer<IBAMR::IBStrategy> ib_method_ops,
+        SAMRAI::tbox::Pointer<IBAMR::IBStrategy> ibn_method_ops,
         SAMRAI::tbox::Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_hier_integrator,
         bool register_for_restart = true);
 
@@ -221,7 +221,7 @@ private:
     int d_fn_current_idx = IBTK::invalid_index;
 
     // Network IB method implementation object
-    SAMRAI::tbox::Pointer<IBStrategy> d_ibn_method_ops;
+    SAMRAI::tbox::Pointer<IBAMR::IBStrategy> d_ibn_method_ops;
 
     // IB forcing functions
     SAMRAI::tbox::Pointer<IBMultiphaseEulerianForceFunction> d_fn_fcn, d_fs_fcn;
@@ -234,7 +234,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_fn_prolong_alg;
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineOperator<NDIM>> d_fn_prolong_op;
 };
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

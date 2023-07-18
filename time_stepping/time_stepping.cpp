@@ -34,7 +34,8 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+using namespace multiphase;
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *

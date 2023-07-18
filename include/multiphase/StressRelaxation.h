@@ -1,5 +1,5 @@
-#ifndef included_StressRelaxation
-#define included_StressRelaxation
+#ifndef included_multiphase_StressRelaxation
+#define included_multiphase_StressRelaxation
 
 #include <ibamr/config.h>
 
@@ -24,6 +24,8 @@
 
 #include <string>
 
+namespace multiphase
+{
 /*!
  * \brief Class StressRelaxation is a concrete CFRelaxationOperator that computes the relaxation function for an
  * Oldroyd-B fluid model.
@@ -105,5 +107,5 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_var;
     SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> d_thn_integrator;
 };
-
+} // namespace multiphase
 #endif
