@@ -1,16 +1,3 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2014 - 2022 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "ibamr/namespaces.h" // IWYU pragma: keep
@@ -33,12 +20,12 @@
 #include <string>
 
 // Local includes
-#include "IBMultiphaseHierarchyIntegrator.h"
-#include "utility_functions.h"
+#include "multiphase/IBMultiphaseHierarchyIntegrator.h"
+#include "multiphase/utility_functions.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /////////////////////////////// STATIC ///////////////////////////////////////
 

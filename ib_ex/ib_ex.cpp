@@ -28,9 +28,10 @@
 #include <array>
 
 // Local includes
-#include "IBMultiphaseCrossLinks.h"
-#include "IBMultiphaseHierarchyIntegrator.h"
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/IBMultiphaseCrossLinks.h"
+#include "multiphase/IBMultiphaseHierarchyIntegrator.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+using namespace multiphase;
 
 int finest_ln;
 std::array<int, NDIM> N;

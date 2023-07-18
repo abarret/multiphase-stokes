@@ -1367,47 +1367,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorRe
         f_vec->getComponentDescriptorIndex(1), 1.0, f_vec->getComponentDescriptorIndex(1), -d_rho, d_fs_scr_idx);
 }
 
-void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
-                                                        int& thn_new_idx,
-                                                        int& thn_scr_idx,
-                                                        const double current_time,
-                                                        const double new_time,
-                                                        const bool start_of_ts)
-{
-    auto var_db = VariableDatabase<NDIM>::getDatabase();
-    thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
-    thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
-    thn_scr_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
-
-    if (d_thn_integrator)
-    {
-        // We are evolving thn, so use the integrator to copy data.
-        const int thn_evolve_cur_idx =
-            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
-        const int thn_evolve_new_idx =
-            var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
-        d_hier_cc_data_ops->copyData(thn_cur_idx, thn_evolve_cur_idx);
-        d_hier_cc_data_ops->copyData(thn_new_idx, start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx);
-        d_hier_cc_data_ops->linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
-    }
-    else if (start_of_ts)
-    {
-        // Otherwise set the values with the function
-#ifndef NDEBUG
-        TBOX_ASSERT(d_thn_fcn);
-#endif
-        if (start_of_ts)
-        {
-            d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, false);
-            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, false);
-        }
-        double half_time = 0.5 * (current_time + new_time);
-        d_thn_fcn->setDataOnPatchHierarchy(thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time, false);
-    }
-    return;
-}
-
 //////////////////////////////////////////////////////////////////////////////
 
 } // namespace multiphase

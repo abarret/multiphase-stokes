@@ -239,13 +239,6 @@ protected:
     void setupPlotDataSpecialized() override;
 
 private:
-    void setThnAtHalf(int& thn_cur_idx,
-                      int& thn_new_idx,
-                      int& thn_scr_idx,
-                      double current_time,
-                      double new_time,
-                      bool start_of_ts);
-
     void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
                         double current_time,
                         double new_time,

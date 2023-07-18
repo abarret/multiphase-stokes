@@ -23,6 +23,9 @@
 #include <string>
 #include <utility>
 
+// Local includes
+#include "multiphase/FullFACPreconditioner.h"
+
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace
 {
@@ -33,8 +36,6 @@ static Timer* t_deallocate;
 
 namespace multiphase
 {
-/////////////////////////////// STATIC ///////////////////////////////////////
-
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
 FullFACPreconditioner::FullFACPreconditioner(std::string object_name,

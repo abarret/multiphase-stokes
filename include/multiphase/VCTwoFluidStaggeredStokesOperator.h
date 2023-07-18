@@ -22,15 +22,6 @@
 #include <string>
 #include <vector>
 
-namespace SAMRAI
-{
-namespace solv
-{
-template <int DIM>
-class RobinBcCoefStrategy;
-} // namespace solv
-} // namespace SAMRAI
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
 namespace multiphase

@@ -42,11 +42,11 @@ IBTK_ENABLE_EXTRA_WARNINGS
 #include <vector>
 
 // Local includes
-#include "IBMultiphaseCrossLinks.h"
+#include "multiphase/IBMultiphaseCrossLinks.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
