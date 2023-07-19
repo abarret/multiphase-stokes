@@ -14,7 +14,7 @@ TAG_BUFFER = 1
 
 ADV_DIFF_NUM_CYCLES = 1
 ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
-ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
+ADV_DIFF_CONVECTIVE_TS_TYPE = "ADAMS_BASHFORTH"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
 ETA_S = 0.04
@@ -73,8 +73,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
 
    precond_db {
       cycle_type = "V_CYCLE"
-      num_pre_sweeps = 15
-      num_post_sweeps = 15
+      num_pre_sweeps = 0
+      num_post_sweeps = 5
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
