@@ -38,11 +38,9 @@
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace
 {
-static Timer* t_solve = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::solveSystem()");
-static Timer* t_initialize =
-    TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::initializeSolverState()");
-static Timer* t_deallocate =
-    TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::deallocateSolverState()");
+static Timer* t_solve;
+static Timer* t_initialize;
+static Timer* t_deallocate;
 } // namespace
 
 namespace IBTK
