@@ -163,6 +163,17 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
         d_make_div_rhs_sum_to_zero = input_db->getBool("make_div_rhs_sum_to_zero");
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
     d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::us_sc");
+
+    // As of the moment, we DO NOT account for advection in the momentum equation. To account for this in the number of
+    // cycles, we set d_creeping_flow = true.
+    d_creeping_flow = true;
+
+    // Make sure viscous time stepping type is valid for this class
+    if (d_viscous_time_stepping_type != TimeSteppingType::BACKWARD_EULER &&
+        d_viscous_time_stepping_type != TimeSteppingType::TRAPEZOIDAL_RULE)
+        TBOX_ERROR(d_object_name + ": Viscous time step type " +
+                   enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
+                   " not valid. Must use BACKWARD_EULER or TRAPEZOIDAL_RULE");
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -882,6 +893,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     // Set up the advection diffusion integrator
     for (const auto& adv_diff_integrator : d_adv_diff_hier_integrators)
     {
+        const int adv_diff_num_cycles = adv_diff_integrator->getNumberOfCycles();
         const int U_adv_diff_cur_idx =
             var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getCurrentContext());
         const int U_adv_diff_scr_idx =
@@ -889,7 +901,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         const int U_adv_diff_new_idx =
             var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getNewContext());
         if (isAllocatedPatchData(U_adv_diff_cur_idx)) copy_side_to_face(U_adv_diff_cur_idx, un_cur_idx, d_hierarchy);
-        adv_diff_integrator->preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
+        adv_diff_integrator->preprocessIntegrateHierarchy(current_time, new_time, adv_diff_num_cycles);
         if (isAllocatedPatchData(U_adv_diff_scr_idx))
             d_hier_fc_data_ops->copyData(U_adv_diff_scr_idx, U_adv_diff_cur_idx);
         if (isAllocatedPatchData(U_adv_diff_new_idx))
@@ -1153,12 +1165,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     // Deallocate scratch data
     deallocatePatchData(un_scr_idx, coarsest_ln, finest_ln);
     deallocatePatchData(us_scr_idx, coarsest_ln, finest_ln);
-}
-
-int
-INSVCTwoFluidStaggeredHierarchyIntegrator::getNumberOfCycles() const
-{
-    return 1;
 }
 
 //////////////////////////////////////////////////////////////////////////////

@@ -231,8 +231,6 @@ public:
                                           bool initial_time,
                                           bool uses_richardson_extrapolation_too);
 
-    int getNumberOfCycles() const override;
-
 protected:
     void setupPlotDataSpecialized() override;
 

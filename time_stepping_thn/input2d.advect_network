@@ -1,29 +1,31 @@
 RHO = 1.0
 MAX_MULTIGRID_LEVELS = 4
 START_TIME = 0.0
-END_TIME = 1.0
+END_TIME = 2.0
 NUM_CYCLES = 1
 N = 32
 DX = 1.0 / N
 U_MAX = 1.0
-CFL = 0.3
+CFL = 0.1
 DT_MAX = CFL * DX / U_MAX
 ENABLE_LOGGING = TRUE
 W = 0.75
 USE_PRECONDITIONER = TRUE
-VIZ_DUMP_TIME_INTERVAL = 0.005
+VIZ_DUMP_TIME_INTERVAL = 0.05
 DELTA = 0.175
 TAG_BUFFER = 1
 
+VISCOUS_TS_TYPE = "TRAPEZOIDAL_RULE"
+
 ADV_DIFF_NUM_CYCLES = 1
 ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
-ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
+ADV_DIFF_CONVECTIVE_TS_TYPE = "ADAMS_BASHFORTH"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
-ETA_S = 0.04
-ETA_N = 4.0
+ETA_S = 1.0
+ETA_N = 1.0
 NU = 1.0
-XI = 250.0*ETA_S
+XI = 1.0
 
 un {
    function_0 = "cos(2*PI*(X_0-t))*sin(2*PI*(X_1-t))"
@@ -77,6 +79,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    num_cycles                    = NUM_CYCLES
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
+   viscous_time_stepping_type = VISCOUS_TS_TYPE
    w = W
    use_preconditioner = USE_PRECONDITIONER
    grad_abs_thresh = 0.75
@@ -90,7 +93,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    precond_db {
       cycle_type = "V_CYCLE"
       num_pre_sweeps = 0
-      num_post_sweeps = 15
+      num_post_sweeps = 5
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
