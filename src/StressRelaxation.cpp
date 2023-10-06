@@ -13,21 +13,17 @@
 StressRelaxation::StressRelaxation(const std::string& object_name,
                                    Pointer<Database> input_db,
                                    Pointer<SideVariable<NDIM, double>> u_var,
-                                   Pointer<HierarchyIntegrator> u_integrator,
-                                   Pointer<CellVariable<NDIM, double>> thn_var,
-                                   Pointer<HierarchyIntegrator> thn_integrator)
+                                   Pointer<HierarchyIntegrator> u_integrator)
     : CFRelaxationOperator(object_name, input_db),
       d_EE_var(new CellVariable<NDIM, double>(d_object_name + "::EE_var", 3)),
       d_u_var(u_var),
-      d_u_integrator(u_integrator),
-      d_thn_var(thn_var),
-      d_thn_integrator(thn_integrator)
+      d_u_integrator(u_integrator)
 {
     d_lambda = input_db->getDouble("relaxation_time");
+    d_mup = input_db->getDouble("viscosity");
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     d_EE_idx = var_db->registerVariableAndContext(d_EE_var, var_db->getContext(d_object_name));
-
     return;
 } // Constructor
 
@@ -64,18 +60,6 @@ StressRelaxation::setDataOnPatchHierarchy(const int data_idx,
         pout << "Copying data\n";
     }
 
-    const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_var, d_thn_integrator->getCurrentContext());
-    const int thn_scr_idx = var_db->mapVariableAndContextToIndex(d_thn_var, d_thn_integrator->getScratchContext());
-    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_var, d_thn_integrator->getNewContext());
-    bool deallocate_thn_after = !d_thn_integrator->isAllocatedPatchData(thn_scr_idx, coarsest_ln, finest_ln);
-    if (deallocate_thn_after) d_thn_integrator->allocatePatchData(thn_scr_idx, data_time, coarsest_ln, finest_ln);
-
-    HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(hierarchy, coarsest_ln, finest_ln);
-    if (d_thn_integrator->isAllocatedPatchData(thn_new_idx, coarsest_ln, finest_ln))
-        hier_cc_data_ops.linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
-    else
-        hier_cc_data_ops.copyData(thn_scr_idx, thn_cur_idx);
-
     // Fill in ghost cells for u
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comps = { ITC(u_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true) };
@@ -91,7 +75,6 @@ StressRelaxation::setDataOnPatchHierarchy(const int data_idx,
         setDataOnPatchLevel(data_idx, var, hierarchy->getPatchLevel(ln), data_time, initial_time);
 
     if (deallocate_after) d_u_integrator->deallocatePatchData(u_scr_idx, coarsest_ln, finest_ln);
-    if (deallocate_thn_after) d_thn_integrator->deallocatePatchData(thn_scr_idx, coarsest_ln, finest_ln);
     d_u_integrator->deallocatePatchData(d_EE_idx, coarsest_ln, finest_ln);
 }
 
@@ -107,7 +90,6 @@ StressRelaxation::setDataOnPatch(const int data_idx,
     Pointer<CellData<NDIM, double>> ret_data = patch->getPatchData(data_idx);
     Pointer<CellData<NDIM, double>> in_data = patch->getPatchData(d_W_cc_idx);
     Pointer<CellData<NDIM, double>> EE_data = patch->getPatchData(d_EE_idx);
-    Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(d_thn_var, d_thn_integrator->getScratchContext());
     ret_data->fillAll(0.0);
     if (initial_time) return;
     const double l_inv = 1.0 / d_lambda;
@@ -130,9 +112,9 @@ StressRelaxation::setDataOnPatch(const int data_idx,
 #endif
         mat = convertToConformation(mat);
 #if (NDIM == 2)
-        (*ret_data)(idx, 0) = l_inv * (-mat(0, 0)) + 2.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 0);
-        (*ret_data)(idx, 1) = l_inv * (-mat(1, 1)) + 2.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 1);
-        (*ret_data)(idx, 2) = l_inv * (-mat(1, 0)) + 2.0 / l_inv * (*thn_data)(idx) * (*EE_data)(idx, 2);
+        (*ret_data)(idx, 0) = l_inv * (-mat(0, 0)) + d_mup * l_inv * (*EE_data)(idx, 0);
+        (*ret_data)(idx, 1) = l_inv * (-mat(1, 1)) + d_mup * l_inv * (*EE_data)(idx, 1);
+        (*ret_data)(idx, 2) = l_inv * (-mat(1, 0)) + d_mup * l_inv * (*EE_data)(idx, 2);
 #endif
 #if (NDIM == 3)
         (*ret_data)(idx, 0) = l_inv * (-mat(0, 0));

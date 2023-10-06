@@ -164,9 +164,7 @@ main(int argc, char* argv[])
                 new StressRelaxation("StressRelax",
                                      app_initializer->getComponentDatabase("CFINSForcing"),
                                      ins_integrator->getNetworkVariable(),
-                                     ins_integrator,
-                                     ins_integrator->getNetworkVolumeFractionVariable(),
-                                     adv_diff_integrator);
+                                     ins_integrator);
             cf_un_forcing->registerRelaxationOperator(stress_relax);
             ins_integrator->setForcingFunctions(cf_un_forcing, nullptr);
         }

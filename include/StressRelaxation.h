@@ -37,9 +37,7 @@ public:
     StressRelaxation(const std::string& object_name,
                      SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
                      SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> u_var,
-                     SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> u_integrator,
-                     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> thn_var,
-                     SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> thn_integrator);
+                     SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> u_integrator);
 
     /*!
      * \brief Default constructor.
@@ -94,15 +92,13 @@ public:
     //\}
 
 private:
-    double d_lambda;
+    double d_lambda = std::numeric_limits<double>::quiet_NaN();
+    double d_mup = std::numeric_limits<double>::quiet_NaN();
 
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_EE_var;
     int d_EE_idx;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_u_var;
     SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> d_u_integrator;
-
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_var;
-    SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> d_thn_integrator;
 };
 
 #endif
