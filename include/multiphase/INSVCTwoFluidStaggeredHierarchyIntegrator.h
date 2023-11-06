@@ -82,7 +82,7 @@ public:
     /*!
      * Non-zero Reynolds numbers are not implemented. Returns nullptr.
      */
-    SAMRAI::tbox::Pointer<ConvectiveOperator> getConvectiveOperator() override;
+    SAMRAI::tbox::Pointer<IBAMR::ConvectiveOperator> getConvectiveOperator() override;
 
     /*!
      * Not in use. Returns nullptr.
