@@ -174,8 +174,13 @@ public:
     /*!
      * Sets that the network volume fraction should be advected with the specified advection diffusion integrator. Also
      * registers the integrator with the hierarchy.
+     *
+     * The optional input has_meaningful_mid_value should be set to false if there is no meaningful "new" time value
+     * after a single evolution. In particular, this should be set to false if using semi-Lagrangian methods to evolve
+     * the volume fraction.
      */
-    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator);
+    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator,
+                                     bool has_meaningful_mid_value = true);
 
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
@@ -368,6 +373,9 @@ private:
 
     // Scratch force index.
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
+
+    // Flag for if thn has a meaningful value in middle of time step.
+    bool d_use_new_thn = true;
 };
 } // namespace multiphase
 

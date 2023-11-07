@@ -115,6 +115,13 @@
 namespace multiphase
 {
 
+namespace
+{
+static Timer* t_integrate_hierarchy = nullptr;
+static Timer* t_preprocess_integrate_hierarchy = nullptr;
+static Timer* t_postprocess_integrate_hierarchy = nullptr;
+} // namespace
+
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
     std::string object_name,
@@ -141,7 +148,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
       d_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "::us_sc")),
       d_f_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "::f_un_sc")),
       d_f_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "::f_us_sc")),
-      d_f_cc_var(new CellVariable<NDIM, double>(d_object_name + "::f_cc"))
+      d_f_cc_var(new CellVariable<NDIM, double>(d_object_name + "::f_cc")),
+      d_thn_cc_var(new CellVariable<NDIM, double>(d_object_name + "::thn_cc"))
 {
     if (input_db->keyExists("viscous_time_stepping_type"))
         d_viscous_time_stepping_type =
@@ -158,6 +166,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
     d_U_var = d_us_sc_var;
     d_U_bc_coefs = std::move(u_dummy_coefs);
     d_P_bc_coef = p_dummy_coefs;
+
+    IBTK_DO_ONCE(t_integrate_hierarchy = TimerManager::getManager()->getTimer(
+                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy()");
+                 t_preprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
+                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::preprocess()");
+                 t_postprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
+                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::postprocess()"););
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -373,17 +388,19 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Poin
 
 void
 INSVCTwoFluidStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
-    Pointer<AdvDiffHierarchyIntegrator> adv_diff_integrator)
+    Pointer<AdvDiffHierarchyIntegrator> adv_diff_integrator,
+    bool has_meaningful_mid_value)
 {
     registerAdvDiffHierarchyIntegrator(adv_diff_integrator);
     d_thn_integrator = adv_diff_integrator;
 
     // Set up thn to be advected
-    d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
     d_thn_integrator->registerTransportedQuantity(d_thn_cc_var, true /*output_Q*/);
     d_thn_integrator->setAdvectionVelocity(d_thn_cc_var, d_U_adv_diff_var);
     d_thn_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false); // Not divergence free in general.
     d_thn_integrator->setInitialConditions(d_thn_cc_var, d_thn_init_fcn);
+
+    d_use_thn_at_half = has_meaningful_mid_value;
 }
 
 void
@@ -401,8 +418,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
 
     // First create the variables we need.
     // NOTE: d_P_var is a member variable of the base class.
-    // NOTE: This may have been created above with the advection diffusion integrator.
-    if (!d_thn_cc_var) d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
     d_grad_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_thn_cc", NDIM);
     d_un_rhs_var = new SideVariable<NDIM, double>(d_object_name + "::un_rhs");
     d_us_rhs_var = new SideVariable<NDIM, double>(d_object_name + "::us_rhs");
@@ -623,6 +638,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
                                                                         const double new_time,
                                                                         const int num_cycles)
 {
+    IBTK_TIMER_START(t_preprocess_integrate_hierarchy);
     // Do anything that needs to be done before we call integrateHierarchy().
     INSHierarchyIntegrator::preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
 
@@ -680,7 +696,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 
     // Grab the volume fraction indices
     int thn_cur_idx, thn_new_idx, thn_scr_idx;
-    setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*update_with_fcn*/ true);
+    setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*start_of_ts*/ true);
 
     // Set up null vectors (if applicable)
     d_nul_vecs.resize(1);
@@ -834,6 +850,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     }
 
     executePreprocessIntegrateHierarchyCallbackFcns(current_time, new_time, num_cycles);
+    IBTK_TIMER_STOP(t_preprocess_integrate_hierarchy);
     return;
 } // preprocessIntegrateHierarchy
 
@@ -842,6 +859,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
                                                               const double new_time,
                                                               const int cycle_num)
 {
+    IBTK_TIMER_START(t_integrate_hierarchy);
     INSHierarchyIntegrator::integrateHierarchy(current_time, new_time, cycle_num);
     double half_time = 0.5 * (current_time + new_time);
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -855,7 +873,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     // Update thn if necessary. We need to update it if we are using the preconditioner, which uses a different patch
     // hierarchy.
     int thn_cur_idx, thn_new_idx, thn_scr_idx;
-    setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*update_with_fcn*/ false);
+    setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*start_of_ts*/ d_use_new_thn);
     if (d_thn_integrator)
     {
         if (d_use_preconditioner)
@@ -970,6 +988,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Execuate any registered callbacks
     executeIntegrateHierarchyCallbackFcns(current_time, new_time, cycle_num);
+    IBTK_TIMER_STOP(t_integrate_hierarchy);
     return;
 } // integrateHierarchy
 
@@ -979,6 +998,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
                                                                          const bool skip_synchronize_new_state_data,
                                                                          const int num_cycles)
 {
+    IBTK_TIMER_START(t_postprocess_integrate_hierarchy);
     // Do anything that needs to be done after integrateHierarchy().
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
@@ -1033,6 +1053,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     d_stokes_solver = nullptr;
     d_precond_op = nullptr;
     d_stokes_precond = nullptr;
+    IBTK_TIMER_STOP(t_postprocess_integrate_hierarchy);
     return;
 } // postprocessIntegrateHierarchy
 
