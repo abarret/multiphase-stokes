@@ -294,6 +294,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
+    bool d_has_vel_nullspace = false;
 
     // Physical parameters
     double d_rho = std::numeric_limits<double>::quiet_NaN();
@@ -318,10 +319,11 @@ private:
     bool d_use_preconditioner = true;
 
     /*!
-     * Velocity Drawing information.
+     * Drawing information.
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_un_draw_var, d_us_draw_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_div_draw_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_fn_draw_var, d_fs_draw_var;
 
     /*!
      * Objects that can do the operations we need
