@@ -400,7 +400,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
     d_thn_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false); // Not divergence free in general.
     d_thn_integrator->setInitialConditions(d_thn_cc_var, d_thn_init_fcn);
 
-    d_use_thn_at_half = has_meaningful_mid_value;
+    d_use_new_thn = has_meaningful_mid_value;
 }
 
 void
