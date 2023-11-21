@@ -156,6 +156,42 @@ move_tethers(LDataManager* data_manager, const double time)
     X_ref_data->restoreArrays();
 }
 
+void
+print_max_dist_from_target(LDataManager* data_manager, const double time)
+{
+    double max_disp = 0.0;
+    Pointer<LMesh> mesh = data_manager->getLMesh(finest_ln);
+    const std::pair<int, int>& upper_lag_idxs = data_manager->getLagrangianStructureIndexRange(0, finest_ln);
+    std::vector<LNode*> nodes = mesh->getLocalNodes();
+
+    Pointer<LData> X_data = data_manager->getLData(data_manager->POSN_DATA_NAME, finest_ln);
+    double* X_vals = X_data->getVecArray()->data();
+    Pointer<LData> X_ref_data = data_manager->getLData(data_manager->INIT_POSN_DATA_NAME, finest_ln);
+    double* X_ref_vals = X_ref_data->getVecArray()->data();
+
+    for (const auto& node : nodes)
+    {
+        const int petsc_idx = node->getLocalPETScIndex();
+        const int lag_idx = node->getLagrangianIndex();
+        Eigen::Map<VectorNd> x(&X_vals[petsc_idx * NDIM]), x_ref(&X_ref_vals[petsc_idx * NDIM]);
+
+        VectorNd x_target;
+        if (upper_lag_idxs.first <= lag_idx && lag_idx < upper_lag_idxs.second)
+            x_target = upper_channel(x_ref(0), time);
+        else
+            x_target = lower_channel(x_ref(0), time);
+        max_disp = std::max(max_disp, (x - x_target).norm());
+    }
+
+    pout << "Max distance from target point: " << max_disp << "\n";
+    pout << "Fraction of grid spacing:       " << max_disp / dx << "\n";
+    if ((max_disp / dx) > 0.1)
+    {
+        // Error out if the distance from target point is more than 10% of a grid cell.
+        TBOX_ERROR("Too far away from target point!");
+    }
+}
+
 /*******************************************************************************
  * For each run, the input filename and restart information (if needed) must   *
  * be given on the command line.  For non-restarted case, command line is:     *
@@ -267,29 +303,20 @@ main(int argc, char* argv[])
         upper_perim = 1.02423522856; // alpha * (L*M_PI + g * std::sin(L*M_PI)*std::sin(L*M_PI)) / (2.0 * M_PI * M_PI);
         lower_perim = upper_perim;
 
-        ibn_initializer->setStructureNamesOnLevel(finest_ln, struct_list_network);
-        ibn_initializer->registerInitStructureFunction(generate_structure);
-        ibn_initializer->registerInitTargetPtFunction(generate_tethers);
-        ib_network_ops->registerLInitStrategy(ibn_initializer);
-        Pointer<IBStandardForceGen> ibn_spring_forces = new IBStandardForceGen();
-        Pointer<IBMultiphaseCrossLinks> ibn_cross_forces =
-            new IBMultiphaseCrossLinks(ib_solvent_ops->getLDataManager(), input_db->getDouble("KAPPA") / 0.0160037);
-        std::vector<Pointer<IBLagrangianForceStrategy>> net_forces = { ibn_spring_forces, ibn_cross_forces };
-        Pointer<IBLagrangianForceStrategySet> ibn_force_fcn =
-            new IBLagrangianForceStrategySet(net_forces.begin(), net_forces.end());
-        ib_network_ops->registerIBLagrangianForceFunction(ibn_force_fcn);
-
         ibs_initializer->setStructureNamesOnLevel(finest_ln, struct_list_solvent);
         ibs_initializer->registerInitStructureFunction(generate_structure);
         ibs_initializer->registerInitTargetPtFunction(generate_tethers);
         ib_solvent_ops->registerLInitStrategy(ibs_initializer);
         Pointer<IBStandardForceGen> ibs_spring_forces = new IBStandardForceGen();
-        Pointer<IBMultiphaseCrossLinks> ibs_cross_forces =
-            new IBMultiphaseCrossLinks(ib_network_ops->getLDataManager(), input_db->getDouble("KAPPA") / 0.0160037);
-        std::vector<Pointer<IBLagrangianForceStrategy>> sol_forces = { ibs_spring_forces, ibs_cross_forces };
-        Pointer<IBLagrangianForceStrategySet> ibs_force_fcn =
-            new IBLagrangianForceStrategySet(sol_forces.begin(), sol_forces.end());
-        ib_solvent_ops->registerIBLagrangianForceFunction(ibs_force_fcn);
+        ib_solvent_ops->registerIBLagrangianForceFunction(ibs_spring_forces);
+
+        Pointer<IBMultiphaseCrossLinks> ib_cross_forces = new IBMultiphaseCrossLinks(
+            ib_network_ops, ib_solvent_ops, patch_hierarchy, input_db->getDouble("KAPPA") / 0.0160037);
+        time_integrator->registerCrossLinkStrategy(ib_cross_forces);
+
+        ibn_initializer->setStructureNamesOnLevel(finest_ln, struct_list_network);
+        ibn_initializer->registerInitStructureFunction(generate_structure);
+        ib_network_ops->registerLInitStrategy(ibn_initializer);
 
         // Set up visualization plot file writers.
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
@@ -371,6 +398,8 @@ main(int argc, char* argv[])
         {
             iteration_num = time_integrator->getIntegratorStep();
             loop_time = time_integrator->getIntegratorTime();
+            print_max_dist_from_target(ib_network_ops->getLDataManager(), loop_time);
+            print_max_dist_from_target(ib_solvent_ops->getLDataManager(), loop_time);
             move_tethers(ib_network_ops->getLDataManager(), loop_time);
             move_tethers(ib_solvent_ops->getLDataManager(), loop_time);
 

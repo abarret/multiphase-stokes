@@ -50,115 +50,118 @@ namespace multiphase
 {
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
-IBMultiphaseCrossLinks::IBMultiphaseCrossLinks(LDataManager* other_data_manager, const double kappa)
-    : d_other_data_manager(other_data_manager), d_kappa(kappa)
+IBMultiphaseCrossLinks::IBMultiphaseCrossLinks(Pointer<IBMethod> ibn_ops,
+                                               Pointer<IBMethod> ibs_ops,
+                                               Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                               const double kappa)
+    : MultiphaseCrossLinksStrategy(), d_ibn_ops(ibn_ops), d_ibs_ops(ibs_ops), d_kappa(kappa), d_hierarchy(hierarchy)
 {
     // intentionally blank
     return;
 } // IBMultiphaseCrossLinks
 
 void
-IBMultiphaseCrossLinks::initializeLevelData(const Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                            const int level_number,
-                                            const double init_data_time,
-                                            const bool initial_time,
-                                            LDataManager* const l_data_manager)
+IBMultiphaseCrossLinks::doComputeLagrangianForce(const double time, TimePoint time_pt)
 {
-    if (!l_data_manager->levelContainsLagrangianData(level_number)) return;
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
 
-#if !defined(NDEBUG)
-    TBOX_ASSERT(hierarchy);
-#endif
-    // We don't need ghost points or any initialization steps here.
-    d_is_initialized.resize(std::max(level_number + 1, static_cast<int>(d_is_initialized.size())));
-    d_is_initialized[level_number] = true;
-    return;
-} // initializeLevelData
+    LDataManager* ibn_manager = d_ibn_ops->getLDataManager();
+    LDataManager* ibs_manager = d_ibs_ops->getLDataManager();
+    d_Fn_data.resize(finest_ln - coarsest_ln + 1);
+    d_Fs_data.resize(finest_ln - coarsest_ln + 1);
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        static const bool maintain_data = false;
+        d_Fn_data[ln] = ibn_manager->createLData("Fn_data", ln, NDIM, maintain_data);
+        d_Fs_data[ln] = ibs_manager->createLData("Fs_data", ln, NDIM, maintain_data);
+    }
 
-void
-IBMultiphaseCrossLinks::computeLagrangianForce(Pointer<LData> F_data,
-                                               Pointer<LData> X_data,
-                                               Pointer<LData> U_data,
-                                               const Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                               const int level_number,
-                                               const double data_time,
-                                               LDataManager* const l_data_manager)
-{
-    if (!l_data_manager->levelContainsLagrangianData(level_number)) return;
+    std::vector<Pointer<LData>>* Xn_data;
+    std::vector<Pointer<LData>>* Un_data;
+    bool* Xn_needs_ghost_fill;
+    d_ibn_ops->getPositionData(&Xn_data, &Xn_needs_ghost_fill, time);
+    d_ibn_ops->getVelocityData(&Un_data, time);
 
-    computeCrossSpringForce(F_data, X_data, U_data, hierarchy, level_number, data_time, l_data_manager);
+    std::vector<Pointer<LData>>* Xs_data;
+    std::vector<Pointer<LData>>* Us_data;
+    bool* Xs_needs_ghost_fill;
+
+    d_ibs_ops->getPositionData(&Xs_data, &Xs_needs_ghost_fill, time);
+    d_ibs_ops->getVelocityData(&Us_data, time);
+
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        doComputeLagrangianForce(
+            d_Fn_data[ln], d_Fs_data[ln], (*Xn_data)[ln], (*Un_data)[ln], (*Xs_data)[ln], (*Us_data)[ln], time, ln);
+    }
+
     return;
 } // computeLagrangianForce
-
-void
-IBMultiphaseCrossLinks::computeLagrangianForceJacobianNonzeroStructure(
-    std::vector<int>& d_nnz,
-    std::vector<int>& o_nnz,
-    const Pointer<PatchHierarchy<NDIM>> /*hierarchy*/,
-    const int level_number,
-    LDataManager* const l_data_manager)
-{
-    if (!l_data_manager->levelContainsLagrangianData(level_number)) return;
-
-    TBOX_ERROR("Not currently implemented\n");
-    return;
-} // computeLagrangianForceJacobianNonzeroStructure
-
-void
-IBMultiphaseCrossLinks::computeLagrangianForceJacobian(Mat& J_mat,
-                                                       MatAssemblyType assembly_type,
-                                                       const double X_coef,
-                                                       Pointer<LData> X_data,
-                                                       const double U_coef,
-                                                       Pointer<LData> /*U_data*/,
-                                                       const Pointer<PatchHierarchy<NDIM>> /*hierarchy*/,
-                                                       const int level_number,
-                                                       const double /*data_time*/,
-                                                       LDataManager* const l_data_manager)
-{
-    if (!l_data_manager->levelContainsLagrangianData(level_number)) return;
-
-    TBOX_ERROR("Not currently implemented\n");
-    return;
-} // computeLagrangianForceJacobian
-
-double
-IBMultiphaseCrossLinks::computeLagrangianEnergy(Pointer<LData> /*X_data*/,
-                                                Pointer<LData> /*U_data*/,
-                                                const Pointer<PatchHierarchy<NDIM>> /*hierarchy*/,
-                                                const int level_number,
-                                                const double /*data_time*/,
-                                                LDataManager* const l_data_manager)
-{
-    if (!l_data_manager->levelContainsLagrangianData(level_number)) return 0.0;
-
-    // Compute the energy.
-    TBOX_ERROR("not currently implemented\n");
-    return std::numeric_limits<double>::quiet_NaN();
-} // computeLagrangianEnergy
 
 /////////////////////////////// PRIVATE //////////////////////////////////////
 
 void
-IBMultiphaseCrossLinks::computeCrossSpringForce(Pointer<LData> F_data,
-                                                Pointer<LData> X_data,
-                                                Pointer<LData> /*U_data*/,
-                                                const Pointer<PatchHierarchy<NDIM>> /*hierarchy*/,
-                                                const int level_number,
-                                                const double /*data_time*/,
-                                                LDataManager* const l_data_manager)
+IBMultiphaseCrossLinks::doSpreadForce(const int f_data_idx,
+                                      RobinPhysBdryPatchStrategy* f_phys_bdry_op,
+                                      const std::vector<Pointer<RefineSchedule<NDIM>>>& f_prolongation_scheds,
+                                      const double data_time,
+                                      const bool spread_network,
+                                      TimePoint time_pt)
 {
+    std::vector<Pointer<LData>>* X_data;
+    bool* X_needs_ghost_fill;
+    static bool F_needs_ghost_fill = true;
+    if (spread_network)
+    {
+        d_ibn_ops->getPositionData(&X_data, &X_needs_ghost_fill, data_time);
+        d_ibn_ops->getLDataManager()->spread(f_data_idx,
+                                             d_Fn_data,
+                                             *X_data,
+                                             f_phys_bdry_op,
+                                             f_prolongation_scheds,
+                                             data_time,
+                                             F_needs_ghost_fill,
+                                             *X_needs_ghost_fill);
+    }
+    else
+    {
+        d_ibs_ops->getPositionData(&X_data, &X_needs_ghost_fill, data_time);
+        d_ibs_ops->getLDataManager()->spread(f_data_idx,
+                                             d_Fs_data,
+                                             *X_data,
+                                             f_phys_bdry_op,
+                                             f_prolongation_scheds,
+                                             data_time,
+                                             F_needs_ghost_fill,
+                                             *X_needs_ghost_fill);
+    }
+}
+
+void
+IBMultiphaseCrossLinks::doComputeLagrangianForce(Pointer<LData>& Fn_data,
+                                                 Pointer<LData>& Fs_data,
+                                                 Pointer<LData>& Xn_data,
+                                                 Pointer<LData>& /*Un_data*/,
+                                                 Pointer<LData>& Xs_data,
+                                                 Pointer<LData>& /*Us_data*/,
+                                                 const double time,
+                                                 const int ln)
+{
+    LDataManager* ibn_manager = d_ibn_ops->getLDataManager();
+    LDataManager* ibs_manager = d_ibs_ops->getLDataManager();
+    if (ibn_manager->getNumberOfLocalNodes(ln) == 0) return;
     double max_stretch = 0.0;
     // Pull out relevant data.
-    double* const F_node = F_data->getLocalFormVecArray()->data();
-    const double* const X_node = X_data->getLocalFormVecArray()->data();
+    double* const Fn_node = Fn_data->getLocalFormVecArray()->data();
+    const double* const Xn_node = Xn_data->getLocalFormVecArray()->data();
 
     // We also need the other sites data
-    Pointer<LData> X_other_data = d_other_data_manager->getLData(d_other_data_manager->POSN_DATA_NAME, level_number);
-    double* const X_other_node = X_other_data->getLocalFormVecArray()->data();
+    double* const Fs_node = Fs_data->getLocalFormVecArray()->data();
+    const double* const Xs_node = Xs_data->getLocalFormVecArray()->data();
 
-    // Loop through local indices and compute force
-    const std::vector<LNode*>& nodes = l_data_manager->getLMesh(level_number)->getLocalNodes();
+    // Loop through local indices and compute forces on the network's nodes
+    const std::vector<LNode*>& nodes = ibn_manager->getLMesh(ln)->getLocalNodes();
 
     // Note that although the initial Lagrangian indexing is the same, slight differences in structures can mean that
     // the PETSc ordering can be different. Here we gather the Lagrangian indices on which we are calculating forces and
@@ -166,31 +169,34 @@ IBMultiphaseCrossLinks::computeCrossSpringForce(Pointer<LData> F_data,
     // TODO: Remove the assumption that the initial Lagrangian indexing is the same. We need to store a map between
     // initial Lagrangian indices.
 #ifndef NDEBUG
-    TBOX_ASSERT(l_data_manager->getNumberOfNodes(level_number) >= nodes.size());
+    TBOX_ASSERT(ibs_manager->getNumberOfNodes(ln) >= nodes.size());
 #endif
-    std::vector<int> o_petsc_idxs(l_data_manager->getNumberOfNodes(level_number), -1);
+    std::vector<int> solvent_petsc_idxs(ibs_manager->getNumberOfNodes(ln), -1);
     for (size_t i = 0; i < nodes.size(); ++i)
-        o_petsc_idxs[nodes[i]->getLagrangianIndex()] = nodes[i]->getLagrangianIndex();
-    d_other_data_manager->mapLagrangianToPETSc(o_petsc_idxs, level_number);
+        solvent_petsc_idxs[nodes[i]->getLagrangianIndex()] = nodes[i]->getLagrangianIndex();
+    ibs_manager->mapLagrangianToPETSc(solvent_petsc_idxs, ln);
 
     for (const auto& node : nodes)
     {
         const int lag_idx = node->getLagrangianIndex();
-        const int petsc_idx = node->getLocalPETScIndex();
-        const int o_petsc_idx = o_petsc_idxs[lag_idx];
+        const int network_petsc_idx = node->getLocalPETScIndex();
+        const int solvent_petsc_idx = solvent_petsc_idxs[lag_idx];
 
-        Eigen::Map<const VectorNd> X(&X_node[petsc_idx * NDIM]);
-        Eigen::Map<const VectorNd> X_o(&X_other_node[o_petsc_idx * NDIM]);
-        Eigen::Map<VectorNd> F(&F_node[petsc_idx * NDIM]);
-        F += -d_kappa * (X - X_o);
-        if (d_log_point_distances) max_stretch = std::max(max_stretch, (X - X_o).norm());
+        Eigen::Map<const VectorNd> Xn(&Xn_node[network_petsc_idx * NDIM]);
+        Eigen::Map<const VectorNd> Xs(&Xs_node[solvent_petsc_idx * NDIM]);
+        Eigen::Map<VectorNd> Fn(&Fn_node[network_petsc_idx * NDIM]);
+        Eigen::Map<VectorNd> Fs(&Fs_node[solvent_petsc_idx * NDIM]);
+        Fn = -d_kappa * (Xn - Xs);
+        Fs = d_kappa * (Xn - Xs); // Solvent force is negative network force
+        max_stretch = std::max(max_stretch, (Xn - Xs).norm());
     }
 
-    if (d_log_point_distances) plog << "max_stretch: " << max_stretch << "\n";
+    pout << "max_stretch: " << max_stretch << "\n";
 
-    F_data->restoreArrays();
-    X_data->restoreArrays();
-    X_other_data->restoreArrays();
+    Fn_data->restoreArrays();
+    Xn_data->restoreArrays();
+    Fs_data->restoreArrays();
+    Xs_data->restoreArrays();
     return;
 }
 
