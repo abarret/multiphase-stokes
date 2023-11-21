@@ -11,6 +11,7 @@ SET(MULTIPHASE_SRC
     src/FullFACPreconditioner.cpp
     src/IBMultiphaseCrossLinks.cpp
     src/IBMultiphaseEulerianForceFunction.cpp
+    src/IBMultiphaseScaledEulerianForceFunction.cpp
     src/IBMultiphaseHierarchyIntegrator.cpp
     src/INSVCTwoFluidStaggeredHierarchyIntegrator.cpp
     src/ScaleStress.cpp

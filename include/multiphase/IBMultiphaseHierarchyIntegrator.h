@@ -31,6 +31,7 @@
 
 // Local includes
 #include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseCrossLinksStrategy.h"
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
@@ -105,11 +106,13 @@ public:
     void initializePatchHierarchy(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
                                   SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> gridding_alg) override;
 
+    void registerCrossLinkStrategy(SAMRAI::tbox::Pointer<MultiphaseCrossLinksStrategy> cross_link_strategy);
+
 protected:
     class IBMultiphaseEulerianForceFunction : public IBTK::CartGridFunction
     {
     public:
-        IBMultiphaseEulerianForceFunction(const IBMultiphaseHierarchyIntegrator* ib_solver, bool solvent_force);
+        IBMultiphaseEulerianForceFunction(const IBMultiphaseHierarchyIntegrator* ib_solver, int ib_idx);
 
         bool isTimeDependent() const override;
 
@@ -129,18 +132,44 @@ protected:
                             SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level =
                                 SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>>(NULL)) override;
 
-        /*!
-         * set network volume fraction patch index. Index should be side centered.
-         */
-        void setNetworkVolumeFractionPatchIndex(int thn_idx);
+    private:
+        const IBMultiphaseHierarchyIntegrator* const d_ib_solver;
+        int d_ib_idx = IBTK::invalid_index;
+    };
+
+    class IBMultiphaseScaledEulerianForceFunction : public IBTK::CartGridFunction
+    {
+    public:
+        IBMultiphaseScaledEulerianForceFunction(const IBMultiphaseHierarchyIntegrator* ib_solver,
+                                                int ib_idx,
+                                                bool scale_by_solvent);
+
+        bool isTimeDependent() const override;
+
+        void setDataOnPatchHierarchy(const int data_idx,
+                                     SAMRAI::tbox::Pointer<SAMRAI::hier::Variable<NDIM>> var,
+                                     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                                     const double data_time,
+                                     const bool initial_time = false,
+                                     const int coarsest_ln = IBTK::invalid_level_number,
+                                     const int finest_ln = IBTK::invalid_level_number) override;
+
+        void setDataOnPatch(int data_idx,
+                            SAMRAI::tbox::Pointer<SAMRAI::hier::Variable<NDIM>> var,
+                            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                            double data_time,
+                            bool initial_time = false,
+                            SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level =
+                                SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>>(NULL)) override;
 
     private:
         const IBMultiphaseHierarchyIntegrator* const d_ib_solver;
-        bool d_solvent_force = true;
-        int d_thn_idx = IBTK::invalid_index;
+        int d_ib_idx = IBTK::invalid_index;
+        bool d_scale_by_solvent = true;
     };
 
     friend class IBMultiphaseEulerianForceFunction;
+    friend class IBMultiphaseScaledEulerianForceFunction;
 
     /*!
      * Perform necessary data movement, workload estimation, and logging prior
@@ -216,15 +245,20 @@ private:
 
     // Network velocity and force.
     // NOTE: Solvent force and velocity are handled by base class.
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_var, d_fn_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_var, d_fn_var, d_cross_links_un_var,
+        d_cross_links_us_var;
     int d_un_idx = IBTK::invalid_index, d_fn_idx = IBTK::invalid_index;
     int d_fn_current_idx = IBTK::invalid_index;
+    int d_cross_links_un_idx = IBTK::invalid_index, d_cross_links_current_un_idx = IBTK::invalid_index;
+    int d_cross_links_us_idx = IBTK::invalid_index, d_cross_links_current_us_idx = IBTK::invalid_index;
 
     // Network IB method implementation object
     SAMRAI::tbox::Pointer<IBAMR::IBStrategy> d_ibn_method_ops;
 
     // IB forcing functions
     SAMRAI::tbox::Pointer<IBMultiphaseEulerianForceFunction> d_fn_fcn, d_fs_fcn;
+    SAMRAI::tbox::Pointer<IBMultiphaseScaledEulerianForceFunction> d_cross_links_un_fcn, d_cross_links_us_fcn;
+    SAMRAI::tbox::Pointer<MultiphaseCrossLinksStrategy> d_cross_links_strategy;
 
     // Network communication algorithms.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_un_ghostfill_alg;
