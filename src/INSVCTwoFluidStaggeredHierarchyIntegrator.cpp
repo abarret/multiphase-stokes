@@ -458,8 +458,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     // Note the forces need ghost cells for modifying the RHS to account for non-homogenous boundary conditions.
     int thn_cur_idx, thn_scr_idx, thn_new_idx, f_p_idx, f_un_idx, f_us_idx, un_rhs_idx, us_rhs_idx, p_rhs_idx;
     registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getScratchContext());
-    registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getScratchContext());
-    registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getScratchContext());
+    registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getCurrentContext());
+    registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getCurrentContext());
     registerVariable(thn_cur_idx, d_thn_cc_var, IntVector<NDIM>(1), getCurrentContext());
     registerVariable(thn_scr_idx, d_thn_cc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(thn_new_idx, d_thn_cc_var, IntVector<NDIM>(1), getNewContext());
@@ -488,10 +488,14 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         d_un_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Un_draw", NDIM);
         d_us_draw_var = new NodeVariable<NDIM, double>(d_object_name + "::Us_draw", NDIM);
         d_div_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Div_Draw");
-        int un_draw_idx, us_draw_idx, div_draw_idx;
+        d_fn_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Fn_Draw", NDIM);
+        d_fs_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Fs_Draw", NDIM);
+        int un_draw_idx, us_draw_idx, div_draw_idx, fn_draw_idx, fs_draw_idx;
         registerVariable(un_draw_idx, d_un_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(us_draw_idx, d_us_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(div_draw_idx, d_div_draw_var, IntVector<NDIM>(0), getCurrentContext());
+        registerVariable(fn_draw_idx, d_fn_draw_var, IntVector<NDIM>(0), getCurrentContext());
+        registerVariable(fs_draw_idx, d_fs_draw_var, IntVector<NDIM>(0), getCurrentContext());
 
         d_visit_writer->registerPlotQuantity("Un", "VECTOR", un_draw_idx, 0, 1.0, "NODE");
         for (int d = 0; d < NDIM; ++d)
@@ -500,6 +504,14 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         d_visit_writer->registerPlotQuantity("Us", "VECTOR", us_draw_idx, 0, 1.0, "NODE");
         for (int d = 0; d < NDIM; ++d)
             d_visit_writer->registerPlotQuantity("Us_" + std::to_string(d), "SCALAR", us_draw_idx, d, 1.0, "NODE");
+
+        d_visit_writer->registerPlotQuantity("Fn", "VECTOR", fn_draw_idx, 0, 1.0, "CELL");
+        for (int d = 0; d < NDIM; ++d)
+            d_visit_writer->registerPlotQuantity("Fn_" + std::to_string(d), "SCALAR", fn_draw_idx, d, 1.0, "CELL");
+
+        d_visit_writer->registerPlotQuantity("Fs", "VECTOR", fs_draw_idx, 0, 1.0, "CELL");
+        for (int d = 0; d < NDIM; ++d)
+            d_visit_writer->registerPlotQuantity("Fs_" + std::to_string(d), "SCALAR", fs_draw_idx, d, 1.0, "CELL");
 
         d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "CELL");
 
@@ -565,6 +577,21 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointe
         hier_math_ops.grad(grad_thn_idx, d_grad_thn_var, 1.0, thn_idx, d_thn_cc_var, ghost_cell_fill, init_data_time);
         // TODO: Replace this with a max over the L2 norm.
         d_max_grad_thn = hier_cc_data_ops->maxNorm(grad_thn_idx, IBTK::invalid_index);
+
+        // Fill in initial values for drawing variables
+        if (d_visit_writer)
+        {
+            const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+            const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+            for (PatchLevel<NDIM>::Iterator p(new_level); p; p++)
+            {
+                Pointer<Patch<NDIM>> patch = new_level->getPatch(p());
+                Pointer<SideData<NDIM, double>> fn_data = patch->getPatchData(fn_idx);
+                fn_data->fillAll(0.0);
+                Pointer<SideData<NDIM, double>> fs_data = patch->getPatchData(fs_idx);
+                fs_data->fillAll(0.0);
+            }
+        }
     }
 }
 
@@ -1079,9 +1106,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_draw_idx = var_db->mapVariableAndContextToIndex(d_un_draw_var, getCurrentContext());
     const int us_draw_idx = var_db->mapVariableAndContextToIndex(d_us_draw_var, getCurrentContext());
+    const int fn_draw_idx = var_db->mapVariableAndContextToIndex(d_fn_draw_var, getCurrentContext());
+    const int fs_draw_idx = var_db->mapVariableAndContextToIndex(d_fs_draw_var, getCurrentContext());
     const int div_draw_idx = var_db->mapVariableAndContextToIndex(d_div_draw_var, getCurrentContext());
     const int un_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
     const int us_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
+    const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+    const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
     const int us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getScratchContext());
     const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
@@ -1134,6 +1165,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
                             nullptr,
                             d_integrator_time,
                             synch_cf_interface);
+    d_hier_math_ops->interp(
+        fn_draw_idx, d_fn_draw_var, fn_idx, d_f_un_sc_var, nullptr, d_integrator_time, synch_cf_interface);
+    d_hier_math_ops->interp(
+        fs_draw_idx, d_fs_draw_var, fs_idx, d_f_us_sc_var, nullptr, d_integrator_time, synch_cf_interface);
 
     // Compute divergence of velocity fields.
     pre_div_interp(un_scr_idx, thn_cur_idx, un_scr_idx, us_scr_idx, d_hierarchy);
