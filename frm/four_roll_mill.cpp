@@ -45,6 +45,7 @@
 void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                  Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+                 Pointer<CFINSForcing> conformation_tensor_handler,  
                  const int iteration_num,
                  const double loop_time,
                  const string& data_dump_dirname);
@@ -147,7 +148,7 @@ main(int argc, char* argv[])
         ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
 
         bool use_cf = input_db->getBool("USE_CF");
-        Pointer<CFINSForcing> cf_un_forcing;
+        Pointer<CFINSForcing> cf_un_forcing;  
         Pointer<ScaleStress> stress_scale =
             new ScaleStress("ScaleStress", ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator);
         if (use_cf)
@@ -184,6 +185,8 @@ main(int argc, char* argv[])
         // Visualization files info.
         double viz_dump_time_interval = input_db->getDouble("VIZ_DUMP_TIME_INTERVAL");
         double next_viz_dump_time = 0.0;
+        double viz_hier_time_interval = 2.0*viz_dump_time_interval;
+        double next_hier_dump_time = 0.5;
         // At specified intervals, write visualization files
         if (IBTK::abs_equal_eps(loop_time, next_viz_dump_time, 0.1 * dt) || loop_time >= next_viz_dump_time)
         {
@@ -257,9 +260,17 @@ main(int argc, char* argv[])
                 ins_integrator->deallocatePatchData(EE_idx, coarsest_ln, finest_ln);
                 next_viz_dump_time += viz_dump_time_interval;
             }
+
+            // At specified intervals, store hierarchy data for post processing.
+            if (IBTK::abs_equal_eps(loop_time, next_hier_dump_time, 0.1 * dt) || loop_time >= next_hier_dump_time)
+            {
+                pout << "\nWriting hierarchy data files...\n\n";
+                output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
+                next_hier_dump_time += viz_hier_time_interval;
+            }
         }
-        // At specified intervals, store hierarchy data for post processing.
-        output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, iteration_num, loop_time, postproc_data_dump_dirname);
+        // pout << "\nWriting hierarchy data files...\n\n";
+        // output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
 
@@ -267,6 +278,7 @@ void
 output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                  Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+                 Pointer<CFINSForcing> conformation_tensor_handler,
                  const int iteration_num,
                  const double loop_time,
                  const string& data_dump_dirname)
@@ -288,7 +300,16 @@ output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
     hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(),   // Pressure
                                                         ins_integrator->getCurrentContext()));
     hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction 
-                                                        adv_diff_integrator->getCurrentContext()));                                             
+                                                        adv_diff_integrator->getCurrentContext())); 
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(conformation_tensor_handler->getVariable(),      // Conformation tensor
+                                                            adv_diff_integrator->getCurrentContext()));    
+    pout << "network variable name: " << ins_integrator->getNetworkVariable()->getName() << "\n";
+    pout << "solvent variable name: " << ins_integrator->getSolventVariable()->getName() << "\n";
+    pout << "pressure variable name: " << ins_integrator->getPressureVariable()->getName() << "\n";
+    pout << "Thn variable name: " << ins_integrator->getNetworkVolumeFractionVariable()->getName() << "\n";
+    pout << "Conformation tensor variable name: " << conformation_tensor_handler->getVariable()->getName() << "\n";
+    pout << "ins context: " << ins_integrator->getCurrentContext()->getName() << "\n";
+    pout << "ins context: " << adv_diff_integrator->getCurrentContext()->getName() << "\n";                                                                                                    
     patch_hierarchy->putToDatabase(hier_db->putDatabase("PatchHierarchy"), hier_data);
     hier_db->putDouble("loop_time", loop_time);
     hier_db->putInteger("iteration_num", iteration_num);
