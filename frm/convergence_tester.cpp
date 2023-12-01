@@ -394,7 +394,7 @@ main(int argc, char* argv[])
         data_indices.setFlag(us_scratch_idx);
         data_indices.setFlag(p_scratch_idx);
         data_indices.setFlag(thn_scratch_idx);
-        // data_indices.setFlag(S_scratch_idx);
+        data_indices.setFlag(S_scratch_idx);
         CartExtrapPhysBdryOp bc_helper(data_indices, "LINEAR");
 
         refine_alg.createSchedule(dst_level, src_level, ln - 1, coarse_patch_hierarchy, &bc_helper)

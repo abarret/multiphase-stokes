@@ -269,8 +269,6 @@ main(int argc, char* argv[])
                 next_hier_dump_time += viz_hier_time_interval;
             }
         }
-        // pout << "\nWriting hierarchy data files...\n\n";
-        // output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
 
