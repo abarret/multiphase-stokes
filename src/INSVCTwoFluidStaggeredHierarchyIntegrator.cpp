@@ -974,6 +974,17 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
     d_hier_sc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(1), us_new_idx);
     d_hier_cc_data_ops->copyData(d_sol_vec->getComponentDescriptorIndex(2), p_new_idx);
 
+    // Synchronize the rhs before we solve
+    {
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(2);
+        ghost_cell_comp[0] = ITC(d_rhs_vec->getComponentDescriptorIndex(0), "NONE", false, "CONSERVATIVE_COARSEN");
+        ghost_cell_comp[1] = ITC(d_rhs_vec->getComponentDescriptorIndex(1), "NONE", false, "CONSERVATIVE_COARSEN");
+        HierarchyGhostCellInterpolation hier_ghost_fill;
+        hier_ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        hier_ghost_fill.fillData(current_time);
+    }
+
     // Solve for un(n+1), us(n+1), p(n+1).
     bool converged = d_stokes_solver->solveSystem(*d_sol_vec, *d_rhs_vec);
     if (d_enable_logging)
