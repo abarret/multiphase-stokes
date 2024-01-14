@@ -113,10 +113,6 @@ main(int argc, char* argv[])
 
         // Set up visualizations
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
-        
-        // Hierarchy data dumps
-        const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
-        const string postproc_data_dump_dirname = app_initializer->getPostProcessingDataDumpDirectory();
 
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<CellVariable<NDIM, double>> EE_var = new CellVariable<NDIM, double>("EE", 3);
@@ -176,11 +172,24 @@ main(int argc, char* argv[])
         double time_end = ins_integrator->getEndTime();
         double dt = 0.0;
 
+        // Get simulation restart information
+        const bool dump_restart_data = app_initializer->dumpRestartData();
+        const int restart_dump_interval = app_initializer->getRestartDumpInterval();
+        const string restart_dump_dirname = app_initializer->getRestartDumpDirectory(); 
+
+        // Get hierarchy data dump information
+        const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
+        const int postproc_data_dump_interval = app_initializer->getPostProcessingDataDumpInterval();
+        const string postproc_data_dump_dirname = app_initializer->getPostProcessingDataDumpDirectory();
+        if (dump_postproc_data && (postproc_data_dump_interval > 0) && !postproc_data_dump_dirname.empty())
+        {
+            Utilities::recursiveMkdir(postproc_data_dump_dirname);
+        }
+
         // Visualization files info.
         double viz_dump_time_interval = input_db->getDouble("VIZ_DUMP_TIME_INTERVAL");
         double next_viz_dump_time = 0.0;
-        double viz_hier_time_interval = 2.0*viz_dump_time_interval;
-        double next_hier_dump_time = 0.5;
+
         // At specified intervals, write visualization files
         if (IBTK::abs_equal_eps(loop_time, next_viz_dump_time, 0.1 * dt) || loop_time >= next_viz_dump_time)
         {
@@ -255,12 +264,19 @@ main(int argc, char* argv[])
                 next_viz_dump_time += viz_dump_time_interval;
             }
 
+            // At specified intervals, write restart files.
+            const bool last_step = !ins_integrator->stepsRemaining();
+            if (dump_restart_data && (iteration_num % restart_dump_interval == 0 || last_step))
+            {
+                pout << "\nWriting restart files...\n\n";
+                RestartManager::getManager()->writeRestartFile(restart_dump_dirname, iteration_num);
+            }
+
             // At specified intervals, store hierarchy data for post processing.
-            if (IBTK::abs_equal_eps(loop_time, next_hier_dump_time, 0.1 * dt) || loop_time >= next_hier_dump_time)
+            if (dump_postproc_data && (iteration_num % postproc_data_dump_interval == 0 || last_step))
             {
                 pout << "\nWriting hierarchy data files...\n\n";
                 output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
-                next_hier_dump_time += viz_hier_time_interval;
             }
         }
     } // cleanup dynamically allocated objects prior to shutdown
@@ -277,7 +293,7 @@ output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
 {
     plog << "writing hierarchy data at iteration " << iteration_num << " to disk" << endl;
     plog << "simulation time is " << loop_time << endl;
-    string file_name = data_dump_dirname;
+    string file_name = data_dump_dirname + "/" + "hier_data_cf";
     char temp_buf[128];
     sprintf(temp_buf, ".%05d.samrai.%05d", iteration_num, IBTK_MPI::getRank());
     file_name += temp_buf;
