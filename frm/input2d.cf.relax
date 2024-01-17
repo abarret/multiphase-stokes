@@ -1,38 +1,41 @@
 RHO = 1.0
-MAX_MULTIGRID_LEVELS = 6
+MAX_MULTIGRID_LEVELS = 7
 START_TIME = 0.0
-END_TIME = 4.0
+END_TIME = 2.0
 NUM_CYCLES = 1
-DT_MAX = 0.0005
+DT_MAX = 0.0001
 ENABLE_LOGGING = TRUE
-W = 0.25
+W = 0.75
 USE_PRECONDITIONER = TRUE
-N = 32
-VIZ_DUMP_TIME_INTERVAL = 0.01
+N = 16
+VIZ_DUMP_TIME_INTERVAL = 0.001
 DELTA = 0.175
-TAG_BUFFER = 2
+TAG_BUFFER = 1
 
 ADV_DIFF_NUM_CYCLES = 1
 ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
-ADV_DIFF_CONVECTIVE_TS_TYPE = "FORWARD_EULER"
+ADV_DIFF_CONVECTIVE_TS_TYPE = "ADAMS_BASHFORTH"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
 // Complex Fluid parameters
 USE_CF = TRUE
-FLUID_MODEL = "USER_DEFINED"
+FLUID_MODEL = "OLDROYDB"
 EVOLVE_TYPE = "STANDARD"
 LOG_DETERMINANT     = TRUE
 CONVECTIVE_OPERATOR_TYPE     = "CUI"
 OUTPUT_CONFORMATION_TENSOR = TRUE
 OUTPUT_STRESS_TENSOR = FALSE
 OUTPUT_DIVERGENCE = TRUE
-RELAXATION_TIME = 4.0
+RELAXATION_TIME = 0.3
 VISCOSITY = 2.0
 USING_EXACT_U = FALSE
 BDRY_INTERP_TYPE = "LINEAR"
 PROJECT_CONFORM_TENS = FALSE
 
-ETA_S = 0.04
+VISCOUS_TS_TYPE = "TRAPEZOIDAL_RULE"
+HAS_VEL_NULLSPACE = FALSE
+
+ETA_S = 0.004
 ETA_N = 2.0
 NU_N = 1.0
 NU_S = 1.0
@@ -54,26 +57,26 @@ p {
 
 thn {
    delta = DELTA
-   //function = "0.25 + 0.25*((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
-   function = "0.05 + ((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
+   function = "0.25 + 0.25*((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
+   //function = "0.05 + ((sqrt(X_0*X_0+X_1*X_1)<delta) ? (1989.0/(896*PI)*(1.0-((X_0*X_0+X_1*X_1)/(delta*delta))^4.0)^4.0*(4.0*((X_0*X_0+X_1*X_1)/(delta*delta))^4.0+1.0)) : 0.0)"
    //function = "0.5"
    //function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
 }
 
 FN_FCN {
-   function_0 = "(t < 0.15) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
-   function_1 = "(t < 0.15) ? (2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
+   function_0 = "(t < 0.34) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
+   function_1 = "(t < 0.34) ? (2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
 }
 
 FS_FCN {
-   function_0 = "(t < 0.15) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
-   function_1 = "(t < 0.15) ? (2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
+   function_0 = "(t < 0.34) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
+   function_1 = "(t < 0.34) ? (2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
 }
 
 CFINSForcing {
 InitialConditions{
- function_0 = "0.0"
- function_1 = "0.0"
+ function_0 = "1.0"
+ function_1 = "1.0"
  function_2 = "0.0"
 }
 relaxation_time = RELAXATION_TIME
@@ -98,7 +101,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    enable_logging                = ENABLE_LOGGING
    w = W
    use_preconditioner = USE_PRECONDITIONER
-   grad_abs_thresh = 0.75
+   grad_abs_thresh = 1.0, 4.0, 6.0
    use_grad_tagging = TRUE
    tag_buffer = TAG_BUFFER
    regrid_interval = 10
@@ -135,11 +138,19 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d_frm_cf_relax"
+   viz_dump_dirname = "viz2d_overlap"
    visit_number_procs_per_file = 1
 
+// restart dump parameters
+   restart_dump_interval       = int(END_TIME/(10*DT_MAX))  // Use 0 for no restart. Writes file every X number of time steps
+   restart_dump_dirname        = "restart_viz2d"
+   
 // timer dump parameters
    timer_enabled = TRUE
+
+// hierarchy data dump parameters
+   data_dump_interval          = int(END_TIME/(5*DT_MAX))   // Use 0 for no data dump. Writes file every X number of time steps
+   data_dump_dirname           = "hier_data_cf_relax"
 }
 
 CartesianGeometry {
@@ -150,11 +161,11 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 4                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 4, 4              // vector ratio to next coarser level
-      level_2 = 2, 2
+      level_2 = 4, 4
       level_3 = 2, 2
    }
 
@@ -168,12 +179,12 @@ GriddingAlgorithm {
                                   // all finer levels will use same values as level_0...
    }
 
-   efficiency_tolerance = 0.80e0  // min % of tag cells in new patch level
-   combine_efficiency   = 0.75e0  // chop box if sum of volumes of smaller
+   efficiency_tolerance = 0.85e0  // min % of tag cells in new patch level
+   combine_efficiency   = 0.85e0  // chop box if sum of volumes of smaller
                                   // boxes < efficiency * vol of large box
 
    proper_nesting_buffer = 1
-   allow_patches_smaller_than_minimum_size_to_prevent_overlaps = TRUE
+   allow_patches_smaller_than_minimum_size_to_prevent_overlaps = FALSE
 }
 
 StandardTagAndInitialize {
