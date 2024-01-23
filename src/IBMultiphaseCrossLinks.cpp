@@ -53,8 +53,14 @@ namespace multiphase
 IBMultiphaseCrossLinks::IBMultiphaseCrossLinks(Pointer<IBMethod> ibn_ops,
                                                Pointer<IBMethod> ibs_ops,
                                                Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                               const double kappa)
-    : MultiphaseCrossLinksStrategy(), d_ibn_ops(ibn_ops), d_ibs_ops(ibs_ops), d_kappa(kappa), d_hierarchy(hierarchy)
+                                               const double kappa,
+                                               const double eta)
+    : MultiphaseCrossLinksStrategy(),
+      d_ibn_ops(ibn_ops),
+      d_ibs_ops(ibs_ops),
+      d_kappa(kappa),
+      d_eta(eta),
+      d_hierarchy(hierarchy)
 {
     // intentionally blank
     return;
@@ -142,23 +148,26 @@ void
 IBMultiphaseCrossLinks::doComputeLagrangianForce(Pointer<LData>& Fn_data,
                                                  Pointer<LData>& Fs_data,
                                                  Pointer<LData>& Xn_data,
-                                                 Pointer<LData>& /*Un_data*/,
+                                                 Pointer<LData>& Un_data,
                                                  Pointer<LData>& Xs_data,
-                                                 Pointer<LData>& /*Us_data*/,
+                                                 Pointer<LData>& Us_data,
                                                  const double time,
                                                  const int ln)
 {
     LDataManager* ibn_manager = d_ibn_ops->getLDataManager();
     LDataManager* ibs_manager = d_ibs_ops->getLDataManager();
     if (ibn_manager->getNumberOfLocalNodes(ln) == 0) return;
+    std::pair<int, int> strct_idxs = ibn_manager->getLagrangianStructureIndexRange(1, ln);
     double max_stretch = 0.0;
     // Pull out relevant data.
     double* const Fn_node = Fn_data->getLocalFormVecArray()->data();
     const double* const Xn_node = Xn_data->getLocalFormVecArray()->data();
+    const double* const Un_node = Un_data->getLocalFormVecArray()->data();
 
     // We also need the other sites data
     double* const Fs_node = Fs_data->getLocalFormVecArray()->data();
     const double* const Xs_node = Xs_data->getLocalFormVecArray()->data();
+    const double* const Us_node = Us_data->getLocalFormVecArray()->data();
 
     // Loop through local indices and compute forces on the network's nodes
     const std::vector<LNode*>& nodes = ibn_manager->getLMesh(ln)->getLocalNodes();
@@ -179,15 +188,18 @@ IBMultiphaseCrossLinks::doComputeLagrangianForce(Pointer<LData>& Fn_data,
     for (const auto& node : nodes)
     {
         const int lag_idx = node->getLagrangianIndex();
+        if (lag_idx >= strct_idxs.first) continue;
         const int network_petsc_idx = node->getLocalPETScIndex();
         const int solvent_petsc_idx = solvent_petsc_idxs[lag_idx];
 
         Eigen::Map<const VectorNd> Xn(&Xn_node[network_petsc_idx * NDIM]);
         Eigen::Map<const VectorNd> Xs(&Xs_node[solvent_petsc_idx * NDIM]);
+        Eigen::Map<const VectorNd> Un(&Un_node[network_petsc_idx * NDIM]);
+        Eigen::Map<const VectorNd> Us(&Us_node[solvent_petsc_idx * NDIM]);
         Eigen::Map<VectorNd> Fn(&Fn_node[network_petsc_idx * NDIM]);
         Eigen::Map<VectorNd> Fs(&Fs_node[solvent_petsc_idx * NDIM]);
-        Fn = -d_kappa * (Xn - Xs);
-        Fs = d_kappa * (Xn - Xs); // Solvent force is negative network force
+        Fn = -(d_kappa * (Xn - Xs) - d_eta * (Un - Us));
+        Fs = d_kappa * (Xn - Xs) - d_eta * (Un - Us); // Solvent force is negative network force
         max_stretch = std::max(max_stretch, (Xn - Xs).norm());
     }
 

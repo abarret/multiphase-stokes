@@ -311,7 +311,7 @@ main(int argc, char* argv[])
         ib_solvent_ops->registerIBLagrangianForceFunction(ibs_spring_forces);
 
         Pointer<IBMultiphaseCrossLinks> ib_cross_forces = new IBMultiphaseCrossLinks(
-            ib_network_ops, ib_solvent_ops, patch_hierarchy, input_db->getDouble("KAPPA") / 0.0160037);
+            ib_network_ops, ib_solvent_ops, patch_hierarchy, input_db->getDouble("KAPPA") / 0.0160037, 0.0);
         time_integrator->registerCrossLinkStrategy(ib_cross_forces);
 
         ibn_initializer->setStructureNamesOnLevel(finest_ln, struct_list_network);
