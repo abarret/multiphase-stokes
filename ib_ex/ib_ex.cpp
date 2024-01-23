@@ -228,7 +228,8 @@ main(int argc, char* argv[])
             new IBMultiphaseCrossLinks(ib_network_ops,
                                        ib_solvent_ops,
                                        patch_hierarchy,
-                                       input_db->getDouble("KAPPA") / (2.0 * M_PI * R / num_node[0]));
+                                       input_db->getDouble("KAPPA") / (2.0 * M_PI * R / num_node[0]),
+                                       0.0);
         time_integrator->registerCrossLinkStrategy(cross_forces);
 
         // Set up coefficients

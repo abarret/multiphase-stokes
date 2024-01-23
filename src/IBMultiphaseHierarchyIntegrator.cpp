@@ -113,7 +113,9 @@ IBMultiphaseHierarchyIntegrator::preprocessIntegrateHierarchy(const double curre
         if (d_enable_logging) plog << d_object_name << "::preprocessIntegrateHierarchy(): computing Lagrangian force\n";
         d_ib_method_ops->computeLagrangianForce(current_time);
         d_ibn_method_ops->computeLagrangianForce(current_time);
-        d_cross_links_strategy->computeLagrangianForce(current_time, MultiphaseCrossLinksStrategy::TimePoint::CURRENT);
+        if (d_cross_links_strategy)
+            d_cross_links_strategy->computeLagrangianForce(current_time,
+                                                           MultiphaseCrossLinksStrategy::TimePoint::CURRENT);
         if (d_enable_logging)
             plog << d_object_name
                  << "::preprocessIntegrateHierarchy(): spreading Lagrangian force "
@@ -130,21 +132,25 @@ IBMultiphaseHierarchyIntegrator::preprocessIntegrateHierarchy(const double curre
             d_fn_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), current_time);
 
         d_hier_velocity_data_ops->setToScalar(d_cross_links_un_idx, 0.0);
-        d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
-        d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
-                                            d_u_phys_bdry_op,
-                                            getProlongRefineSchedules(d_object_name + "::fn"),
-                                            current_time,
-                                            true /*spread_network*/,
-                                            MultiphaseCrossLinksStrategy::TimePoint::CURRENT);
         d_hier_velocity_data_ops->setToScalar(d_cross_links_us_idx, 0.0);
-        d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_us_idx);
-        d_cross_links_strategy->spreadForce(d_cross_links_us_idx,
-                                            d_u_phys_bdry_op,
-                                            getProlongRefineSchedules(d_object_name + "::f"),
-                                            current_time,
-                                            false /*spread_network*/,
-                                            MultiphaseCrossLinksStrategy::TimePoint::CURRENT);
+
+        if (d_cross_links_strategy)
+        {
+            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
+            d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
+                                                d_u_phys_bdry_op,
+                                                getProlongRefineSchedules(d_object_name + "::fn"),
+                                                current_time,
+                                                true /*spread_network*/,
+                                                MultiphaseCrossLinksStrategy::TimePoint::CURRENT);
+            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_us_idx);
+            d_cross_links_strategy->spreadForce(d_cross_links_us_idx,
+                                                d_u_phys_bdry_op,
+                                                getProlongRefineSchedules(d_object_name + "::f"),
+                                                current_time,
+                                                false /*spread_network*/,
+                                                MultiphaseCrossLinksStrategy::TimePoint::CURRENT);
+        }
 
         d_u_phys_bdry_op->setHomogeneousBc(false);
         if (d_f_current_idx != invalid_index) d_hier_velocity_data_ops->copyData(d_f_current_idx, d_f_idx);
@@ -210,7 +216,9 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
         if (d_enable_logging) plog << d_object_name << "::integrateHierarchy(): computing Lagrangian force\n";
         d_ib_method_ops->computeLagrangianForce(half_time);
         d_ibn_method_ops->computeLagrangianForce(half_time);
-        d_cross_links_strategy->computeLagrangianForce(half_time, MultiphaseCrossLinksStrategy::TimePoint::MIDPOINT);
+        if (d_cross_links_strategy)
+            d_cross_links_strategy->computeLagrangianForce(half_time,
+                                                           MultiphaseCrossLinksStrategy::TimePoint::MIDPOINT);
         if (d_enable_logging)
             plog << d_object_name << "::integrateHierarchy(): spreading Lagrangian force to the Eulerian grid\n";
         d_hier_velocity_data_ops->setToScalar(d_f_idx, 0.0);
@@ -225,21 +233,24 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
             d_fn_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), half_time);
 
         d_hier_velocity_data_ops->setToScalar(d_cross_links_un_idx, 0.0);
-        d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
-        d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
-                                            d_u_phys_bdry_op,
-                                            getProlongRefineSchedules(d_object_name + "::fn"),
-                                            half_time,
-                                            true /*spread_network*/,
-                                            MultiphaseCrossLinksStrategy::TimePoint::MIDPOINT);
         d_hier_velocity_data_ops->setToScalar(d_cross_links_us_idx, 0.0);
-        d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_us_idx);
-        d_cross_links_strategy->spreadForce(d_cross_links_us_idx,
-                                            d_u_phys_bdry_op,
-                                            getProlongRefineSchedules(d_object_name + "::f"),
-                                            half_time,
-                                            false /*spread_network*/,
-                                            MultiphaseCrossLinksStrategy::TimePoint::MIDPOINT);
+        if (d_cross_links_strategy)
+        {
+            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
+            d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
+                                                d_u_phys_bdry_op,
+                                                getProlongRefineSchedules(d_object_name + "::fn"),
+                                                half_time,
+                                                true /*spread_network*/,
+                                                MultiphaseCrossLinksStrategy::TimePoint::MIDPOINT);
+            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_us_idx);
+            d_cross_links_strategy->spreadForce(d_cross_links_us_idx,
+                                                d_u_phys_bdry_op,
+                                                getProlongRefineSchedules(d_object_name + "::f"),
+                                                half_time,
+                                                false /*spread_network*/,
+                                                MultiphaseCrossLinksStrategy::TimePoint::MIDPOINT);
+        }
 
         d_u_phys_bdry_op->setHomogeneousBc(false);
         break;
@@ -250,7 +261,8 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
             if (d_enable_logging) plog << d_object_name << "::integrateHierarchy(): computing Lagrangian force\n";
             d_ib_method_ops->computeLagrangianForce(new_time);
             d_ibn_method_ops->computeLagrangianForce(new_time);
-            d_cross_links_strategy->computeLagrangianForce(half_time, MultiphaseCrossLinksStrategy::TimePoint::NEW);
+            if (d_cross_links_strategy)
+                d_cross_links_strategy->computeLagrangianForce(half_time, MultiphaseCrossLinksStrategy::TimePoint::NEW);
             if (d_enable_logging)
                 plog << d_object_name << "::integrateHierarchy(): spreading Lagrangian force to the Eulerian grid\n";
             d_hier_velocity_data_ops->setToScalar(d_f_idx, 0.0);
@@ -265,21 +277,24 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchy(const double current_time,
                 d_fn_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), new_time);
 
             d_hier_velocity_data_ops->setToScalar(d_cross_links_un_idx, 0.0);
-            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
-            d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
-                                                d_u_phys_bdry_op,
-                                                getProlongRefineSchedules(d_object_name + "::fn"),
-                                                new_time,
-                                                true /*spread_network*/,
-                                                MultiphaseCrossLinksStrategy::TimePoint::NEW);
             d_hier_velocity_data_ops->setToScalar(d_cross_links_us_idx, 0.0);
-            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_us_idx);
-            d_cross_links_strategy->spreadForce(d_cross_links_us_idx,
-                                                d_u_phys_bdry_op,
-                                                getProlongRefineSchedules(d_object_name + "::f"),
-                                                new_time,
-                                                false /*spread_network*/,
-                                                MultiphaseCrossLinksStrategy::TimePoint::NEW);
+            if (d_cross_links_strategy)
+            {
+                d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
+                d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
+                                                    d_u_phys_bdry_op,
+                                                    getProlongRefineSchedules(d_object_name + "::fn"),
+                                                    new_time,
+                                                    true /*spread_network*/,
+                                                    MultiphaseCrossLinksStrategy::TimePoint::NEW);
+                d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_us_idx);
+                d_cross_links_strategy->spreadForce(d_cross_links_us_idx,
+                                                    d_u_phys_bdry_op,
+                                                    getProlongRefineSchedules(d_object_name + "::f"),
+                                                    new_time,
+                                                    false /*spread_network*/,
+                                                    MultiphaseCrossLinksStrategy::TimePoint::NEW);
+            }
 
             d_u_phys_bdry_op->setHomogeneousBc(false);
             d_hier_velocity_data_ops->linearSum(d_f_idx, 0.5, d_f_current_idx, 0.5, d_f_idx);

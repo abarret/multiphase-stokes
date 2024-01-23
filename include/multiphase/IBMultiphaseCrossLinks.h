@@ -59,7 +59,8 @@ public:
     IBMultiphaseCrossLinks(SAMRAI::tbox::Pointer<IBAMR::IBMethod> ibn_ops,
                            SAMRAI::tbox::Pointer<IBAMR::IBMethod> ibs_ops,
                            SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                           double kappa);
+                           double kappa,
+                           double eta);
 
     /*!
      * \brief Destructor.
@@ -105,6 +106,7 @@ private:
     SAMRAI::tbox::Pointer<IBAMR::IBMethod> d_ibn_ops, d_ibs_ops;
 
     double d_kappa = std::numeric_limits<double>::quiet_NaN();
+    double d_eta = std::numeric_limits<double>::quiet_NaN();
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
 };
