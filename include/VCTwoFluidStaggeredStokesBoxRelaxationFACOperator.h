@@ -58,6 +58,11 @@ public:
      */
     ~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator();
 
+    void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                            const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef,
+                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+
     /*!
      * \name Functions for configuring the solver.
      */
@@ -278,11 +283,16 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
+    std::unique_ptr<SAMRAI::solv::RobinBcCoefStrategy<NDIM>> d_default_un_bc_coef, d_default_us_bc_coef,
+        d_default_P_bc_coef, d_default_thn_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef = nullptr;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
+    SAMRAI::tbox::Pointer<IBTK::CartSideRobinPhysBdryOp> d_un_bc_op, d_us_bc_op;
+    SAMRAI::tbox::Pointer<IBTK::CartCellRobinPhysBdryOp> d_P_bc_op, d_thn_bc_op;
+    SAMRAI::xfer::RefinePatchStrategy<NDIM>* d_vel_P_bc_op = nullptr;
     // Cached communications operators.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
         d_P_fill_pattern;
-    std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> transaction_comps;
     SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
 
     std::vector<std::vector<std::array<SAMRAI::hier::BoxList<NDIM>, NDIM>>> d_patch_side_bc_box_overlap;

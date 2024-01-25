@@ -33,6 +33,7 @@
 #include "ibtk/ibtk_utilities.h"
 #include <ibtk/CartCellDoubleQuadraticCFInterpolation.h>
 #include <ibtk/CartSideDoubleQuadraticCFInterpolation.h>
+#include <ibtk/RefinePatchStrategySet.h>
 
 #include "Box.h"
 #include "BoxList.h"
@@ -58,6 +59,8 @@
 #include "petscksp.h"
 
 #include <Eigen/LU>
+
+#include <LocationIndexRobinBcCoefs.h>
 
 #include <algorithm>
 #include <cstring>
@@ -151,8 +154,38 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
     const std::string& default_options_prefix)
-    : FACPreconditionerStrategy(object_name)
+    : FACPreconditionerStrategy(object_name),
+      d_default_un_bc_coef(
+          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
+      d_default_us_bc_coef(
+          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_us_bc_coef", Pointer<Database>(nullptr))),
+      d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
+      d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
+      d_default_P_bc_coef(
+          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_P_bc_coef", Pointer<Database>(nullptr))),
+      d_P_bc_coef(d_default_P_bc_coef.get()),
+      d_default_thn_bc_coef(
+          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
+      d_thn_bc_coef(d_default_thn_bc_coef.get())
 {
+    // Setup a default boundary condition object that specifies homogeneous
+    // Dirichlet boundary conditions for the velocity and homogeneous Neumann
+    // boundary conditions for the pressure.
+    for (unsigned int d = 0; d < NDIM; ++d)
+    {
+        auto p_default_un_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_un_bc_coef.get());
+        auto p_default_us_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_us_bc_coef.get());
+        p_default_un_bc_coef->setBoundaryValue(2 * d, 0.0);
+        p_default_un_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
+        p_default_us_bc_coef->setBoundaryValue(2 * d, 0.0);
+        p_default_us_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
+        auto p_default_P_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_P_bc_coef.get());
+        p_default_P_bc_coef->setBoundarySlope(2 * d, 0.0);
+        p_default_P_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
+        auto p_default_thn_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_thn_bc_coef.get());
+        p_default_thn_bc_coef->setBoundarySlope(2 * d, 0.0);
+        p_default_thn_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
+    }
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     Pointer<VariableContext> d_ctx = var_db->getContext(d_object_name + "::context");
@@ -194,6 +227,19 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
                  t_compute_residual = TimerManager::getManager()->getTimer(
                      "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
     return;
+}
+
+void
+VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+    RobinBcCoefStrategy<NDIM>* P_bc_coef,
+    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+{
+    if (!un_bc_coefs.empty()) d_un_bc_coefs = un_bc_coefs;
+    if (!us_bc_coefs.empty()) d_us_bc_coefs = us_bc_coefs;
+    if (P_bc_coef) d_P_bc_coef = P_bc_coef;
+    if (thn_bc_coef) d_thn_bc_coef = thn_bc_coef;
 }
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator()
@@ -845,6 +891,16 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         level->allocatePatchData(d_p_scr_idx, d_new_time);
     }
 
+    // Set up boundary condition operator
+    d_un_bc_op = new CartSideRobinPhysBdryOp(d_un_scr_idx, d_un_bc_coefs, false);
+    d_us_bc_op = new CartSideRobinPhysBdryOp(d_us_scr_idx, d_us_bc_coefs, false);
+    d_P_bc_op = new CartCellRobinPhysBdryOp(d_p_scr_idx, d_P_bc_coef, false);
+    std::vector<RefinePatchStrategy<NDIM>*> bc_op_ptrs(3);
+    bc_op_ptrs[0] = d_un_bc_op;
+    bc_op_ptrs[1] = d_us_bc_op;
+    bc_op_ptrs[2] = d_P_bc_op;
+    d_vel_P_bc_op = new RefinePatchStrategySet(bc_op_ptrs.begin(), bc_op_ptrs.end(), false);
+
     // Cache prolongation operators. Creating refinement schedules can be expensive for hierarchies with many levels. We
     // create the schedules here, and SAMRAI will determine whether they need to be regenerated whenever we switch patch
     // indices.
@@ -866,13 +922,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     // Note start from zero because you can't prolong to the coarsest level.
     for (int dst_ln = coarsest_ln + 1; dst_ln <= finest_ln; ++dst_ln)
     {
-        // TODO: The last argument should be the refine patch strategies. These should be, e.g. physical boundary
-        // routines and fix-ups related to coarse fine interfaces.
-        d_prolong_scheds[dst_ln] = d_prolong_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln),
-                                                                 Pointer<PatchLevel<NDIM>>(),
-                                                                 dst_ln - 1,
-                                                                 d_hierarchy,
-                                                                 nullptr /* Refine patch strategy*/);
+        d_prolong_scheds[dst_ln] = d_prolong_alg->createSchedule(
+            d_hierarchy->getPatchLevel(dst_ln), Pointer<PatchLevel<NDIM>>(), dst_ln - 1, d_hierarchy, d_vel_P_bc_op);
     }
 
     // Cache restriction operators.
@@ -908,7 +959,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         // TODO: the second argument here should fill in physical boundary conditions. This only works for periodic
         // conditions.
         d_ghostfill_no_restrict_scheds[dst_ln] =
-            d_ghostfill_no_restrict_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln), nullptr);
+            d_ghostfill_no_restrict_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_vel_P_bc_op);
     }
 
     // Coarse-fine boundary operators
@@ -1034,6 +1085,15 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std
                                                                        const std::array<int, 3>& src_idxs,
                                                                        const int dst_ln)
 {
+    d_un_bc_op->setPatchDataIndex(dst_idxs[0]);
+    d_un_bc_op->setHomogeneousBc(true);
+
+    d_us_bc_op->setPatchDataIndex(dst_idxs[1]);
+    d_us_bc_op->setHomogeneousBc(true);
+
+    d_P_bc_op->setPatchDataIndex(dst_idxs[2]);
+    d_P_bc_op->setHomogeneousBc(true);
+
     RefineAlgorithm<NDIM> refine_alg;
     refine_alg.registerRefine(dst_idxs[0], src_idxs[0], dst_idxs[0], d_un_prolong_op);
     refine_alg.registerRefine(dst_idxs[1], src_idxs[1], dst_idxs[1], d_us_prolong_op);
@@ -1064,6 +1124,15 @@ void
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std::array<int, 3>& dst_idxs,
                                                                        const int dst_ln)
 {
+    d_un_bc_op->setPatchDataIndex(dst_idxs[0]);
+    d_un_bc_op->setHomogeneousBc(true);
+
+    d_us_bc_op->setPatchDataIndex(dst_idxs[1]);
+    d_us_bc_op->setHomogeneousBc(true);
+
+    d_P_bc_op->setPatchDataIndex(dst_idxs[2]);
+    d_P_bc_op->setHomogeneousBc(true);
+
     RefineAlgorithm<NDIM> refine_alg;
     refine_alg.registerRefine(dst_idxs[0], dst_idxs[0], dst_idxs[0], Pointer<RefineOperator<NDIM>>());
     refine_alg.registerRefine(dst_idxs[1], dst_idxs[1], dst_idxs[1], Pointer<RefineOperator<NDIM>>());

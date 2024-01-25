@@ -357,6 +357,7 @@ main(int argc, char* argv[])
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
                 "Krylov_precond_");
+        fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
