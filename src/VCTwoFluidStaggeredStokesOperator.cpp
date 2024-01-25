@@ -71,7 +71,7 @@ static const std::string DATA_COARSEN_TYPE =
                      // the hierarchies
 
 // Type of extrapolation to use at physical boundaries.
-static const std::string BDRY_EXTRAP_TYPE = "LINEAR"; // these operations are all in IBAMR
+static const std::string BDRY_EXTRAP_TYPE = "QUADRATIC"; // these operations are all in IBAMR
 
 // Whether to enforce consistent interpolated values at Type 2 coarse-fine
 // interface ghost cells.
@@ -117,6 +117,9 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
       d_default_P_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_P_bc_coef", Pointer<Database>(nullptr))),
       d_P_bc_coef(d_default_P_bc_coef),
+      d_default_thn_bc_coef(
+          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
+      d_thn_bc_coef(d_default_thn_bc_coef),
       d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable")),
       d_thn_sc_var(new SideVariable<NDIM, double>(d_object_name + "::ThnSide", 1, false)),
       d_thn_nc_var(new NodeVariable<NDIM, double>(d_object_name + "::ThnNode", 1, false)),
@@ -136,6 +139,9 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
         auto p_default_P_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_P_bc_coef);
         p_default_P_bc_coef->setBoundarySlope(2 * d, 0.0);
         p_default_P_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
+        auto p_default_thn_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_thn_bc_coef);
+        p_default_thn_bc_coef->setBoundarySlope(2 * d, 0.0);
+        p_default_thn_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
     }
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -160,7 +166,8 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
     // Initialize the boundary conditions objects.
     setPhysicalBcCoefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef),
                        std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef),
-                       d_default_P_bc_coef);
+                       d_default_P_bc_coef,
+                       d_default_thn_bc_coef);
 
     if (input_db)
     {
@@ -246,7 +253,8 @@ VCTwoFluidStaggeredStokesOperator::setThnIdx(const int thn_idx)
 void
 VCTwoFluidStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                                                       const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                                      RobinBcCoefStrategy<NDIM>* P_bc_coef)
+                                                      RobinBcCoefStrategy<NDIM>* P_bc_coef,
+                                                      RobinBcCoefStrategy<NDIM>* thn_bc_coef)
 {
 #if !defined(NDEBUG)
     TBOX_ASSERT(un_bc_coefs.size() == NDIM);
@@ -284,6 +292,11 @@ VCTwoFluidStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcC
     {
         d_P_bc_coef = d_default_P_bc_coef;
     }
+
+    if (thn_bc_coef)
+        d_thn_bc_coef = thn_bc_coef;
+    else
+        d_thn_bc_coef = d_default_thn_bc_coef;
     return;
 } // setPhysicalBcCoefs
 
@@ -315,7 +328,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    std::vector<InterpolationTransactionComponent> transaction_comps(4);
+    std::vector<InterpolationTransactionComponent> transaction_comps(3);
     transaction_comps[0] = InterpolationTransactionComponent(un_scratch_idx,
                                                              un_idx,
                                                              SC_DATA_REFINE_TYPE,
@@ -339,21 +352,26 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_P_bc_coef);
-    transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                             "CONSERVATIVE_LINEAR_REFINE",
-                                                             USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
-                                                             BDRY_EXTRAP_TYPE,
-                                                             CONSISTENT_TYPE_2_BDRY,
-                                                             d_P_bc_coef); // defaults to fill corner
 
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
     d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
-    StaggeredStokesPhysicalBoundaryHelper::setupBcCoefObjects(
-        d_un_bc_coefs, d_P_bc_coef, un_scratch_idx, P_idx, d_homogeneous_bc);
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
-    StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     d_hier_bdry_fill->resetTransactionComponents(d_transaction_comps);
+
+    {
+        // Note that thn ghost cells are always filled under inhomogeneous conditions.
+        std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
+            thn_idx,
+            "CONSERVATIVE_LINEAR_REFINE",
+            USE_CF_INTERPOLATION,
+            DATA_COARSEN_TYPE,
+            BDRY_EXTRAP_TYPE,
+            CONSISTENT_TYPE_2_BDRY,
+            d_thn_bc_coef) };
+        HierarchyGhostCellInterpolation hier_bdry_fill;
+        hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
+        hier_bdry_fill.fillData(d_solution_time);
+    }
 
 // TODO: These preprocessor flags need a permanent change associated with them. We need to determine which to keep and
 // which to throw away. If we want to keep the option of switching, we should replace the preprocessor flags with
@@ -579,7 +597,11 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             }
         }
     }
-    if (d_bc_helper) d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
+    if (d_bc_helper)
+    {
+        d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
+        d_bc_helper->copyDataAtDirichletBoundaries(A_us_idx, us_scratch_idx);
+    }
 
 #ifdef POST_SYNCH
     {
@@ -665,7 +687,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
 
     // Setup the interpolation transaction information.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    d_transaction_comps.resize(4);
+    d_transaction_comps.resize(3);
     d_transaction_comps[0] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(0),
                                                                in.getComponentDescriptorIndex(0),
                                                                SC_DATA_REFINE_TYPE,
@@ -689,13 +711,6 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_P_bc_coef); // noFillCorners
-    d_transaction_comps[3] = InterpolationTransactionComponent(thn_idx,
-                                                               "CONSERVATIVE_LINEAR_REFINE",
-                                                               USE_CF_INTERPOLATION,
-                                                               DATA_COARSEN_TYPE,
-                                                               BDRY_EXTRAP_TYPE,
-                                                               CONSISTENT_TYPE_2_BDRY,
-                                                               d_P_bc_coef); // defaults to fill corners
 
     // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
@@ -715,6 +730,8 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
         TBOX_ASSERT(d_hier_math_ops);
     }
 #endif
+
+    d_bc_helper->cacheBcCoefData(d_us_bc_coefs, d_solution_time, d_hierarchy);
 
     // Indicate the operator is initialized.
     d_is_initialized = true;
@@ -793,12 +810,9 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
         {
             const int un_idx = x->getComponentDescriptorIndex(0);
             const int P_idx = x->getComponentDescriptorIndex(2);
-            StaggeredStokesPhysicalBoundaryHelper::setupBcCoefObjects(
-                d_un_bc_coefs, d_P_bc_coef, un_idx, P_idx, d_homogeneous_bc);
             d_bc_helper->enforceNormalVelocityBoundaryConditions(
                 un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
         }
-        StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
         apply(*x, *b);
         y.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&y, false), b);
         x->freeVectorComponents();
@@ -809,10 +823,7 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
     {
         const int un_idx = y.getComponentDescriptorIndex(0);
         const int P_idx = y.getComponentDescriptorIndex(2);
-        StaggeredStokesPhysicalBoundaryHelper::setupBcCoefObjects(
-            d_un_bc_coefs, d_P_bc_coef, un_idx, P_idx, homogeneous_bc);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(un_idx, P_idx, d_un_bc_coefs, d_new_time, homogeneous_bc);
-        StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     }
     return;
 } // modifyRhsForBcs
@@ -824,11 +835,8 @@ VCTwoFluidStaggeredStokesOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& 
     {
         const int un_idx = u.getComponentDescriptorIndex(0);
         const int P_idx = u.getComponentDescriptorIndex(2);
-        StaggeredStokesPhysicalBoundaryHelper::setupBcCoefObjects(
-            d_un_bc_coefs, d_P_bc_coef, un_idx, P_idx, d_homogeneous_bc);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(
             un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
-        StaggeredStokesPhysicalBoundaryHelper::resetBcCoefObjects(d_un_bc_coefs, d_P_bc_coef);
     }
     return;
 } // imposeSolBcs

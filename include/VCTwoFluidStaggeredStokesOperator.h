@@ -156,7 +156,8 @@ public:
      */
     virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                                     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
+                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef,
+                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
 
     /*!
      * \brief Set the physical boundary condition helper object.
@@ -262,6 +263,8 @@ protected:
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_thn_bc_coef;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
