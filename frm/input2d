@@ -1,21 +1,32 @@
+USE_PRECONDITIONER = TRUE
 RHO = 1.0
-MAX_MULTIGRID_LEVELS = 4
+N = 64
+MAX_MULTIGRID_LEVELS = 6
 START_TIME = 0.0
 END_TIME = 1.0
 NUM_CYCLES = 1
-DT_MAX = 0.0001
+DX = 1.0 / N
+U_MAX = 20.0   // use a larger u_max
+CFL_MAX = 0.1
+DT_MAX = CFL_MAX * DX / U_MAX
 ENABLE_LOGGING = TRUE
 W = 0.75
 USE_PRECONDITIONER = TRUE
-N = 16
 VIZ_DUMP_TIME_INTERVAL = 0.005
 DELTA = 0.175
 TAG_BUFFER = 1
+REGRID_INTERVAL = 10
 
 ADV_DIFF_NUM_CYCLES = 1
 ADV_DIFF_CONVECTIVE_OP_TYPE = "CUI"
 ADV_DIFF_CONVECTIVE_TS_TYPE = "ADAMS_BASHFORTH"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
+
+// Complex Fluid parameters
+USE_CF = FALSE
+
+VISCOUS_TS_TYPE = "TRAPEZOIDAL_RULE"
+HAS_VEL_NULLSPACE = FALSE
 
 ETA_S = 0.04
 ETA_N = 4.0
@@ -66,6 +77,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    grad_abs_thresh = 0.75
    use_grad_tagging = TRUE
    tag_buffer = TAG_BUFFER
+   regrid_interval = REGRID_INTERVAL
 
    solver_db {
       ksp_type = "fgmres"
@@ -73,7 +85,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
 
    precond_db {
       cycle_type = "V_CYCLE"
-      num_pre_sweeps = 0
+      num_pre_sweeps = 5
       num_post_sweeps = 5
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
@@ -118,10 +130,10 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 4                 // Maximum number of levels in hierarchy.
+   max_levels = 3                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
-      level_1 = 4, 4              // vector ratio to next coarser level
+      level_1 = 2, 2              // vector ratio to next coarser level
       level_2 = 2, 2
       level_3 = 2, 2
    }
