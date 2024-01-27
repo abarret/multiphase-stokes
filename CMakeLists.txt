@@ -21,3 +21,5 @@ SET(DIRS apply smooth multigrid time_stepping time_stepping_thn frm)
 FOREACH(_dir ${DIRS})
    ADD_SUBDIRECTORY(${_dir})
 ENDFOREACH()
+
+ADD_SUBDIRECTORY(tests)
