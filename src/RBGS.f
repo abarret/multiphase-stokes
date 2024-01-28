@@ -38,6 +38,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        nu_n, nu_s, xi, w, C, D, red_or_black)
 c
       use my_subs
+      use LU
       implicit none
 cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
       double precision dx(0:1)
@@ -84,9 +85,12 @@ c
       double precision A_box(9,9)
       double precision b(9)
       integer ipiv(9), info
+      integer :: i, dd, rc, n = 9
+      integer, pointer ::  INDX(:)  ! integer vector (n)
 c
       integer i0, i1
 c    
+      allocate(INDX(n))
       do i1 = ilow1, iup1   
         do i0 = ilow0, iup0  ! same loop as the c++ code (currently this is just GS)
 c
@@ -387,22 +391,17 @@ c
           ! pressure at cell center
           b(9) = f_p_data(i0,i1)
 c
-          ! CALL dgetrf( 9, 9, A_box, 9, ipiv, info)
+          ! call LU decomposition routine
+          call LUDCMP(A_box,n,INDX,dd,rc)
 
-          !IF( info.EQ.0 ) THEN
-          !     print *, 'info is:'
-               ! Solve the system A*X = B, overwriting B with X.
-          !     CALL dgetrs( 'No transpose', 9, 1, A_box, 9, ipiv, b, 
-c    &               9, info )
-          !END IF
+          ! call appropriate solver if previous return code is ok
+          if (rc.eq.0) then
+               call LUBKSB(A_box,n,INDX,b)
+          endif
 
-          ! solve the system Ax = b, overwriting b with x
-          call dgesv(9, 1, A_box, 9, ipiv, b, 9, info)
-c
-          if (info /= 0) then
-            ! print *, A_box
-            print *, 'ERROR IN DGESV'
-            print *, info
+          ! print results or error message
+          if (rc.eq.1) then
+               write(*,*) 'The system matrix is singular. No solution!'
           endif
 c 
           un_data_0(i0,i1) = (1.d0-w)*un_data_0(i0,i1) + w*b(1);
