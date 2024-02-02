@@ -483,9 +483,9 @@ IBMultiphaseHierarchyIntegrator::postprocessIntegrateHierarchy(const double curr
     Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator = d_ins_hier_integrator;
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     const int us_new_idx =
-        var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(), ins_integrator->getNewContext());
-    const int un_new_idx =
         var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(), ins_integrator->getNewContext());
+    const int un_new_idx =
+        var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(), ins_integrator->getNewContext());
 #ifndef NDEBUG
     ops->setToScalar(d_u_idx, std::numeric_limits<double>::quiet_NaN(), false);
     ops->setToScalar(d_un_idx, std::numeric_limits<double>::quiet_NaN(), false);
@@ -507,6 +507,7 @@ IBMultiphaseHierarchyIntegrator::postprocessIntegrateHierarchy(const double curr
                                           getGhostfillRefineSchedules(d_object_name + "::un"),
                                           new_time);
 
+    // Note IBHierarchyIntegrator calls postprocessIntegrateData on d_ib_method_ops
     d_ibn_method_ops->postprocessIntegrateData(current_time, new_time, num_cycles);
 
     IBHierarchyIntegrator::postprocessIntegrateHierarchy(

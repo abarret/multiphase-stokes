@@ -179,6 +179,7 @@ IBMultiphaseCrossLinks::doComputeLagrangianForce(Pointer<LData>& Fn_data,
     // determine the PETSc ordering of the other structural data.
     // TODO: Remove the assumption that the initial Lagrangian indexing is the same. We need to store a map between
     // initial Lagrangian indices.
+    // TODO: We also assume that network and solvent pairs of indices are available on the same process.
 #ifndef NDEBUG
     TBOX_ASSERT(ibs_manager->getNumberOfNodes(ln) >= nodes.size());
 #endif
