@@ -56,11 +56,14 @@ public:
     /*!
      * \brief Constructor.
      */
-    IBMultiphaseCrossLinks(SAMRAI::tbox::Pointer<IBAMR::IBMethod> ibn_ops,
-                           SAMRAI::tbox::Pointer<IBAMR::IBMethod> ibs_ops,
-                           SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                           double kappa,
-                           double eta);
+    IBMultiphaseCrossLinks(
+        SAMRAI::tbox::Pointer<IBAMR::IBMethod> ibn_ops,
+        SAMRAI::tbox::Pointer<IBAMR::IBMethod> ibs_ops,
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+        double kappa,
+        double etan = 0.0,
+        std::function<IBTK::VectorNd(double)> vel_fcn = [](double) -> IBTK::VectorNd
+        { return IBTK::VectorNd::Zero(); });
 
     /*!
      * \brief Destructor.
@@ -107,6 +110,7 @@ private:
 
     double d_kappa = std::numeric_limits<double>::quiet_NaN();
     double d_eta = std::numeric_limits<double>::quiet_NaN();
+    std::function<IBTK::VectorNd(double)> d_vel_fcn;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
 };
