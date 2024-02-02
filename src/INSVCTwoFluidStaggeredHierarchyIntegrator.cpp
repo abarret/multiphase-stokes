@@ -987,6 +987,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
 
     // Reset the RHS
     d_rhs_vec->subtract(d_rhs_vec, f_vec);
+
+    // Copy the force values for output
+    const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+    const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+    d_hier_sc_data_ops->copyData(fn_idx, f_vec->getComponentDescriptorIndex(0));
+    d_hier_sc_data_ops->copyData(fs_idx, f_vec->getComponentDescriptorIndex(1));
     f_vec->deallocateVectorData();
     f_vec->freeVectorComponents();
 

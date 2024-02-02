@@ -54,12 +54,14 @@ IBMultiphaseCrossLinks::IBMultiphaseCrossLinks(Pointer<IBMethod> ibn_ops,
                                                Pointer<IBMethod> ibs_ops,
                                                Pointer<PatchHierarchy<NDIM>> hierarchy,
                                                const double kappa,
-                                               const double eta)
+                                               const double eta,
+                                               std::function<VectorNd(double)> vel_fcn)
     : MultiphaseCrossLinksStrategy(),
       d_ibn_ops(ibn_ops),
       d_ibs_ops(ibs_ops),
       d_kappa(kappa),
       d_eta(eta),
+      d_vel_fcn(vel_fcn),
       d_hierarchy(hierarchy)
 {
     // intentionally blank
@@ -198,8 +200,9 @@ IBMultiphaseCrossLinks::doComputeLagrangianForce(Pointer<LData>& Fn_data,
         Eigen::Map<const VectorNd> Us(&Us_node[solvent_petsc_idx * NDIM]);
         Eigen::Map<VectorNd> Fn(&Fn_node[network_petsc_idx * NDIM]);
         Eigen::Map<VectorNd> Fs(&Fs_node[solvent_petsc_idx * NDIM]);
-        Fn = -(d_kappa * (Xn - Xs) - d_eta * (Un - Us));
-        Fs = d_kappa * (Xn - Xs) - d_eta * (Un - Us); // Solvent force is negative network force
+        VectorNd vel = d_vel_fcn(time);
+        Fn = d_kappa * (Xs - Xn) + d_eta * (vel - Un);
+        Fs = d_kappa * (Xn - Xs) + d_eta * (vel - Us);
         max_stretch = std::max(max_stretch, (Xn - Xs).norm());
     }
 
