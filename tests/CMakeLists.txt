@@ -20,7 +20,7 @@ ADD_CUSTOM_TARGET(tests)
 #    only compiles the IBFE tests.
 # 2. all input and output files in these source directories are symlinked into
 #    their corresponding build directories.
-SET(TEST_DIRECTORIES)
+SET(TEST_DIRECTORIES frm)
 
 FOREACH(_dir ${TEST_DIRECTORIES})
   ADD_CUSTOM_TARGET("tests-${_dir}")
@@ -103,6 +103,8 @@ FOREACH(_dir ${TEST_DIRECTORIES})
     ${CMAKE_SOURCE_DIR}/tests/${_dir} ${CMAKE_BINARY_DIR}/tests/${_dir}
     VERBATIM)
 ENDFOREACH()
+
+SETUP_2D(frm four_roll_mill.cpp)
 
 # Find numdiff, if possible (we only need it for tests so its not essential that
 # we find it now)

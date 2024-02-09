@@ -106,7 +106,7 @@ AdvDiffIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "newtonian_blob_frm.output"
+   log_file_name = "output"
    log_all_nodes = FALSE
 
 // visualization dump parameters
