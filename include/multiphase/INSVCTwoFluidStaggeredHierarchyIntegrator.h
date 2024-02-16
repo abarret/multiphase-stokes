@@ -16,6 +16,7 @@
 #include "ibamr/ibamr_enums.h"
 
 #include "ibtk/SideDataSynchronization.h"
+#include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/muParserCartGridFunction.h>
 
 #include "CellVariable.h"
