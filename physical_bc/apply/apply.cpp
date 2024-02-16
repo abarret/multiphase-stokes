@@ -11,6 +11,8 @@
 //
 // ---------------------------------------------------------------------
 
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+
 #include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -31,8 +33,7 @@
 #include <SAMRAI_config.h>
 #include <StandardTagAndInitialize.h>
 
-// Local includes
-#include "VCTwoFluidStaggeredStokesOperator.h"
+using namespace multiphase;
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *

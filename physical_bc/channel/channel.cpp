@@ -1,3 +1,5 @@
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -23,9 +25,7 @@
 
 #include <memory>
 
-// Local includes
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
-
+using namespace multiphase;
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
  * cases, the command line is:                                                 *

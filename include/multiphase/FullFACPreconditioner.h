@@ -51,14 +51,14 @@ namespace multiphase
  enable_logging = FALSE  // see setLoggingEnabled()
  \endverbatim
 */
-class FullFACPreconditioner : public FACPreconditioner
+class FullFACPreconditioner : public IBTK::FACPreconditioner
 {
 public:
     /*!
      * Constructor.
      */
     FullFACPreconditioner(std::string object_name,
-                          SAMRAI::tbox::Pointer<FACPreconditionerStrategy> fac_strategy,
+                          SAMRAI::tbox::Pointer<IBTK::FACPreconditionerStrategy> fac_strategy,
                           SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
                           const std::string& default_options_prefix);
 
