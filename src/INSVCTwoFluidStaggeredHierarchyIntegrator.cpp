@@ -165,6 +165,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
     d_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::us_sc");
 
+    // Arbitrarily set the base class velocity variable to the solvent variable. Note this is required for the base
+    // class to compute the CFL number.
+    d_U_var = d_us_sc_var;
+
     // As of the moment, we DO NOT account for advection in the momentum equation. To account for this in the number of
     // cycles, we set d_creeping_flow = true.
     d_creeping_flow = true;
@@ -956,11 +960,11 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 } // preprocessIntegrateHierarchy
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double current_time,
-                                                              const double new_time,
-                                                              const int cycle_num)
+INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const double current_time,
+                                                                         const double new_time,
+                                                                         const int cycle_num)
 {
-    INSHierarchyIntegrator::integrateHierarchy(current_time, new_time, cycle_num);
+    INSHierarchyIntegrator::integrateHierarchySpecialized(current_time, new_time, cycle_num);
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_new_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getNewContext());
     const int us_new_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getNewContext());
@@ -1062,8 +1066,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy(const double curre
         }
     }
 
-    // Execuate any registered callbacks
-    executeIntegrateHierarchyCallbackFcns(current_time, new_time, cycle_num);
     return;
 } // integrateHierarchy
 
