@@ -189,6 +189,31 @@ extern "C"
 }
 namespace multiphase
 {
+// Function to convert limiter to required ghost cell width
+int
+get_limiter_gcw(IBAMR::LimiterType limiter)
+{
+    switch (limiter)
+    {
+    case LimiterType::UPWIND:
+        return 2;
+        break;
+    case LimiterType::CUI:
+    case LimiterType::FBICS:
+    case LimiterType::MGAMMA:
+        return 3;
+        break;
+    case LimiterType::PPM:
+        return 4;
+        break;
+    default:
+        TBOX_ERROR("Limiter type " << IBAMR::enum_to_string(limiter) << " not supported!\n");
+        break;
+    }
+    // Should not reach this statement.
+    return -1;
+}
+
 INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string object_name,
                                                                Pointer<PatchHierarchy<NDIM>> hierarchy,
                                                                Pointer<Database> input_db)
@@ -199,18 +224,37 @@ INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string objec
       d_N0_var(new SideVariable<NDIM, double>(d_object_name + "::N0_var")),
       d_hier_sc_data_ops(hierarchy)
 {
+    d_limiter = IBAMR::string_to_enum<IBAMR::LimiterType>(input_db->getString("limiter_type"));
+    commonConstructor();
+}
+
+INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string object_name,
+                                                               Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                                               std::string limiter_type)
+    : d_object_name(std::move(object_name)),
+      d_hierarchy(hierarchy),
+      d_mom_var(new SideVariable<NDIM, double>(d_object_name + "::Mom_var")),
+      d_N_var(new SideVariable<NDIM, double>(d_object_name + "::N_var")),
+      d_N0_var(new SideVariable<NDIM, double>(d_object_name + "::N0_var")),
+      d_hier_sc_data_ops(hierarchy),
+      d_limiter(std::move(limiter_type))
+{
+    commonConstructor();
+}
+
+void
+INSVCTwoFluidConvectiveManager::commonConstructor()
+{
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     Pointer<VariableContext> network_ctx = var_db->getContext(d_object_name + "::NetworkCTX");
     Pointer<VariableContext> solvent_ctx = var_db->getContext(d_object_name + "::SolventCTX");
-    static const int one_gcw = 3;
-    d_mom_un_idx = var_db->registerVariableAndContext(d_mom_var, network_ctx, one_gcw);
-    d_mom_us_idx = var_db->registerVariableAndContext(d_mom_var, solvent_ctx, one_gcw);
+    const int gcw = get_limiter_gcw(d_limiter);
+    d_mom_un_idx = var_db->registerVariableAndContext(d_mom_var, network_ctx, gcw);
+    d_mom_us_idx = var_db->registerVariableAndContext(d_mom_var, solvent_ctx, gcw);
     d_N_un_idx = var_db->registerVariableAndContext(d_N_var, network_ctx);
     d_N_us_idx = var_db->registerVariableAndContext(d_N_var, solvent_ctx);
     d_N0_un_idx = var_db->registerVariableAndContext(d_N0_var, network_ctx);
     d_N0_us_idx = var_db->registerVariableAndContext(d_N0_var, solvent_ctx);
-
-    d_limiter = IBAMR::string_to_enum<IBAMR::LimiterType>(input_db->getString("limiter_type"));
 }
 
 INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
@@ -322,7 +366,6 @@ std::pair<int, int>
 INSVCTwoFluidConvectiveManager::getConvectiveIndices() const
 {
     return std::make_pair(d_N_un_idx, d_N_us_idx);
-    ;
 }
 
 bool
@@ -617,38 +660,6 @@ INSVCTwoFluidConvectiveManager::interpolateToSides(
                                             interp_data[1]->getPointer(0),
                                             interp_data[1]->getPointer(1));
         break;
-        //    case PPM:
-        //        for (unsigned int axis = 0; axis < NDIM; ++axis)
-        //        {
-        //            Pointer<SideData<NDIM, double> > dQ_data =
-        //                new SideData<NDIM, double>(Q_data->getBox(), Q_data->getDepth(), Q_data->getGhostCellWidth());
-        //            Pointer<SideData<NDIM, double> > Q_L_data =
-        //                new SideData<NDIM, double>(Q_data->getBox(), Q_data->getDepth(), Q_data->getGhostCellWidth());
-        //            Pointer<SideData<NDIM, double> > Q_R_data =
-        //                new SideData<NDIM, double>(Q_data->getBox(), Q_data->getDepth(), Q_data->getGhostCellWidth());
-        //            Pointer<SideData<NDIM, double> > Q_scratch1_data =
-        //                new SideData<NDIM, double>(Q_data->getBox(), Q_data->getDepth(), Q_data->getGhostCellWidth());
-        //            GODUNOV_EXTRAPOLATE_FC(side_boxes[axis].lower(0),
-        //                                   side_boxes[axis].upper(0),
-        //                                   side_boxes[axis].lower(1),
-        //                                   side_boxes[axis].upper(1),
-        //                                   Q_data->getGhostCellWidth()(0),
-        //                                   Q_data->getGhostCellWidth()(1),
-        //                                   Q_data->getPointer(axis),
-        //                                   Q_scratch1_data->getPointer(axis),
-        //                                   dQ_data->getPointer(axis),
-        //                                   Q_L_data->getPointer(axis),
-        //                                   Q_R_data->getPointer(axis),
-        //                                   U_adv_data[axis]->getGhostCellWidth()(0),
-        //                                   U_adv_data[axis]->getGhostCellWidth()(1),
-        //                                   Q_half_data[axis]->getGhostCellWidth()(0),
-        //                                   Q_half_data[axis]->getGhostCellWidth()(1),
-        //                                   U_adv_data[axis]->getPointer(0),
-        //                                   U_adv_data[axis]->getPointer(1),
-        //                                   Q_half_data[axis]->getPointer(0),
-        //                                   Q_half_data[axis]->getPointer(1));
-        //        }
-        //        break;
     default:
         TBOX_ERROR("Unknown limiter " << IBAMR::enum_to_string(limiter) << "\n");
     }
