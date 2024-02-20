@@ -53,7 +53,6 @@ main(int argc, char* argv[])
         Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
             "FluidSolver",
             app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-            grid_geometry,
             false);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
