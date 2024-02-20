@@ -12,7 +12,7 @@
 
 CFMultiphaseOldroydB::CFMultiphaseOldroydB(std::string object_name,
                                            Pointer<CellVariable<NDIM, double>> thn_var,
-                                           Pointer<HierarchyIntegrator> thn_integrator,
+                                           Pointer<AdvDiffHierarchyIntegrator> thn_integrator,
                                            Pointer<Database> input_db)
     : CFStrategy(std::move(object_name)), d_thn_var(thn_var), d_thn_integrator(thn_integrator)
 {
@@ -78,6 +78,19 @@ CFMultiphaseOldroydB::computeStress(const int sig_idx,
     else
         hier_cc_data_ops.copyData(thn_scr_idx, thn_cur_idx);
 
+    // Fill thn ghost cells
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_cell_comp{ ITC(thn_scr_idx,
+                                          "CONSERVATIVE_LINEAR_REFINE",
+                                          true,
+                                          "NONE",
+                                          "LINEAR",
+                                          true,
+                                          d_thn_integrator->getPhysicalBcCoefs(d_thn_var)) };
+    HierarchyGhostCellInterpolation ghost_cell_fill;
+    ghost_cell_fill.initializeOperatorState(ghost_cell_comp, hierarchy, coarsest_ln, finest_ln);
+    ghost_cell_fill.fillData(data_time);
+
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
@@ -91,7 +104,9 @@ CFMultiphaseOldroydB::computeStress(const int sig_idx,
             TBOX_ASSERT(C_data);
             TBOX_ASSERT(thn_data);
 #endif
-            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
+            // Note we only need to fill in one level of ghost cells.
+            // For some reason C_data has a width of three ghost cells, so we use thn_data.
+            for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
             {
                 const CellIndex<NDIM>& idx = ci();
                 // Convert conformation to stress in place.

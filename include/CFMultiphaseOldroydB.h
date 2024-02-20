@@ -17,7 +17,7 @@ public:
      */
     CFMultiphaseOldroydB(std::string object_name,
                          SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> thn_var,
-                         SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> thn_integrator,
+                         SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> thn_integrator,
                          SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     /*!
@@ -40,7 +40,7 @@ public:
 
 private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_var;
-    SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> d_thn_integrator;
+    SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
     double d_relaxation_time = std::numeric_limits<double>::quiet_NaN();
     double d_viscosity = std::numeric_limits<double>::quiet_NaN();
 };
