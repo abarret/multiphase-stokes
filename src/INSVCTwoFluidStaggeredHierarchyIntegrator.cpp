@@ -1,17 +1,10 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2014 - 2022 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 /////////////////////////////// INCLUDES /////////////////////////////////////
+
+#include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/utility_functions.h"
 
 #include "ibamr/AdvDiffHierarchyIntegrator.h"
 #include "ibamr/ConvectiveOperator.h"
@@ -114,16 +107,9 @@
 #include <utility>
 #include <vector>
 
-// Local includes
-#include "FullFACPreconditioner.h"
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
-#include "utility_functions.h"
-
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
@@ -150,7 +136,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
 {
     if (input_db->keyExists("viscous_time_stepping_type"))
         d_viscous_time_stepping_type =
-            string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
+            IBAMR::string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
     if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
     if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
@@ -177,7 +163,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
     if (d_viscous_time_stepping_type != TimeSteppingType::BACKWARD_EULER &&
         d_viscous_time_stepping_type != TimeSteppingType::TRAPEZOIDAL_RULE)
         TBOX_ERROR(d_object_name + ": Viscous time step type " +
-                   enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
+                   IBAMR::enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
                    " not valid. Must use BACKWARD_EULER or TRAPEZOIDAL_RULE");
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
@@ -825,7 +811,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         break;
 
     default:
-        TBOX_ERROR("Unknown time stepping type " + enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
+        TBOX_ERROR("Unknown time stepping type " +
+                   IBAMR::enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
                    ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
 

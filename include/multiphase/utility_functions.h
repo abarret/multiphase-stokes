@@ -1,5 +1,5 @@
-#ifndef included_utility_functions
-#define included_utility_functions
+#ifndef included_multiphase_utility_functions
+#define included_multiphase_utility_functions
 
 #include <CellData.h>
 #include <FaceData.h>
@@ -8,7 +8,7 @@
 #include <PatchLevel.h>
 #include <SideData.h>
 
-namespace IBAMR
+namespace multiphase
 {
 
 inline double
@@ -135,5 +135,5 @@ multiply_sc_and_ths(const int dst_idx, const int sc_idx, const int thn_idx, Poin
         }
     }
 }
-} // namespace IBAMR
+} // namespace multiphase
 #endif
