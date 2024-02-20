@@ -20,13 +20,6 @@
 
 #include <string>
 
-/////////////////////////////// FORWARD DECLARATIONS /////////////////////////
-
-namespace IBTK
-{
-class FACPreconditionerStrategy;
-} // namespace IBTK
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
 namespace multiphase
