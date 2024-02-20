@@ -21,6 +21,10 @@ public:
                                    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
                                    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
+    INSVCTwoFluidConvectiveManager(std::string object_name,
+                                   SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                                   std::string limiter_type);
+
     ~INSVCTwoFluidConvectiveManager();
 
     /*!
@@ -54,6 +58,8 @@ public:
     std::pair<int, int> getConvectiveIndices() const;
 
 private:
+    void commonConstructor();
+
     void allocateData(double time, int thn);
 
     bool getIsAllocated() const;
