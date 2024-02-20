@@ -6,6 +6,8 @@
 #include <ibtk/HierarchyIntegrator.h>
 #include <ibtk/ibtk_utilities.h>
 
+namespace multiphase
+{
 /*!
  * \brief Method to initialize the value of the advected scalar Q.
  */
@@ -44,5 +46,5 @@ private:
     double d_relaxation_time = std::numeric_limits<double>::quiet_NaN();
     double d_viscosity = std::numeric_limits<double>::quiet_NaN();
 };
-
+} // namespace multiphase
 #endif // #ifndef included_CFMultiphaseOldroydB

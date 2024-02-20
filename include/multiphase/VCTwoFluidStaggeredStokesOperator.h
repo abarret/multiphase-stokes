@@ -1,20 +1,5 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2014 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
-/////////////////////////////// INCLUDE GUARD ////////////////////////////////
-
-#ifndef included_IBAMR_StaggeredStokesOperator
-#define included_IBAMR_StaggeredStokesOperator
+#ifndef included_multiphase_StaggeredStokesOperator
+#define included_multiphase_StaggeredStokesOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -48,7 +33,7 @@ class RobinBcCoefStrategy;
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /*!
  * \brief Class StaggeredStokesOperator is a concrete IBTK::LinearOperator which
@@ -330,7 +315,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     int d_thn_cc_idx = IBTK::invalid_index;
 };
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

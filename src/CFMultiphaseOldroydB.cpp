@@ -1,3 +1,5 @@
+#include "multiphase/CFMultiphaseOldroydB.h"
+
 #include <ibamr/app_namespaces.h>
 
 #include <ibtk/HierarchyGhostCellInterpolation.h>
@@ -7,9 +9,8 @@
 
 #include <array>
 
-// Local includes
-#include "CFMultiphaseOldroydB.h"
-
+namespace multiphase
+{
 CFMultiphaseOldroydB::CFMultiphaseOldroydB(std::string object_name,
                                            Pointer<CellVariable<NDIM, double>> thn_var,
                                            Pointer<AdvDiffHierarchyIntegrator> thn_integrator,
@@ -121,4 +122,5 @@ CFMultiphaseOldroydB::computeStress(const int sig_idx,
     if (deallocate_after) d_thn_integrator->deallocatePatchData(thn_scr_idx, coarsest_ln, finest_ln);
 }
 
+} // namespace multiphase
 //////////////////////////////////////////////////////////////////////////////

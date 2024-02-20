@@ -1,20 +1,5 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2015 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
-/////////////////////////////// INCLUDE GUARD ////////////////////////////////
-
-#ifndef included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
-#define included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#ifndef included_multiphase_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#define included_multiphase_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -40,9 +25,9 @@
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBTK
+namespace multiphase
 {
-class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public FACPreconditionerStrategy
+class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:
     /*!
@@ -231,7 +216,8 @@ private:
     /*
      * Level solvers and solver parameters.
      */
-    std::string d_level_solver_type = CCPoissonSolverManager::PETSC_LEVEL_SOLVER, d_level_solver_default_options_prefix;
+    std::string d_level_solver_type = IBTK::CCPoissonSolverManager::PETSC_LEVEL_SOLVER,
+                d_level_solver_default_options_prefix;
     double d_level_solver_abs_residual_tol = 1.0e-50, d_level_solver_rel_residual_tol = 1.0e-5;
     int d_level_solver_max_iterations = 1;
     std::vector<SAMRAI::tbox::Pointer<PoissonSolver>> d_level_solvers;
@@ -240,7 +226,7 @@ private:
     /*
      * Coarse level solvers and solver parameters.
      */
-    SAMRAI::tbox::Pointer<PoissonSolver> d_coarse_solver;
+    SAMRAI::tbox::Pointer<IBTK::PoissonSolver> d_coarse_solver;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_coarse_solver_db;
 
     /*
@@ -251,7 +237,7 @@ private:
     /*
      * Coarse-fine interface interpolation objects.
      */
-    SAMRAI::tbox::Pointer<CoarseFineBoundaryRefinePatchStrategy> d_sc_bdry_op, d_cc_bdry_op;
+    SAMRAI::tbox::Pointer<IBTK::CoarseFineBoundaryRefinePatchStrategy> d_sc_bdry_op, d_cc_bdry_op;
 
     // Cache the prolongation and restriction schedules. Note we also cache the algorithms so that we can reset the
     // schedules to their previous state.
@@ -288,7 +274,7 @@ private:
     std::vector<std::vector<std::array<SAMRAI::hier::BoxList<NDIM>, NDIM>>> d_patch_side_bc_box_overlap;
     std::vector<std::vector<SAMRAI::hier::BoxList<NDIM>>> d_patch_cell_bc_box_overlap;
 };
-} // namespace IBTK
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

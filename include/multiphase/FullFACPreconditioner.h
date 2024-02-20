@@ -1,20 +1,5 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2011 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
-/////////////////////////////// INCLUDE GUARD ////////////////////////////////
-
-#ifndef included_FullFACPreconditioner
-#define included_FullFACPreconditioner
+#ifndef included_multiphase_FullFACPreconditioner
+#define included_multiphase_FullFACPreconditioner
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -44,7 +29,7 @@ class FACPreconditionerStrategy;
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBTK
+namespace multiphase
 {
 /*!
  * \brief Class FACPreconditioner is a concrete LinearSolver for implementing
@@ -248,7 +233,7 @@ private:
 
     std::set<int> d_allocated_idxs;
 };
-} // namespace IBTK
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 

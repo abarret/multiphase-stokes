@@ -1,15 +1,7 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2017 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
+#include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -35,11 +27,7 @@
 
 #include <chrono>
 
-// Local includes
-#include "FullFACPreconditioner.h"
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
-#include "utility_functions.h"
+using namespace multiphase;
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *

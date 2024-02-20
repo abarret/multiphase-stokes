@@ -1,24 +1,13 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2008 - 2022 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
-/////////////////////////////// INCLUDE GUARD ////////////////////////////////
-
-#ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
-#define included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
+#ifndef included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
+#define included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include <ibamr/config.h>
+
+#include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
 
 #include "ibamr/INSHierarchyIntegrator.h"
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
@@ -43,20 +32,15 @@
 #include <string>
 #include <vector>
 
-// Local includes
-#include "FullFACPreconditioner.h"
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /*!
  * \brief Class INSVCTwoFluidStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
  */
-class INSVCTwoFluidStaggeredHierarchyIntegrator : public INSHierarchyIntegrator
+class INSVCTwoFluidStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
 {
 public:
     /*!
@@ -81,7 +65,7 @@ public:
     /*!
      * Non-zero Reynolds numbers are not implemented. Returns nullptr.
      */
-    SAMRAI::tbox::Pointer<ConvectiveOperator> getConvectiveOperator() override;
+    SAMRAI::tbox::Pointer<IBAMR::ConvectiveOperator> getConvectiveOperator() override;
 
     /*!
      * Not in use. Returns nullptr.
@@ -313,7 +297,7 @@ private:
      * Preconditioner information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
-    SAMRAI::tbox::Pointer<IBTK::FullFACPreconditioner> d_stokes_precond;
+    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
     SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;
@@ -344,7 +328,7 @@ private:
 
     bool d_make_div_rhs_sum_to_zero = true;
 };
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 
