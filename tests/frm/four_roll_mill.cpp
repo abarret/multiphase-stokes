@@ -66,7 +66,6 @@ main(int argc, char* argv[])
         Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
             "FluidSolver",
             app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-            grid_geometry,
             true /*register_for_restart*/);
 
         Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator =

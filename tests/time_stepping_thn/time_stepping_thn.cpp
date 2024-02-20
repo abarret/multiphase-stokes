@@ -134,7 +134,6 @@ main(int argc, char* argv[])
         Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
             "FluidSolver",
             app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-            grid_geometry,
             false);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
@@ -157,6 +156,10 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
+
+        // We are using periodic conditions, so register some dummy coefficients.
+        std::vector<RobinBcCoefStrategy<NDIM>*> u_bc_coefs(NDIM, nullptr);
+        ins_integrator->registerPhysicalBoundaryConditions(u_bc_coefs, u_bc_coefs);
 
         bool using_var_xi = input_db->getBool("USING_VAR_XI");
         const double xi = input_db->getDouble("XI");
