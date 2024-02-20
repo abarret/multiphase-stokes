@@ -54,7 +54,6 @@ public:
     MultiphaseStaggeredHierarchyIntegrator(
         std::string object_name,
         SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-        SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianGridGeometry<NDIM>> grid_geometry,
         bool register_for_restart = true);
 
     /*!
@@ -97,6 +96,16 @@ public:
     inline SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> getNetworkVolumeFractionVariable() const
     {
         return d_thn_cc_var;
+    }
+
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> getNetworkBodyForceVariable() const
+    {
+        return d_f_un_sc_var;
+    }
+
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> getSolventBodyForceVariable() const
+    {
+        return d_f_us_sc_var;
     }
 
     /*!
@@ -160,6 +169,12 @@ public:
      */
     void setForcingFunctionsScaled(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
                                    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
+
+    /*!
+     * Register forcing functions that should be scaled by both volume fractions.
+     */
+    void setForcingFunctionsScaledByBoth(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
+                                         SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
 
     /*!
      * Register the volume fraction function. If a function is not registered, the volume fraction is advected with the
@@ -253,15 +268,13 @@ public:
 protected:
     void setupPlotDataSpecialized() override;
 
+    /*!
+     * Return the maximum time step size as determined by https://doi.org/10.1006/jcph.1998.5967
+     */
+    double getMaximumTimeStepSizeSpecialized() override;
+
 private:
     bool isVariableDrag() const;
-
-    void setThnAtHalf(int& thn_cur_idx,
-                      int& thn_new_idx,
-                      int& thn_scr_idx,
-                      double current_time,
-                      double new_time,
-                      bool start_of_ts);
 
     void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
                         double current_time,
@@ -300,8 +313,32 @@ private:
      */
     MultiphaseStaggeredHierarchyIntegrator& operator=(const MultiphaseStaggeredHierarchyIntegrator& that) = delete;
 
+    /*!
+     * \brief A helper function to set the volume fractions. Sets thn_scr_idx = 0.5 * (thn_cur_idx + thn_new_idx).
+     *
+     * If start_of_ts = true, then this function will recalculate thn at current and new times if a function is
+     * prescribed. If thn is advected, then we set thn_new_idx to thn_cur_idx.
+     */
+    void setThnAtHalf(int& thn_cur_idx,
+                      int& thn_new_idx,
+                      int& thn_scr_idx,
+                      double current_time,
+                      double new_time,
+                      bool start_of_ts = false);
+
+    /*!
+     * Adds all body forces to the provided SAMRAI vector. Assumes first component of f_vec is the network forces and
+     * the second ocmponent is the solvent forces.
+     *
+     * The volume fraction index thn_idx must have at least one layer of ghost cells to account for scaling the forces.
+     */
+    void addBodyForces(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> f_vec,
+                       double eval_time,
+                       int thn_idx);
+
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_fcn, d_f_us_ths_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_ths_fcn, d_f_us_thn_ths_fcn;
 
     // CartGridFunctions that set the initial values for state variables.
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn, d_thn_init_fcn;
@@ -403,6 +440,12 @@ private:
     // Variable drag coefficient.
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
+
+    bool d_use_accel_ts = false;
+    double d_accel_ts_safety_fac = 0.1;
+
+    // Dummy boundary condition objects
+    std::vector<std::unique_ptr<SAMRAI::solv::LocationIndexRobinBcCoefs<NDIM>>> d_dummy_bcs;
 };
 } // namespace multiphase
 
