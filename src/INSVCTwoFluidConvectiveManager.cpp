@@ -214,15 +214,26 @@ get_limiter_gcw(IBAMR::LimiterType limiter)
     return -1;
 }
 
+template <typename VarType>
+Pointer<VarType>
+get_var(const std::string& var_name)
+{
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    Pointer<VarType> var;
+    if (var_db->checkVariableExists(var_name))
+        var = var_db->getVariable(var_name);
+    else
+        var = new VarType(var_name);
+    return var;
+}
+
 INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string object_name,
                                                                Pointer<PatchHierarchy<NDIM>> hierarchy,
                                                                Pointer<Database> input_db)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
-      d_mom_var(new SideVariable<NDIM, double>(d_object_name + "::Mom_var")),
-      d_N_var(new SideVariable<NDIM, double>(d_object_name + "::N_var")),
-      d_N0_var(new SideVariable<NDIM, double>(d_object_name + "::N0_var")),
-      d_hier_sc_data_ops(hierarchy)
+      d_hier_sc_data_ops(hierarchy),
+      d_hier_cc_data_ops(hierarchy)
 {
     d_limiter = IBAMR::string_to_enum<IBAMR::LimiterType>(input_db->getString("limiter_type"));
     commonConstructor();
@@ -230,14 +241,12 @@ INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string objec
 
 INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string object_name,
                                                                Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                                               std::string limiter_type)
+                                                               LimiterType limiter_type)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
-      d_mom_var(new SideVariable<NDIM, double>(d_object_name + "::Mom_var")),
-      d_N_var(new SideVariable<NDIM, double>(d_object_name + "::N_var")),
-      d_N0_var(new SideVariable<NDIM, double>(d_object_name + "::N0_var")),
       d_hier_sc_data_ops(hierarchy),
-      d_limiter(std::move(limiter_type))
+      d_hier_cc_data_ops(hierarchy),
+      d_limiter(limiter_type)
 {
     commonConstructor();
 }
@@ -249,12 +258,25 @@ INSVCTwoFluidConvectiveManager::commonConstructor()
     Pointer<VariableContext> network_ctx = var_db->getContext(d_object_name + "::NetworkCTX");
     Pointer<VariableContext> solvent_ctx = var_db->getContext(d_object_name + "::SolventCTX");
     const int gcw = get_limiter_gcw(d_limiter);
+    static const IntVector<NDIM> one_gcw = 1;
+
+    // Grab the variables.
+    d_mom_var = get_var<SideVariable<NDIM, double>>(d_object_name + "::Mom_var");
+    d_N_var = get_var<SideVariable<NDIM, double>>(d_object_name + "::N_var");
+    d_N0_var = get_var<SideVariable<NDIM, double>>(d_object_name + "::N0_var");
+    d_U_var = get_var<SideVariable<NDIM, double>>(d_object_name + "::U_var");
+    d_thn_var = get_var<CellVariable<NDIM, double>>(d_object_name + "::thn_var");
+
+    // Create variable indices
     d_mom_un_idx = var_db->registerVariableAndContext(d_mom_var, network_ctx, gcw);
     d_mom_us_idx = var_db->registerVariableAndContext(d_mom_var, solvent_ctx, gcw);
     d_N_un_idx = var_db->registerVariableAndContext(d_N_var, network_ctx);
     d_N_us_idx = var_db->registerVariableAndContext(d_N_var, solvent_ctx);
     d_N0_un_idx = var_db->registerVariableAndContext(d_N0_var, network_ctx);
     d_N0_us_idx = var_db->registerVariableAndContext(d_N0_var, solvent_ctx);
+    d_un_scr_idx = var_db->registerVariableAndContext(d_U_var, network_ctx, one_gcw);
+    d_us_scr_idx = var_db->registerVariableAndContext(d_U_var, solvent_ctx, one_gcw);
+    d_thn_scr_idx = var_db->registerVariableAndContext(d_thn_var, network_ctx, one_gcw);
 }
 
 INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
@@ -262,7 +284,8 @@ INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
     if (getIsAllocated()) deallocateData();
     // Remove patch indices from variable database
     auto var_db = VariableDatabase<NDIM>::getDatabase();
-    std::array<int, 6> idxs{ d_mom_un_idx, d_mom_us_idx, d_N_un_idx, d_N_us_idx, d_N0_un_idx, d_N0_us_idx };
+    std::array<int, 9> idxs{ d_mom_un_idx, d_mom_us_idx, d_N_un_idx,   d_N_us_idx,   d_N0_un_idx,
+                             d_N0_us_idx,  d_un_scr_idx, d_us_scr_idx, d_thn_scr_idx };
     for (const auto& idx : idxs) var_db->removePatchDataIndex(idx);
 }
 
@@ -271,32 +294,55 @@ INSVCTwoFluidConvectiveManager::deallocateData()
 {
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    deallocate_patch_data({ d_mom_un_idx, d_mom_us_idx, d_N_un_idx, d_N_us_idx, d_N0_un_idx, d_N0_us_idx },
+    deallocate_patch_data({ d_mom_un_idx,
+                            d_mom_us_idx,
+                            d_N_un_idx,
+                            d_N_us_idx,
+                            d_N0_un_idx,
+                            d_N0_us_idx,
+                            d_un_scr_idx,
+                            d_us_scr_idx,
+                            d_thn_scr_idx },
                           d_hierarchy,
                           coarsest_ln,
                           finest_ln);
 
     d_thn_ghost_fill.deallocateOperatorState();
     d_mom_ghost_fill.deallocateOperatorState();
+    d_u_ghost_fill.deallocateOperatorState();
 
     d_is_allocated = false;
 }
 
 void
-INSVCTwoFluidConvectiveManager::allocateData(const double time, const int thn_idx)
+INSVCTwoFluidConvectiveManager::resetData()
+{
+    d_is_initial_approximation_filled = false;
+}
+
+void
+INSVCTwoFluidConvectiveManager::allocateData(const double time)
 {
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
     if (!getIsAllocated())
     {
-        allocate_patch_data({ d_mom_un_idx, d_mom_us_idx, d_N_un_idx, d_N_us_idx, d_N0_un_idx, d_N0_us_idx },
+        allocate_patch_data({ d_mom_un_idx,
+                              d_mom_us_idx,
+                              d_N_un_idx,
+                              d_N_us_idx,
+                              d_N0_un_idx,
+                              d_N0_us_idx,
+                              d_un_scr_idx,
+                              d_us_scr_idx,
+                              d_thn_scr_idx },
                             d_hierarchy,
                             time,
                             coarsest_ln,
                             finest_ln);
 
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> thn_ghost_comp = { ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+        std::vector<ITC> thn_ghost_comp = { ITC(d_thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
         d_thn_ghost_fill.initializeOperatorState(thn_ghost_comp, d_hierarchy, coarsest_ln, finest_ln);
 
         std::vector<ITC> mom_ghost_comp = {
@@ -304,6 +350,12 @@ INSVCTwoFluidConvectiveManager::allocateData(const double time, const int thn_id
             ITC(d_mom_us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN")
         };
         d_mom_ghost_fill.initializeOperatorState(mom_ghost_comp, d_hierarchy, coarsest_ln, finest_ln);
+
+        std::vector<ITC> u_ghost_fill_itc = { ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE"),
+                                              ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+        d_u_ghost_fill.initializeOperatorState(u_ghost_fill_itc, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+
+        d_is_allocated = true;
     }
 }
 
@@ -336,7 +388,7 @@ INSVCTwoFluidConvectiveManager::approximateConvectiveOperator(IBAMR::TimeSteppin
                                                               const int us_new_idx,
                                                               const int thn_new_idx)
 {
-    allocateData(current_time, thn_cur_idx);
+    allocateData(current_time);
     switch (ts_type)
     {
     case FORWARD_EULER:
@@ -351,7 +403,9 @@ INSVCTwoFluidConvectiveManager::approximateConvectiveOperator(IBAMR::TimeSteppin
             current_time, new_time, un_cur_idx, us_cur_idx, thn_cur_idx, un_new_idx, us_new_idx, thn_new_idx);
         break;
     default:
-        TBOX_ERROR("Unknown time stepping type " << IBAMR::enum_to_string(ts_type) << "\n");
+        TBOX_ERROR("Unknown time stepping type "
+                   << IBAMR::enum_to_string(ts_type) << "\n"
+                   << "Valid options are FORWARD_EULER, TRAPEZOIDAL_RULE, or MIDPOINT_RULE.\n");
     }
 }
 
@@ -382,23 +436,20 @@ INSVCTwoFluidConvectiveManager::approximateOperator(const int dst_un_idx,
                                                     const int us_idx,
                                                     const int thn_idx)
 {
-    // Fill in ghost cells for thn. Because thn may have changed types, we need to reinitialize the ghost filling
+    // Fill in ghost cells for thn. Because thn may have changed indices, we need to reinitialize the ghost filling
     // routines.
-    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    std::vector<ITC> thn_ghost_fill_itc = { ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
-    d_thn_ghost_fill.resetTransactionComponents(thn_ghost_fill_itc);
+    d_hier_cc_data_ops.copyData(d_thn_scr_idx, thn_idx);
     d_thn_ghost_fill.fillData(eval_time);
 
-    std::vector<ITC> u_ghost_fill_itc = { ITC(us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE"),
-                                          ITC(un_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
-    HierarchyGhostCellInterpolation ghost_fill;
-    ghost_fill.initializeOperatorState(u_ghost_fill_itc, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-    ghost_fill.fillData(eval_time);
+    // Fill in velocity ghost cells. Needed to compute staggered control volume velocities
+    d_hier_sc_data_ops.copyData(d_un_scr_idx, un_idx);
+    d_hier_sc_data_ops.copyData(d_us_scr_idx, us_idx);
+    d_u_ghost_fill.fillData(eval_time);
 
     // Fill in N0 approximations and N approximations.
     // First find the respective momentums.
-    findNetworkMomentum(d_mom_un_idx, thn_idx, un_idx);
-    findSolventMomentum(d_mom_us_idx, thn_idx, us_idx);
+    findNetworkMomentum(d_mom_un_idx, d_thn_scr_idx, d_un_scr_idx);
+    findSolventMomentum(d_mom_us_idx, d_thn_scr_idx, d_us_scr_idx);
 
     // Fill in ghost cells for momentum. Because the indices filled in here are owned by this class, we do not need to
     // reinitialize the ghost filling routines.
@@ -414,8 +465,8 @@ INSVCTwoFluidConvectiveManager::approximateOperator(const int dst_un_idx,
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             const Box<NDIM>& patch_box = patch->getBox();
 
-            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(d_un_scr_idx);
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(d_us_scr_idx);
             Pointer<SideData<NDIM, double>> mom_un_data = patch->getPatchData(d_mom_un_idx);
             Pointer<SideData<NDIM, double>> mom_us_data = patch->getPatchData(d_mom_us_idx);
             Pointer<SideData<NDIM, double>> N_un_data = patch->getPatchData(dst_un_idx);
@@ -456,11 +507,56 @@ INSVCTwoFluidConvectiveManager::approximateForwardEuler(const double current_tim
                                                         const int us_cur_idx,
                                                         const int thn_cur_idx)
 {
+    // We only recompute ForwardEuler if we haven't performed it yet this time step.
+    if (d_is_initial_approximation_filled) return;
     approximateOperator(d_N_un_idx, d_N_us_idx, current_time, un_cur_idx, us_cur_idx, thn_cur_idx);
 
     // Now copy the data to N0.
     d_hier_sc_data_ops.copyData(d_N0_un_idx, d_N_un_idx);
     d_hier_sc_data_ops.copyData(d_N0_us_idx, d_N_us_idx);
+}
+
+void
+INSVCTwoFluidConvectiveManager::approximateTrapezoidalRule(const double current_time,
+                                                           const double new_time,
+                                                           const int un_cur_idx,
+                                                           const int us_cur_idx,
+                                                           const int thn_cur_idx,
+                                                           const int un_new_idx,
+                                                           const int us_new_idx,
+                                                           const int thn_new_idx)
+{
+    // First approximate using forward euler
+    approximateForwardEuler(current_time, new_time, un_cur_idx, us_cur_idx, thn_cur_idx);
+
+    // Now compute approximate at end time
+    approximateOperator(d_N_un_idx, d_N_us_idx, new_time, un_new_idx, us_new_idx, thn_new_idx);
+
+    // Now average N and N0
+    d_hier_sc_data_ops.linearSum(d_N_un_idx, 0.5, d_N_un_idx, 0.5, d_N0_un_idx);
+    d_hier_sc_data_ops.linearSum(d_N_us_idx, 0.5, d_N_us_idx, 0.5, d_N0_us_idx);
+}
+
+void
+INSVCTwoFluidConvectiveManager::approximateMidpointRule(const double current_time,
+                                                        const double new_time,
+                                                        const int un_cur_idx,
+                                                        const int us_cur_idx,
+                                                        const int thn_cur_idx,
+                                                        const int un_new_idx,
+                                                        const int us_new_idx,
+                                                        const int thn_new_idx)
+{
+    double half_time = 0.5 * (current_time + new_time);
+    // First compute "half" values
+    d_hier_sc_data_ops.linearSum(d_un_scr_idx, 0.5, un_cur_idx, 0.5, un_new_idx);
+    d_hier_sc_data_ops.linearSum(d_us_scr_idx, 0.5, us_cur_idx, 0.5, us_new_idx);
+    d_hier_cc_data_ops.linearSum(d_thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
+
+    // Now approximate operator
+    approximateOperator(d_N_un_idx, d_N_us_idx, half_time, d_un_scr_idx, d_us_scr_idx, d_thn_scr_idx);
+
+    // Note that N0 does not have a value!
 }
 
 void

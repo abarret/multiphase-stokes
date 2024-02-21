@@ -6,6 +6,7 @@
 #include <ibamr/config.h>
 
 #include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/INSVCTwoFluidConvectiveManager.h"
 #include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
 
@@ -148,8 +149,13 @@ public:
     /*!
      * Sets that the network volume fraction should be advected with the specified advection diffusion integrator. Also
      * registers the integrator with the hierarchy.
+     *
+     * The optional input has_meaningful_mid_value should be set to false if there is no meaningful "new" time value
+     * after a single evolution. In particular, this should be set to false if using semi-Lagrangian methods to evolve
+     * the volume fraction.
      */
-    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator);
+    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator,
+                                     bool has_meaningful_mid_value = true);
 
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
@@ -216,10 +222,30 @@ public:
                                           bool initial_time,
                                           bool uses_richardson_extrapolation_too);
 
+    void regridHierarchyBeginSpecialized() override;
+    void initializeCompositeHierarchyDataSpecialized(double init_data_time, bool initial_time) override;
+
 protected:
     void setupPlotDataSpecialized() override;
 
 private:
+    void setThnAtHalf(int& thn_cur_idx,
+                      int& thn_new_idx,
+                      int& thn_scr_idx,
+                      double current_time,
+                      double new_time,
+                      bool start_of_ts);
+
+    void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
+                        double current_time,
+                        double new_time,
+                        int un_cur_idx,
+                        int us_cur_idx,
+                        int thn_cur_idx,
+                        int un_new_idx,
+                        int us_new_idx,
+                        int thn_new_idx);
+
     /*!
      * \brief Default constructor.
      *
@@ -328,6 +354,23 @@ private:
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
 
     bool d_make_div_rhs_sum_to_zero = true;
+
+    /*!
+     * Convective operator
+     */
+    std::unique_ptr<INSVCTwoFluidConvectiveManager> d_convec_op;
+    IBAMR::LimiterType d_convec_limiter_type = IBAMR::LimiterType::UNKNOWN_LIMITER_TYPE;
+
+    /*!
+     * AB2 patch index for convective operator
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_Nn_old_var, d_Ns_old_var;
+
+    // Scratch force index
+    int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
+
+    // Flag for if volume fraction has a meaningful value in middle of time step.
+    bool d_use_new_thn = true;
 };
 } // namespace multiphase
 
