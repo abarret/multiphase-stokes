@@ -217,7 +217,7 @@ main(int argc, char* argv[])
                                                 us_idx,
                                                 thn_idx,
                                                 un_idx,
-                                                un_idx,
+                                                us_idx,
                                                 thn_idx);
 
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
