@@ -548,14 +548,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
 
         d_visit_writer->registerPlotQuantity("Div", "SCALAR", div_draw_idx, 0, 1.0, "CELL");
 
-        d_visit_writer->registerPlotQuantity("Fn", "VECTOR", fn_draw_idx, 0, 1.0, "NODE");
-        for (int d = 0; d < NDIM; ++d)
-            d_visit_writer->registerPlotQuantity("Fn_" + std::to_string(d), "SCALAR", fn_draw_idx, d, 1.0, "CELL");
-
-        d_visit_writer->registerPlotQuantity("Fs", "VECTOR", fs_draw_idx, 0, 1.0, "NODE");
-        for (int d = 0; d < NDIM; ++d)
-            d_visit_writer->registerPlotQuantity("Fs_" + std::to_string(d), "SCALAR", fs_draw_idx, d, 1.0, "CELL");
-
         // Only need to plot this variable if we aren't advecting it.
         // If we do advect theta, the advection integrator will plot it.
         if (d_thn_fcn) d_visit_writer->registerPlotQuantity("Thn", "SCALAR", thn_cur_idx, 0, 1.0, "CELL");

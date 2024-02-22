@@ -41,7 +41,6 @@ IBTK_ENABLE_EXTRA_WARNINGS
 #include <utility>
 #include <vector>
 
-// Local includes
 #include "multiphase/IBMultiphaseCrossLinks.h"
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
@@ -69,7 +68,7 @@ IBMultiphaseCrossLinks::IBMultiphaseCrossLinks(Pointer<IBMethod> ibn_ops,
 } // IBMultiphaseCrossLinks
 
 void
-IBMultiphaseCrossLinks::doComputeLagrangianForce(const double time, TimePoint time_pt)
+IBMultiphaseCrossLinks::doComputeLagrangianForce(const double time, IBTK::TimePoint time_pt)
 {
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
@@ -88,15 +87,15 @@ IBMultiphaseCrossLinks::doComputeLagrangianForce(const double time, TimePoint ti
     std::vector<Pointer<LData>>* Xn_data;
     std::vector<Pointer<LData>>* Un_data;
     bool* Xn_needs_ghost_fill;
-    d_ibn_ops->getPositionData(&Xn_data, &Xn_needs_ghost_fill, time);
-    d_ibn_ops->getVelocityData(&Un_data, time);
+    d_ibn_ops->getPositionData(&Xn_data, &Xn_needs_ghost_fill, time_pt);
+    d_ibn_ops->getVelocityData(&Un_data, time_pt);
 
     std::vector<Pointer<LData>>* Xs_data;
     std::vector<Pointer<LData>>* Us_data;
     bool* Xs_needs_ghost_fill;
 
-    d_ibs_ops->getPositionData(&Xs_data, &Xs_needs_ghost_fill, time);
-    d_ibs_ops->getVelocityData(&Us_data, time);
+    d_ibs_ops->getPositionData(&Xs_data, &Xs_needs_ghost_fill, time_pt);
+    d_ibs_ops->getVelocityData(&Us_data, time_pt);
 
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
     {
@@ -115,14 +114,14 @@ IBMultiphaseCrossLinks::doSpreadForce(const int f_data_idx,
                                       const std::vector<Pointer<RefineSchedule<NDIM>>>& f_prolongation_scheds,
                                       const double data_time,
                                       const bool spread_network,
-                                      TimePoint time_pt)
+                                      IBTK::TimePoint time_pt)
 {
     std::vector<Pointer<LData>>* X_data;
     bool* X_needs_ghost_fill;
     static bool F_needs_ghost_fill = true;
     if (spread_network)
     {
-        d_ibn_ops->getPositionData(&X_data, &X_needs_ghost_fill, data_time);
+        d_ibn_ops->getPositionData(&X_data, &X_needs_ghost_fill, time_pt);
         d_ibn_ops->getLDataManager()->spread(f_data_idx,
                                              d_Fn_data,
                                              *X_data,
@@ -134,7 +133,7 @@ IBMultiphaseCrossLinks::doSpreadForce(const int f_data_idx,
     }
     else
     {
-        d_ibs_ops->getPositionData(&X_data, &X_needs_ghost_fill, data_time);
+        d_ibs_ops->getPositionData(&X_data, &X_needs_ghost_fill, time_pt);
         d_ibs_ops->getLDataManager()->spread(f_data_idx,
                                              d_Fs_data,
                                              *X_data,

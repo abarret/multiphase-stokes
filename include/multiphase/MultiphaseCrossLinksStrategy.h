@@ -6,6 +6,7 @@
 #include <ibamr/config.h>
 
 #include "ibtk/CartGridFunction.h"
+#include <ibtk/ibtk_enums.h>
 
 #include "CoarsenPatchStrategy.h"
 #include "IntVector.h"
@@ -32,13 +33,6 @@ namespace multiphase
 class MultiphaseCrossLinksStrategy : public SAMRAI::tbox::DescribedClass
 {
 public:
-    enum class TimePoint
-    {
-        CURRENT,
-        MIDPOINT,
-        NEW,
-        UNKNOWN
-    };
 
     /*!
      * \brief Constructor.
@@ -54,7 +48,7 @@ public:
      * Compute the Lagrangian force at the specified time within the current
      * time interval.
      */
-    inline virtual void computeLagrangianForce(double data_time, TimePoint time_pt)
+    inline virtual void computeLagrangianForce(double data_time, IBTK::TimePoint time_pt)
     {
         doComputeLagrangianForce(data_time, time_pt);
     }
@@ -69,13 +63,13 @@ public:
                 const std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>>& f_prolongation_scheds,
                 double data_time,
                 bool spread_network,
-                TimePoint time_pt)
+                IBTK::TimePoint time_pt)
     {
         doSpreadForce(f_data_idx, f_phys_bdry_op, f_prolongation_scheds, data_time, spread_network, time_pt);
     }
 
 private:
-    virtual void doComputeLagrangianForce(double data_time, TimePoint time_pt) = 0;
+    virtual void doComputeLagrangianForce(double data_time, IBTK::TimePoint time_pt) = 0;
 
     virtual void
     doSpreadForce(int f_data_idx,
@@ -83,7 +77,7 @@ private:
                   const std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>>& f_prolongation_scheds,
                   double data_time,
                   bool spread_network,
-                  TimePoint time_pt) = 0;
+                  IBTK::TimePoint time_pt) = 0;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
 };

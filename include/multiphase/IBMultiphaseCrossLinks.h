@@ -75,7 +75,7 @@ private:
      * Compute the Lagrangian force at the specified time within the current
      * time interval.
      */
-    virtual void doComputeLagrangianForce(double data_time, TimePoint time_pt) override;
+    virtual void doComputeLagrangianForce(double data_time, IBTK::TimePoint time_pt) override;
 
     void doComputeLagrangianForce(SAMRAI::tbox::Pointer<IBTK::LData>& Fn_data,
                                   SAMRAI::tbox::Pointer<IBTK::LData>& Fs_data,
@@ -96,13 +96,13 @@ private:
                   const std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>>& f_prolongation_scheds,
                   double data_time,
                   bool spread_network,
-                  TimePoint time_pt) override;
+                  IBTK::TimePoint time_pt) override;
 
-    void getNetworkPositionData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& X_data, TimePoint time_pt);
-    void getNetworkVelocityData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& U_data, TimePoint time_pt);
+    void getNetworkPositionData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& X_data, IBTK::TimePoint time_pt);
+    void getNetworkVelocityData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& U_data, IBTK::TimePoint time_pt);
 
-    void getSolventPositionData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& X_data, TimePoint time_pt);
-    void getSolventVelocityData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& U_data, TimePoint time_pt);
+    void getSolventPositionData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& X_data, IBTK::TimePoint time_pt);
+    void getSolventVelocityData(std::vector<SAMRAI::tbox::Pointer<IBTK::LData>>& U_data, IBTK::TimePoint time_pt);
 
     std::vector<SAMRAI::tbox::Pointer<IBTK::LData>> d_Fn_data, d_Fs_data;
 
