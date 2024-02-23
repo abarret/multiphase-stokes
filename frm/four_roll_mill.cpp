@@ -37,9 +37,8 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
+#include "CFMultiphaseOldroydB.h"
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
-#include "ScaleStress.h"
-#include "StressRelaxation.h"
 
 // Function prototypes
 void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
@@ -144,9 +143,8 @@ main(int argc, char* argv[])
         ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
 
         bool use_cf = input_db->getBool("USE_CF");
-        Pointer<CFINSForcing> cf_un_forcing;  
-        Pointer<ScaleStress> stress_scale =
-            new ScaleStress("ScaleStress", ins_integrator->getNetworkVolumeFractionVariable(), adv_diff_integrator);
+        Pointer<CFINSForcing> cf_un_forcing;
+        Pointer<CFStrategy> cf_strategy;
         if (use_cf)
         {
             Pointer<INSHierarchyIntegrator> ins_cf_integrator = ins_integrator;
@@ -156,7 +154,11 @@ main(int argc, char* argv[])
                                              grid_geometry,
                                              adv_diff_integrator,
                                              visit_data_writer);
-            cf_un_forcing->setSigmaScaleFcn(stress_scale);
+            cf_strategy = new CFMultiphaseOldroydB("CFOldroydB",
+                                                   ins_integrator->getNetworkVolumeFractionVariable(),
+                                                   adv_diff_integrator,
+                                                   input_db->getDatabase("CFINSForcing"));
+            cf_un_forcing->registerCFStrategy(cf_strategy);
             ins_integrator->setForcingFunctions(cf_un_forcing, nullptr);
         }
 
