@@ -5,6 +5,7 @@ PROJECT(MultiphaseStokes LANGUAGES C CXX Fortran)
 FIND_PACKAGE(IBAMR REQUIRED)
 
 SET(MULTIPHASE_SRC
+    src/CFMultiphaseOldroydB.cpp
     src/FullFACPreconditioner.cpp
     src/INSVCTwoFluidStaggeredHierarchyIntegrator.cpp
     src/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp

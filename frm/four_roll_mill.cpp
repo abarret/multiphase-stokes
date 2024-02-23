@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
+#include <ibamr/CFINSForcing.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
 #include <ibamr/app_namespaces.h>
@@ -36,12 +37,14 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
+#include "CFMultiphaseOldroydB.h"
 #include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 // Function prototypes
 void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                  Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+                 Pointer<CFINSForcing> conformation_tensor_handler,  
                  const int iteration_num,
                  const double loop_time,
                  const string& data_dump_dirname);
@@ -109,10 +112,13 @@ main(int argc, char* argv[])
 
         // Set up visualizations
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
-        
-        // Hierarchy data dumps
-        const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
-        const string postproc_data_dump_dirname = app_initializer->getPostProcessingDataDumpDirectory();
+
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        Pointer<CellVariable<NDIM, double>> EE_var = new CellVariable<NDIM, double>("EE", 3);
+        const int EE_idx = var_db->registerVariableAndContext(EE_var, var_db->getContext("CTX"));
+        visit_data_writer->registerPlotQuantity("EE_0", "SCALAR", EE_idx, 0);
+        visit_data_writer->registerPlotQuantity("EE_1", "SCALAR", EE_idx, 1);
+        visit_data_writer->registerPlotQuantity("EE_2", "SCALAR", EE_idx, 2);
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_init =
@@ -136,9 +142,31 @@ main(int argc, char* argv[])
             new muParserCartGridFunction("FS_FCN", app_initializer->getComponentDatabase("FS_FCN"), grid_geometry);
         ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
 
+        bool use_cf = input_db->getBool("USE_CF");
+        Pointer<CFINSForcing> cf_un_forcing;
+        Pointer<CFStrategy> cf_strategy;
+        if (use_cf)
+        {
+            Pointer<INSHierarchyIntegrator> ins_cf_integrator = ins_integrator;
+            cf_un_forcing = new CFINSForcing("CFINSForcing",
+                                             app_initializer->getComponentDatabase("CFINSForcing"),
+                                             ins_cf_integrator,
+                                             grid_geometry,
+                                             adv_diff_integrator,
+                                             visit_data_writer);
+            cf_strategy = new CFMultiphaseOldroydB("CFOldroydB",
+                                                   ins_integrator->getNetworkVolumeFractionVariable(),
+                                                   adv_diff_integrator,
+                                                   input_db->getDatabase("CFINSForcing"));
+            cf_un_forcing->registerCFStrategy(cf_strategy);
+            ins_integrator->setForcingFunctions(cf_un_forcing, nullptr);
+        }
+
         // Initialize the INS integrator
         ins_integrator->registerVisItDataWriter(visit_data_writer);
         ins_integrator->initializePatchHierarchy(patch_hierarchy, gridding_algorithm);
+
+        input_db->printClassData(plog);
 
         // Get some time stepping information.
         unsigned int iteration_num = ins_integrator->getIntegratorStep();
@@ -146,15 +174,49 @@ main(int argc, char* argv[])
         double time_end = ins_integrator->getEndTime();
         double dt = 0.0;
 
+        // Get simulation restart information
+        const bool dump_restart_data = app_initializer->dumpRestartData();
+        const int restart_dump_interval = app_initializer->getRestartDumpInterval();
+        const string restart_dump_dirname = app_initializer->getRestartDumpDirectory(); 
+
+        // Get hierarchy data dump information
+        const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
+        const int postproc_data_dump_interval = app_initializer->getPostProcessingDataDumpInterval();
+        const string postproc_data_dump_dirname = app_initializer->getPostProcessingDataDumpDirectory();
+        if (dump_postproc_data && (postproc_data_dump_interval > 0) && !postproc_data_dump_dirname.empty())
+        {
+            Utilities::recursiveMkdir(postproc_data_dump_dirname);
+        }
+
         // Visualization files info.
         double viz_dump_time_interval = input_db->getDouble("VIZ_DUMP_TIME_INTERVAL");
         double next_viz_dump_time = 0.0;
+
         // At specified intervals, write visualization files
         if (IBTK::abs_equal_eps(loop_time, next_viz_dump_time, 0.1 * dt) || loop_time >= next_viz_dump_time)
         {
             pout << "\nWriting visualization files...\n\n";
             ins_integrator->setupPlotData();
+            int coarsest_ln = 0;
+            int finest_ln = patch_hierarchy->getFinestLevelNumber();
+            const int u_cur_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                       ins_integrator->getCurrentContext());
+            const int u_scr_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                       ins_integrator->getScratchContext());
+            ins_integrator->allocatePatchData(u_scr_idx, loop_time, coarsest_ln, finest_ln);
+            ins_integrator->allocatePatchData(EE_idx, loop_time, coarsest_ln, finest_ln);
+            HierarchyMathOps hier_math_ops("HierMathOps", patch_hierarchy);
+            hier_math_ops.resetLevels(coarsest_ln, finest_ln);
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comps = { ITC(
+                u_scr_idx, u_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, nullptr) };
+            Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
+            hier_ghost_fill->initializeOperatorState(ghost_cell_comps, patch_hierarchy, coarsest_ln, finest_ln);
+            hier_math_ops.strain_rate(
+                EE_idx, EE_var, u_scr_idx, ins_integrator->getNetworkVariable(), hier_ghost_fill, loop_time);
             visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
+            ins_integrator->deallocatePatchData(u_scr_idx, coarsest_ln, finest_ln);
+            ins_integrator->deallocatePatchData(EE_idx, coarsest_ln, finest_ln);
             next_viz_dump_time += viz_dump_time_interval;
         }
         // Main time step loop
@@ -181,12 +243,44 @@ main(int argc, char* argv[])
             {
                 pout << "\nWriting visualization files...\n\n";
                 ins_integrator->setupPlotData();
+                int coarsest_ln = 0;
+                int finest_ln = patch_hierarchy->getFinestLevelNumber();
+                const int u_cur_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                           ins_integrator->getCurrentContext());
+                const int u_scr_idx = var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),
+                                                                           ins_integrator->getScratchContext());
+                ins_integrator->allocatePatchData(u_scr_idx, loop_time, coarsest_ln, finest_ln);
+                ins_integrator->allocatePatchData(EE_idx, loop_time, coarsest_ln, finest_ln);
+                HierarchyMathOps hier_math_ops("HierMathOps", patch_hierarchy);
+                hier_math_ops.resetLevels(coarsest_ln, finest_ln);
+                using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+                std::vector<ITC> ghost_cell_comps = { ITC(
+                    u_scr_idx, u_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, nullptr) };
+                Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
+                hier_ghost_fill->initializeOperatorState(ghost_cell_comps, patch_hierarchy, coarsest_ln, finest_ln);
+                hier_math_ops.strain_rate(
+                    EE_idx, EE_var, u_scr_idx, ins_integrator->getNetworkVariable(), hier_ghost_fill, loop_time);
                 visit_data_writer->writePlotData(patch_hierarchy, iteration_num, loop_time);
+                ins_integrator->deallocatePatchData(u_scr_idx, coarsest_ln, finest_ln);
+                ins_integrator->deallocatePatchData(EE_idx, coarsest_ln, finest_ln);
                 next_viz_dump_time += viz_dump_time_interval;
             }
+
+            // At specified intervals, write restart files.
+            const bool last_step = !ins_integrator->stepsRemaining();
+            if (dump_restart_data && (iteration_num % restart_dump_interval == 0 || last_step))
+            {
+                pout << "\nWriting restart files...\n\n";
+                RestartManager::getManager()->writeRestartFile(restart_dump_dirname, iteration_num);
+            }
+
+            // At specified intervals, store hierarchy data for post processing.
+            if (dump_postproc_data && (iteration_num % postproc_data_dump_interval == 0 || last_step))
+            {
+                pout << "\nWriting hierarchy data files...\n\n";
+                output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
+            }
         }
-        // At specified intervals, store hierarchy data for post processing.
-        output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, iteration_num, loop_time, postproc_data_dump_dirname);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
 
@@ -194,13 +288,14 @@ void
 output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
                  Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+                 Pointer<CFINSForcing> conformation_tensor_handler,
                  const int iteration_num,
                  const double loop_time,
                  const string& data_dump_dirname)
 {
     plog << "writing hierarchy data at iteration " << iteration_num << " to disk" << endl;
     plog << "simulation time is " << loop_time << endl;
-    string file_name = data_dump_dirname;
+    string file_name = data_dump_dirname + "/" + "hier_data_cf";
     char temp_buf[128];
     sprintf(temp_buf, ".%05d.samrai.%05d", iteration_num, IBTK_MPI::getRank());
     file_name += temp_buf;
@@ -215,7 +310,16 @@ output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
     hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(),   // Pressure
                                                         ins_integrator->getCurrentContext()));
     hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction 
-                                                        adv_diff_integrator->getCurrentContext()));                                             
+                                                        adv_diff_integrator->getCurrentContext())); 
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(conformation_tensor_handler->getVariable(),      // Conformation tensor
+                                                            adv_diff_integrator->getCurrentContext()));    
+    pout << "network variable name: " << ins_integrator->getNetworkVariable()->getName() << "\n";
+    pout << "solvent variable name: " << ins_integrator->getSolventVariable()->getName() << "\n";
+    pout << "pressure variable name: " << ins_integrator->getPressureVariable()->getName() << "\n";
+    pout << "Thn variable name: " << ins_integrator->getNetworkVolumeFractionVariable()->getName() << "\n";
+    pout << "Conformation tensor variable name: " << conformation_tensor_handler->getVariable()->getName() << "\n";
+    pout << "ins context: " << ins_integrator->getCurrentContext()->getName() << "\n";
+    pout << "ins context: " << adv_diff_integrator->getCurrentContext()->getName() << "\n";                                                                                                    
     patch_hierarchy->putToDatabase(hier_db->putDatabase("PatchHierarchy"), hier_data);
     hier_db->putDouble("loop_time", loop_time);
     hier_db->putInteger("iteration_num", iteration_num);
