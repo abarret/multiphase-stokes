@@ -137,39 +137,7 @@ protected:
         int d_ib_idx = IBTK::invalid_index;
     };
 
-    class IBMultiphaseScaledEulerianForceFunction : public IBTK::CartGridFunction
-    {
-    public:
-        IBMultiphaseScaledEulerianForceFunction(const IBMultiphaseHierarchyIntegrator* ib_solver,
-                                                int ib_idx,
-                                                bool scale_by_solvent);
-
-        bool isTimeDependent() const override;
-
-        void setDataOnPatchHierarchy(const int data_idx,
-                                     SAMRAI::tbox::Pointer<SAMRAI::hier::Variable<NDIM>> var,
-                                     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                                     const double data_time,
-                                     const bool initial_time = false,
-                                     const int coarsest_ln = IBTK::invalid_level_number,
-                                     const int finest_ln = IBTK::invalid_level_number) override;
-
-        void setDataOnPatch(int data_idx,
-                            SAMRAI::tbox::Pointer<SAMRAI::hier::Variable<NDIM>> var,
-                            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                            double data_time,
-                            bool initial_time = false,
-                            SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level =
-                                SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>>(NULL)) override;
-
-    private:
-        const IBMultiphaseHierarchyIntegrator* const d_ib_solver;
-        int d_ib_idx = IBTK::invalid_index;
-        bool d_scale_by_solvent = true;
-    };
-
     friend class IBMultiphaseEulerianForceFunction;
-    friend class IBMultiphaseScaledEulerianForceFunction;
 
     /*!
      * Perform necessary data movement, workload estimation, and logging prior
@@ -257,7 +225,7 @@ private:
 
     // IB forcing functions
     SAMRAI::tbox::Pointer<IBMultiphaseEulerianForceFunction> d_fn_fcn, d_fs_fcn;
-    SAMRAI::tbox::Pointer<IBMultiphaseScaledEulerianForceFunction> d_cross_links_un_fcn, d_cross_links_us_fcn;
+    SAMRAI::tbox::Pointer<IBMultiphaseEulerianForceFunction> d_cross_links_un_fcn, d_cross_links_us_fcn;
     SAMRAI::tbox::Pointer<MultiphaseCrossLinksStrategy> d_cross_links_strategy;
 
     // Network communication algorithms.

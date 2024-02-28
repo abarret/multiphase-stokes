@@ -147,6 +147,12 @@ public:
                                    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
 
     /*!
+     * Register forcing functions that should be scaled by both volume fractions.
+     */
+    void setForcingFunctionsScaledByBoth(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
+                                         SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
+
+    /*!
      * Register the volume fraction function. If a function is not registered, the volume fraction is advected with the
      * fluid.
      *
@@ -238,6 +244,11 @@ public:
 protected:
     void setupPlotDataSpecialized() override;
 
+    /*!
+     * Return the maximum time step size as determined by https://doi.org/10.1006/jcph.1998.5967
+     */
+    double getMaximumTimeStepSizeSpecialized() override;
+
 private:
     void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
                         double current_time,
@@ -290,8 +301,19 @@ private:
                       double new_time,
                       bool start_of_ts = false);
 
+    /*!
+     * Adds all body forces to the provided SAMRAI vector. Assumes first component of f_vec is the network forces and
+     * the second ocmponent is the solvent forces.
+     *
+     * The volume fraction index thn_idx must have at least one layer of ghost cells to account for scaling the forces.
+     */
+    void addBodyForces(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> f_vec,
+                       double eval_time,
+                       int thn_idx);
+
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_fcn, d_f_us_ths_fcn;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_ths_fcn, d_f_us_thn_ths_fcn;
 
     // CartGridFunctions that set the initial values for state variables.
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn, d_thn_init_fcn;
@@ -387,6 +409,9 @@ private:
 
     // Flag for if volume fraction has a meaningful value in middle of time step.
     bool d_use_new_thn = true;
+
+    bool d_use_accel_ts = false;
+    double d_accel_ts_safety_fac = 0.1;
 };
 } // namespace multiphase
 

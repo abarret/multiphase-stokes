@@ -554,17 +554,17 @@ IBMultiphaseHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHier
     TBOX_ASSERT(ins_integrator);
 #endif
 
-    // Note we use setForcingFunctions() instead of setForcingFunctionsScaled() because
-    // IBMultiphaseEulerianForceFunction already scales by volume fraction.
+    // Note we use setForcingFunctionsScaled() instead of setForcingFunctions() because
+    // IBMultiphaseEulerianForceFunction does note scale by volume fraction.
     d_fn_fcn = new IBMultiphaseEulerianForceFunction(this, d_fn_idx);
     d_fs_fcn = new IBMultiphaseEulerianForceFunction(this, d_f_idx);
     ins_integrator->setForcingFunctionsScaled(d_fn_fcn, d_fs_fcn);
 
-    d_cross_links_un_fcn =
-        new IBMultiphaseScaledEulerianForceFunction(this, d_cross_links_un_idx, true /*scale_by_solvent*/);
-    d_cross_links_us_fcn =
-        new IBMultiphaseScaledEulerianForceFunction(this, d_cross_links_us_idx, false /*scale_by_solvent*/);
-    ins_integrator->setForcingFunctionsScaled(d_cross_links_un_fcn, d_cross_links_us_fcn);
+    // Note we use setForcingFunctionsScaled because we need to scale by both volume fractions.
+    // IBMultiphaseScaledEulerianForceFunction only scales by one volume fraction.
+    d_cross_links_un_fcn = new IBMultiphaseEulerianForceFunction(this, d_cross_links_un_idx);
+    d_cross_links_us_fcn = new IBMultiphaseEulerianForceFunction(this, d_cross_links_us_idx);
+    ins_integrator->setForcingFunctionsScaledByBoth(d_cross_links_un_fcn, d_cross_links_us_fcn);
 
     // Initialize ibn_method.
     d_ibn_method_ops->registerEulerianVariables();

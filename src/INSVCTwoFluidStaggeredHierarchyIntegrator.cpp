@@ -168,6 +168,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
         input_db->getStringWithDefault("convec_limiter_type", IBAMR::enum_to_string(d_convec_limiter_type)));
     d_convective_time_stepping_type =
         IBAMR::string_to_enum<TimeSteppingType>(input_db->getStringWithDefault("convec_ts_type", "FORWARD_EULER"));
+    d_use_accel_ts = input_db->getBoolWithDefault("use_accel_ts", d_use_accel_ts);
+    d_accel_ts_safety_fac = input_db->getDoubleWithDefault("accel_ts_safety_factor", d_accel_ts_safety_fac);
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
@@ -387,6 +389,57 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctionsScaled(Pointer<Car
         else
         {
             d_f_us_ths_fcn = fs_fcn;
+        }
+    }
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctionsScaledByBoth(Pointer<CartGridFunction> fn_fcn,
+                                                                           Pointer<CartGridFunction> fs_fcn)
+{
+    if (fn_fcn)
+    {
+        if (d_f_un_thn_ths_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_un_fcn = d_f_un_thn_ths_fcn;
+            if (p_f_un_fcn)
+            {
+                p_f_un_fcn->addFunction(fn_fcn);
+            }
+            else
+            {
+                p_f_un_fcn = new CartGridFunctionSet(d_object_name + "::fn_thn_ths_fcn_set");
+                p_f_un_fcn->addFunction(d_f_un_thn_ths_fcn);
+                p_f_un_fcn->addFunction(fn_fcn);
+                d_f_un_thn_ths_fcn = p_f_un_fcn;
+            }
+        }
+        else
+        {
+            d_f_un_thn_ths_fcn = fn_fcn;
+        }
+    }
+
+    if (fs_fcn)
+    {
+        if (d_f_us_thn_ths_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_us_fcn = d_f_us_thn_ths_fcn;
+            if (p_f_us_fcn)
+            {
+                p_f_us_fcn->addFunction(fs_fcn);
+            }
+            else
+            {
+                p_f_us_fcn = new CartGridFunctionSet(d_object_name + "::fs_thn_ths_fcn_set");
+                p_f_us_fcn->addFunction(d_f_us_thn_ths_fcn);
+                p_f_us_fcn->addFunction(fs_fcn);
+                d_f_us_thn_ths_fcn = p_f_us_fcn;
+            }
+        }
+        else
+        {
+            d_f_us_thn_ths_fcn = fs_fcn;
         }
     }
 }
@@ -992,43 +1045,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
     Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_temp");
     f_vec->allocateVectorData(current_time);
     f_vec->setToScalar(0.0);
-    // Start with forces that do not need to be scaled.
-    if (d_f_un_fcn)
-    {
-        d_f_un_fcn->setDataOnPatchHierarchy(d_fn_scr_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_fcn)
-    {
-        d_f_us_fcn->setDataOnPatchHierarchy(d_fs_scr_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
-    }
+    addBodyForces(f_vec, half_time, thn_scr_idx);
 
-    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
-    {
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp = { ITC(
-            thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_fill.fillData(half_time);
-    }
-    if (d_f_un_thn_fcn)
-    {
-        d_f_un_thn_fcn->setDataOnPatchHierarchy(d_fn_scr_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_thn(d_fn_scr_idx, d_fn_scr_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_ths_fcn)
-    {
-        d_f_us_ths_fcn->setDataOnPatchHierarchy(d_fs_scr_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_ths(d_fs_scr_idx, d_fs_scr_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
-    }
     if (!d_creeping_flow)
     {
         approxConvecOp(
@@ -1110,7 +1128,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
                 adv_diff_hier_integrator->integrateHierarchy(current_time, new_time, adv_diff_cycle_num);
         }
     }
-
     IBTK_TIMER_STOP(t_integrate_hierarchy);
     return;
 } // integrateHierarchy
@@ -1387,6 +1404,113 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorRe
         f_vec->getComponentDescriptorIndex(0), 1.0, f_vec->getComponentDescriptorIndex(0), -d_rho, d_fn_scr_idx);
     d_hier_sc_data_ops->linearSum(
         f_vec->getComponentDescriptorIndex(1), 1.0, f_vec->getComponentDescriptorIndex(1), -d_rho, d_fs_scr_idx);
+}
+
+double
+INSVCTwoFluidStaggeredHierarchyIntegrator::getMaximumTimeStepSizeSpecialized()
+{
+    double dt = INSHierarchyIntegrator::getMaximumTimeStepSizeSpecialized();
+    if (!d_use_accel_ts) return dt;
+    double dt_loc = std::numeric_limits<double>::max();
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<SideData<NDIM, double>> fn_data = patch->getPatchData(d_f_un_sc_var, getCurrentContext());
+            Pointer<SideData<NDIM, double>> fs_data = patch->getPatchData(d_f_us_sc_var, getCurrentContext());
+
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            const double* const dx = pgeom->getDx();
+            const double dx_min = *std::min_element(dx, dx + NDIM);
+
+            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
+            {
+                const CellIndex<NDIM>& idx = ci();
+                VectorNd fn, fs;
+                for (int d = 0; d < NDIM; ++d)
+                {
+                    fn[d] = 0.5 * ((*fn_data)(SideIndex<NDIM>(idx, d, 0)) + (*fn_data)(SideIndex<NDIM>(idx, d, 1)));
+                    fs[d] = 0.5 * ((*fs_data)(SideIndex<NDIM>(idx, d, 0)) + (*fs_data)(SideIndex<NDIM>(idx, d, 1)));
+                }
+                double f_max = std::max(fn.norm(), fs.norm());
+                dt_loc = std::min(dt_loc, d_accel_ts_safety_fac * std::sqrt(dx_min / f_max));
+            }
+        }
+    }
+    return std::max(dt, dt_loc);
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<NDIM, double>> f_vec,
+                                                         const double eval_time,
+                                                         const int thn_idx)
+{
+    // Create some scratch indices for accumulation
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int fn_cloned_idx = var_db->registerClonedPatchDataIndex(d_f_un_sc_var, d_fn_scr_idx);
+    const int fs_cloned_idx = var_db->registerClonedPatchDataIndex(d_f_us_sc_var, d_fs_scr_idx);
+    allocate_patch_data(
+        { fn_cloned_idx, fs_cloned_idx }, d_hierarchy, eval_time, 0, d_hierarchy->getFinestLevelNumber());
+    d_hier_sc_data_ops->setToScalar(d_fn_scr_idx, 0.0);
+    d_hier_sc_data_ops->setToScalar(d_fs_scr_idx, 0.0);
+
+    // Start with forces that do not need to be scaled.
+    if (d_f_un_fcn)
+    {
+        d_f_un_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, d_fn_scr_idx, fn_cloned_idx);
+    }
+    if (d_f_us_fcn)
+    {
+        d_f_us_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, d_fs_scr_idx, fs_cloned_idx);
+    }
+
+    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
+    {
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp = { ITC(
+            thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
+        HierarchyGhostCellInterpolation ghost_fill;
+        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        ghost_fill.fillData(eval_time);
+    }
+    if (d_f_un_thn_fcn)
+    {
+        d_f_un_thn_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn(fn_cloned_idx, fn_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, d_fn_scr_idx, fn_cloned_idx);
+    }
+    if (d_f_us_ths_fcn)
+    {
+        d_f_us_ths_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_ths(fs_cloned_idx, fs_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, d_fs_scr_idx, fs_cloned_idx);
+    }
+    if (d_f_un_thn_ths_fcn)
+    {
+        d_f_un_thn_ths_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn_and_ths(fn_cloned_idx, fn_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, d_fn_scr_idx, fn_cloned_idx);
+    }
+    if (d_f_us_thn_ths_fcn)
+    {
+        d_f_us_thn_ths_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn_and_ths(fs_cloned_idx, fs_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, d_fs_scr_idx, fs_cloned_idx);
+    }
+    // Add forces to the RHS.
+    d_hier_sc_data_ops->add(f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
+    d_hier_sc_data_ops->add(f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
+
+    // Remove cloned patch indices
+    deallocate_patch_data({ fn_cloned_idx, fs_cloned_idx }, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+    var_db->removePatchDataIndex(fn_cloned_idx);
+    var_db->removePatchDataIndex(fs_cloned_idx);
 }
 
 //////////////////////////////////////////////////////////////////////////////
