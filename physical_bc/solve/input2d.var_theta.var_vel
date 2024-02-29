@@ -1,4 +1,4 @@
-USE_PRECOND = FALSE
+USE_PRECOND = TRUE
 w = 0.75
 C = 1.0
 D = -1.0
@@ -157,7 +157,7 @@ KrylovPrecondStrategy {
 
 KrylovPrecond {
    cycle_type = "V_CYCLE"
-   num_pre_sweeps = 0
+   num_pre_sweeps = 5
    num_post_sweeps = 5
    enable_logging = TRUE
    max_multigrid_levels = MAX_MULTIGRID_LEVELS
@@ -186,21 +186,11 @@ CartesianGeometry {
    periodic_dimension = 0, 0
 }
 
-MultigridCartesianGeometry {
-   domain_boxes       = [(0,0), (N - 1,N - 1)]
-   x_lo               = 0, 0      // lower end of computational domain.
-   x_up               = 1, 1      // upper end of computational domain.
-   periodic_dimension = 1, 1  
-}
-
-MultigridAlg {
-}
-
 GriddingAlgorithm {
-   max_levels = 1                 // Maximum number of levels in hierarchy.
+   max_levels = 2                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
-      level_1 = 2, 2              // vector ratio to next coarser level
+      level_1 = 4, 4              // vector ratio to next coarser level
    }
 
    largest_patch_size {

@@ -24,6 +24,7 @@
 #include "ibtk/FACPreconditionerStrategy.h"
 #include "ibtk/HierarchyGhostCellInterpolation.h"
 #include "ibtk/PoissonFACPreconditioner.h"
+#include "ibtk/StaggeredPhysicalBoundaryHelper.h"
 
 #include "IntVector.h"
 #include "PoissonSpecifications.h"
@@ -289,7 +290,7 @@ private:
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
     SAMRAI::tbox::Pointer<IBTK::CartSideRobinPhysBdryOp> d_un_bc_op, d_us_bc_op;
     SAMRAI::tbox::Pointer<IBTK::CartCellRobinPhysBdryOp> d_P_bc_op, d_thn_bc_op;
-    SAMRAI::xfer::RefinePatchStrategy<NDIM>* d_vel_P_bc_op = nullptr;
+    std::unique_ptr<SAMRAI::xfer::RefinePatchStrategy<NDIM>> d_vel_P_bc_op;
     // Cached communications operators.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
         d_P_fill_pattern;
@@ -297,6 +298,10 @@ private:
 
     std::vector<std::vector<std::array<SAMRAI::hier::BoxList<NDIM>, NDIM>>> d_patch_side_bc_box_overlap;
     std::vector<std::vector<SAMRAI::hier::BoxList<NDIM>>> d_patch_cell_bc_box_overlap;
+
+    SAMRAI::tbox::Pointer<IBTK::StaggeredPhysicalBoundaryHelper> d_bc_un_helper, d_bc_us_helper;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, int>> d_mask_var;
+    int d_mask_idx = IBTK::invalid_index;
 };
 } // namespace IBTK
 

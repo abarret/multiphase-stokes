@@ -75,6 +75,7 @@
 
 // FORTRAN ROUTINES
 #define R_B_G_S IBTK_FC_FUNC_(rbgs, RBGS)
+#define R_B_G_S_mask IBTK_FC_FUNC_(rbgs_mask, RBGS)
 
 extern "C"
 {
@@ -110,6 +111,43 @@ extern "C"
                  const double&, // C in C*u term
                  const double&, // D
                  const int&);   // red_or_black
+
+    void R_B_G_S_mask(const double*, // dx
+                      const int&,    // ilower0
+                      const int&,    // iupper0
+                      const int&,    // ilower1
+                      const int&,    // iupper1
+                      double* const, // un_data_0
+                      double* const, // un_data_1
+                      const int&,    // un_gcw
+                      double* const, // us_data_0
+                      double* const, // us_data_0
+                      const int&,    // us_gcw
+                      double* const, // p_data_
+                      const int&,    // p_gcw
+                      double* const, // f_p_data
+                      const int&,    // f_p_gcw
+                      double* const, // f_un_data_0
+                      double* const, // f_un_data_1
+                      const int&,    // f_un_gcw
+                      double* const, // f_us_data_0
+                      double* const, // f_us_data_1
+                      const int&,    // f_us_gcw
+                      double* const, // thn_data
+                      const int&,    // thn_gcw
+                      const double&, // eta_n    // whatever will be passed in will be treated as a reference to a
+                                     // double
+                      const double&, // eta_s    // telling the compiler that the function is expecting a reference
+                      const double&, // nu_n
+                      const double&, // nu_s
+                      const double&, // xi
+                      const double&, // w = under relaxation factor
+                      const double&, // C in C*u term
+                      const double&, // D
+                      const int&,    // red_or_black
+                      const int*,    // mask_0
+                      const int*,    // mask_1
+                      const int&);   // mask_gcw
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace IBTK
@@ -166,7 +204,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
       d_P_bc_coef(d_default_P_bc_coef.get()),
       d_default_thn_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
-      d_thn_bc_coef(d_default_thn_bc_coef.get())
+      d_thn_bc_coef(d_default_thn_bc_coef.get()),
+      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -218,6 +257,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
     d_un_scr_idx = var_db->registerVariableAndContext(un_scr_var, d_ctx, IntVector<NDIM>(1));
     d_us_scr_idx = var_db->registerVariableAndContext(us_scr_var, d_ctx, IntVector<NDIM>(1));
     d_p_scr_idx = var_db->registerVariableAndContext(p_scr_var, d_ctx, IntVector<NDIM>(1));
+
+    if (var_db->checkVariableExists(d_mask_var->getName()))
+    {
+        d_mask_var = var_db->getVariable(d_mask_var->getName());
+        d_mask_idx = var_db->mapVariableAndContextToIndex(d_mask_var, d_ctx);
+        var_db->removePatchDataIndex(d_mask_idx);
+    }
+    d_mask_idx = var_db->registerVariableAndContext(d_mask_var, d_ctx, IntVector<NDIM>(0));
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
@@ -494,6 +541,17 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
             Pointer<SideData<NDIM, double>> f_us_data = patch->getPatchData(f_us_idx);
             Pointer<CellData<NDIM, double>> f_p_data = patch->getPatchData(f_P_idx);
+            Pointer<SideData<NDIM, int>> mask_data = patch->getPatchData(d_mask_idx);
+
+            // Enforce any Dirichlet boundary conditions.
+            if (d_bc_un_helper->patchTouchesDirichletBoundary(patch))
+            {
+                d_bc_un_helper->copyDataAtDirichletBoundaries(un_data, f_un_data, patch);
+            }
+            if (d_bc_us_helper->patchTouchesDirichletBoundary(patch))
+            {
+                d_bc_us_helper->copyDataAtDirichletBoundaries(us_data, f_us_data, patch);
+            }
 
             double* const un_data_0 = un_data->getPointer(0);
             double* const un_data_1 = un_data->getPointer(1);
@@ -521,39 +579,80 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
             const IntVector<NDIM>& f_p_gcw = f_p_data->getGhostCellWidth();
             int red_or_black = sweep % 2; // red = 0 and black = 1
-            R_B_G_S(dx,
-                    patch_lower(0),       // ilower0
-                    patch_upper(0),       // iupper0
-                    patch_lower(1),       // ilower1
-                    patch_upper(1),       // iupper1
-                    un_data_0,
-                    un_data_1,
-                    un_gcw.min(),
-                    us_data_0,
-                    us_data_1,
-                    us_gcw.min(),
-                    p_ptr_data,
-                    p_gcw.min(),
-                    f_p_ptr_data,
-                    f_p_gcw.min(),
-                    f_un_data_0,
-                    f_un_data_1,
-                    f_un_gcw.min(),
-                    f_us_data_0,
-                    f_us_data_1,
-                    f_us_gcw.min(),
-                    thn_ptr_data,
-                    thn_gcw.min(),
-                    d_eta_n,
-                    d_eta_s,
-                    d_nu_n,
-                    d_nu_s,
-                    d_xi,
-                    d_w,
-                    d_C,
-                    d_D,
-                    red_or_black);
-
+            if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
+                d_bc_us_helper->patchTouchesDirichletBoundary(patch))
+            {
+                R_B_G_S_mask(dx,
+                             patch_lower(0), // ilower0
+                             patch_upper(0), // iupper0
+                             patch_lower(1), // ilower1
+                             patch_upper(1), // iupper1
+                             un_data_0,
+                             un_data_1,
+                             un_gcw.min(),
+                             us_data_0,
+                             us_data_1,
+                             us_gcw.min(),
+                             p_ptr_data,
+                             p_gcw.min(),
+                             f_p_ptr_data,
+                             f_p_gcw.min(),
+                             f_un_data_0,
+                             f_un_data_1,
+                             f_un_gcw.min(),
+                             f_us_data_0,
+                             f_us_data_1,
+                             f_us_gcw.min(),
+                             thn_ptr_data,
+                             thn_gcw.min(),
+                             d_eta_n,
+                             d_eta_s,
+                             d_nu_n,
+                             d_nu_s,
+                             d_xi,
+                             d_w,
+                             d_C,
+                             d_D,
+                             red_or_black,
+                             mask_data->getPointer(0),
+                             mask_data->getPointer(1),
+                             mask_data->getGhostCellWidth().max());
+            }
+            else
+            {
+                R_B_G_S(dx,
+                        patch_lower(0), // ilower0
+                        patch_upper(0), // iupper0
+                        patch_lower(1), // ilower1
+                        patch_upper(1), // iupper1
+                        un_data_0,
+                        un_data_1,
+                        un_gcw.min(),
+                        us_data_0,
+                        us_data_1,
+                        us_gcw.min(),
+                        p_ptr_data,
+                        p_gcw.min(),
+                        f_p_ptr_data,
+                        f_p_gcw.min(),
+                        f_un_data_0,
+                        f_un_data_1,
+                        f_un_gcw.min(),
+                        f_us_data_0,
+                        f_us_data_1,
+                        f_us_gcw.min(),
+                        thn_ptr_data,
+                        thn_gcw.min(),
+                        d_eta_n,
+                        d_eta_s,
+                        d_nu_n,
+                        d_nu_s,
+                        d_xi,
+                        d_w,
+                        d_C,
+                        d_D,
+                        red_or_black);
+            }
         } // patchess
     }     // num_sweeps
     performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
@@ -630,7 +729,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
     d_hier_bdry_fill->initializeOperatorState(transaction_comps, d_hierarchy, coarsest_level_num, finest_level_num);
-    d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
+    d_hier_bdry_fill->setHomogeneousBc(true);
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
 
     for (int ln = coarsest_level_num; ln <= finest_level_num; ++ln)
@@ -830,8 +929,27 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
                     (d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s) +
                      d_C * convertToThs(thn_lower) * (*us_data)(idx));
             }
+
+            if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
+                d_bc_us_helper->patchTouchesDirichletBoundary(patch))
+            {
+                Pointer<SideData<NDIM, int>> mask_data = patch->getPatchData(d_mask_idx);
+                for (int axis = 0; axis < NDIM; ++axis)
+                {
+                    for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
+                    {
+                        const SideIndex<NDIM>& idx = si();
+                        if ((*mask_data)(idx) == 1)
+                        {
+                            (*res_un_data)(idx) = (*rhs_un_data)(idx) - (*un_data)(idx);
+                            (*res_us_data)(idx) = (*rhs_us_data)(idx) - (*us_data)(idx);
+                        }
+                    }
+                }
+            }
         }
     }
+
     IBTK_TIMER_STOP(t_compute_residual);
     return;
 }
@@ -891,6 +1009,21 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         level->allocatePatchData(d_p_scr_idx, d_new_time);
     }
 
+    // Set up physical boundary condition helpers
+    d_bc_un_helper = new StaggeredPhysicalBoundaryHelper();
+    d_bc_un_helper->cacheBcCoefData(d_un_bc_coefs, d_solution_time, d_hierarchy);
+    d_bc_us_helper = new StaggeredPhysicalBoundaryHelper();
+    d_bc_us_helper->cacheBcCoefData(d_us_bc_coefs, d_solution_time, d_hierarchy);
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        if (!level->checkAllocated(d_mask_idx)) level->allocatePatchData(d_mask_idx);
+    }
+    // Note that this assumes that we are using dirichlet conditions at the SAME locations for network and solvent.
+    // To remove this restriction, we are going to want to do something more complicated than
+    // StaggeredPhysicalBoundaryHelper.
+    d_bc_un_helper->setupMaskingFunction(d_mask_idx);
+
     // Set up boundary condition operator
     d_un_bc_op = new CartSideRobinPhysBdryOp(d_un_scr_idx, d_un_bc_coefs, false);
     d_us_bc_op = new CartSideRobinPhysBdryOp(d_us_scr_idx, d_us_bc_coefs, false);
@@ -899,7 +1032,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     bc_op_ptrs[0] = d_un_bc_op;
     bc_op_ptrs[1] = d_us_bc_op;
     bc_op_ptrs[2] = d_P_bc_op;
-    d_vel_P_bc_op = new RefinePatchStrategySet(bc_op_ptrs.begin(), bc_op_ptrs.end(), false);
+    d_vel_P_bc_op = std::make_unique<RefinePatchStrategySet>(bc_op_ptrs.begin(), bc_op_ptrs.end(), false);
 
     // Cache prolongation operators. Creating refinement schedules can be expensive for hierarchies with many levels. We
     // create the schedules here, and SAMRAI will determine whether they need to be regenerated whenever we switch patch
@@ -922,8 +1055,11 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     // Note start from zero because you can't prolong to the coarsest level.
     for (int dst_ln = coarsest_ln + 1; dst_ln <= finest_ln; ++dst_ln)
     {
-        d_prolong_scheds[dst_ln] = d_prolong_alg->createSchedule(
-            d_hierarchy->getPatchLevel(dst_ln), Pointer<PatchLevel<NDIM>>(), dst_ln - 1, d_hierarchy, d_vel_P_bc_op);
+        d_prolong_scheds[dst_ln] = d_prolong_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln),
+                                                                 Pointer<PatchLevel<NDIM>>(),
+                                                                 dst_ln - 1,
+                                                                 d_hierarchy,
+                                                                 d_vel_P_bc_op.get());
     }
 
     // Cache restriction operators.
@@ -959,7 +1095,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         // TODO: the second argument here should fill in physical boundary conditions. This only works for periodic
         // conditions.
         d_ghostfill_no_restrict_scheds[dst_ln] =
-            d_ghostfill_no_restrict_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_vel_P_bc_op);
+            d_ghostfill_no_restrict_alg->createSchedule(d_hierarchy->getPatchLevel(dst_ln), d_vel_P_bc_op.get());
     }
 
     // Coarse-fine boundary operators
@@ -1044,6 +1180,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
         level->deallocatePatchData(d_un_scr_idx);
         level->deallocatePatchData(d_us_scr_idx);
         level->deallocatePatchData(d_p_scr_idx);
+        level->deallocatePatchData(d_mask_idx);
     }
 
     d_is_initialized = false;
