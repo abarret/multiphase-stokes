@@ -114,6 +114,26 @@ public:
     }
 
     /*!
+     * Register physical boundary condition objects. Note that we currently only work with periodic and Dirichlet
+     * conditions on the velocity.
+     *
+     * This class does not assume ownership of the bc objects, so they must be deleted by the user.
+     */
+    void registerPhysicalBoundaryConditions(std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
+                                            std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> us_bc_coefs);
+
+    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getNetworkBoundaryConditions() const;
+    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getSolventBoundaryConditions() const;
+
+    /*!
+     * Optionally register the volume fraction boundary conditions. This will only be used when the volume fraction is
+     * not an advected quantity. This conditions are ignored at periodic boundaries.
+     *
+     * If this is not set, then linear extrapolation will be used at physical boundaries.
+     */
+    void registerVolumeFractionBoundaryConditions(SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coefs);
+
+    /*!
      * \brief Set the viscosity coefficients for the viscous stresses.
      */
     void setViscosityCoefficient(double eta_n, double eta_s);
@@ -270,6 +290,11 @@ private:
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn, d_thn_init_fcn;
 
     /*!
+     * Boundary conditions
+     */
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs, d_us_bc_coefs;
+
+    /*!
      * Fluid solver variables.
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_sc_var;
@@ -341,6 +366,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
 
     bool d_make_div_rhs_sum_to_zero = true;
 };

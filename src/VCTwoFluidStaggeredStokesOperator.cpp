@@ -370,6 +370,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
             d_thn_bc_coef) };
         HierarchyGhostCellInterpolation hier_bdry_fill;
         hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
+        hier_bdry_fill.setHomogeneousBc(false);
         hier_bdry_fill.fillData(d_solution_time);
     }
 
@@ -809,9 +810,12 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
         if (d_bc_helper)
         {
             const int un_idx = x->getComponentDescriptorIndex(0);
+            const int us_idx = x->getComponentDescriptorIndex(1);
             const int P_idx = x->getComponentDescriptorIndex(2);
             d_bc_helper->enforceNormalVelocityBoundaryConditions(
                 un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
+            d_bc_helper->enforceNormalVelocityBoundaryConditions(
+                us_idx, P_idx, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
         }
         apply(*x, *b);
         y.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&y, false), b);
@@ -822,8 +826,10 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
     if (d_bc_helper)
     {
         const int un_idx = y.getComponentDescriptorIndex(0);
+        const int us_idx = y.getComponentDescriptorIndex(1);
         const int P_idx = y.getComponentDescriptorIndex(2);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(un_idx, P_idx, d_un_bc_coefs, d_new_time, homogeneous_bc);
+        d_bc_helper->enforceNormalVelocityBoundaryConditions(us_idx, P_idx, d_us_bc_coefs, d_new_time, homogeneous_bc);
     }
     return;
 } // modifyRhsForBcs
@@ -834,9 +840,12 @@ VCTwoFluidStaggeredStokesOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& 
     if (d_bc_helper)
     {
         const int un_idx = u.getComponentDescriptorIndex(0);
+        const int us_idx = u.getComponentDescriptorIndex(1);
         const int P_idx = u.getComponentDescriptorIndex(2);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(
             un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
+        d_bc_helper->enforceNormalVelocityBoundaryConditions(
+            us_idx, P_idx, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
     }
     return;
 } // imposeSolBcs

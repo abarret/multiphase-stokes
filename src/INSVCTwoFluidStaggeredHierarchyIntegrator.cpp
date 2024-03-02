@@ -224,6 +224,34 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureVariable() const
 }
 
 void
+INSVCTwoFluidStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
+    std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
+    std::vector<RobinBcCoefStrategy<NDIM>*> us_bc_coefs)
+{
+    d_un_bc_coefs = std::move(un_bc_coefs);
+    d_us_bc_coefs = std::move(us_bc_coefs);
+}
+
+const std::vector<RobinBcCoefStrategy<NDIM>*>&
+INSVCTwoFluidStaggeredHierarchyIntegrator::getNetworkBoundaryConditions() const
+{
+    return d_un_bc_coefs;
+}
+
+const std::vector<RobinBcCoefStrategy<NDIM>*>&
+INSVCTwoFluidStaggeredHierarchyIntegrator::getSolventBoundaryConditions() const
+{
+    return d_us_bc_coefs;
+}
+
+void
+INSVCTwoFluidStaggeredHierarchyIntegrator::registerVolumeFractionBoundaryConditions(
+    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+{
+    d_thn_bc_coef = thn_bc_coef;
+}
+
+void
 INSVCTwoFluidStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
     d_eta_n = eta_n;
@@ -521,6 +549,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         if (d_thn_fcn) d_visit_writer->registerPlotQuantity("Thn", "SCALAR", thn_cur_idx, 0, 1.0, "CELL");
     }
 
+    // Set the correct boundary conditions. If we advect the volume fraction, then we overwrite this class's bc's with
+    // the integrators.
+    if (d_thn_integrator) d_thn_bc_coef = d_thn_integrator->getPhysicalBcCoefs(d_thn_cc_var)[0];
+
     // Create the hierarchy data operations
     auto hier_ops_manager = HierarchyDataOpsManager<NDIM>::getManager();
     d_hier_cc_data_ops =
@@ -566,7 +598,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointe
         // Now fill in ghost cells
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
         std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, nullptr);
+        ghost_cell_comp[0] = ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
 
         Pointer<HierarchyGhostCellInterpolation> ghost_cell_fill = new HierarchyGhostCellInterpolation();
         // Note: when we create a new level, the coarser levels should already be created. So we can use that data to
@@ -798,6 +830,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     }
 
     VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
+    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
+    RHS_op.setPhysicalBoundaryHelper(bc_helper);
+    RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
     // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions in
     // the RHS.
     RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
@@ -810,11 +845,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     RHS_op.apply(*d_sol_vec, *d_rhs_vec);
 
     // Set up the operators and solvers needed to solve the linear system.
-    d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+    d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", false);
+    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
     d_stokes_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
     d_stokes_op->setViscosityCoefficient(d_eta_n, d_eta_s);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
+    d_stokes_op->setPhysicalBoundaryHelper(bc_helper);
 
     d_stokes_solver = new PETScKrylovLinearSolver("solver", d_solver_db, "solver_");
     d_stokes_solver->setOperator(d_stokes_op);
@@ -829,6 +866,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         d_precond_op->setViscosityCoefficient(d_eta_n, d_eta_s);
         d_precond_op->setUnderRelaxationParamater(d_w);
         d_precond_op->setCandDCoefficients(C, D2);
+        d_precond_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
         d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
         d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);
@@ -871,7 +909,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
                                  "NONE",
                                  "LINEAR",
                                  true,
-                                 nullptr); // defaults to fill corner
+                                 d_thn_bc_coef); // defaults to fill corner
         HierarchyGhostCellInterpolation ghost_cell_fill;
         ghost_cell_fill.initializeOperatorState(
             ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
@@ -915,7 +953,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
                                  "NONE",
                                  "LINEAR",
                                  true,
-                                 nullptr); // defaults to fill corner
+                                 d_thn_bc_coef); // defaults to fill corner
         HierarchyGhostCellInterpolation ghost_cell_fill;
         ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(half_time);
@@ -994,7 +1032,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
                                      "NONE",
                                      "LINEAR",
                                      true,
-                                     nullptr); // defaults to fill corner
+                                     d_thn_bc_coef); // defaults to fill corner
             HierarchyGhostCellInterpolation ghost_cell_fill;
             ghost_cell_fill.initializeOperatorState(
                 ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
@@ -1043,6 +1081,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
     d_hier_sc_data_ops->copyData(us_new_idx, d_sol_vec->getComponentDescriptorIndex(1));
     d_hier_cc_data_ops->copyData(p_new_idx, d_sol_vec->getComponentDescriptorIndex(2));
 
+    if (d_normalize_pressure)
+    {
+        const double int_p =
+            d_hier_cc_data_ops->integral(p_new_idx, d_hier_math_ops->getCellWeightPatchDescriptorIndex());
+        d_hier_cc_data_ops->addScalar(p_new_idx, p_new_idx, -int_p);
+    }
+
     // Do any more updates to the advection diffusion variables
     for (const auto& adv_diff_hier_integrator : d_adv_diff_hier_integrators)
     {
@@ -1085,7 +1130,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
     const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp(1);
-    ghost_cell_comp[0] = ITC(thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, nullptr);
+    ghost_cell_comp[0] = ITC(thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
     HierarchyGhostCellInterpolation hier_ghost_fill;
     hier_ghost_fill.initializeOperatorState(
         ghost_cell_comp, d_hierarchy, 0 /*coarsest_ln*/, d_hierarchy->getFinestLevelNumber());
@@ -1188,9 +1233,23 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     // We need ghost cells to interpolate to nodes.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_comp = {
-        ITC(un_scr_idx, un_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
-        ITC(us_scr_idx, us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
-        ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr)
+        ITC(un_scr_idx,
+            un_idx,
+            "CONSERVATIVE_LINEAR_REFINE",
+            true,
+            "CONSERVATIVE_COARSEN",
+            "LINEAR",
+            false,
+            d_un_bc_coefs),
+        ITC(us_scr_idx,
+            us_idx,
+            "CONSERVATIVE_LINEAR_REFINE",
+            true,
+            "CONSERVATIVE_COARSEN",
+            "LINEAR",
+            false,
+            d_us_bc_coefs),
+        ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR", false, d_thn_bc_coef)
     };
     HierarchyGhostCellInterpolation hier_bdry_fill;
     hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);

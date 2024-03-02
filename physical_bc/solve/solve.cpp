@@ -421,6 +421,7 @@ main(int argc, char* argv[])
         }
 
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+        krylov_solver->setHomogeneousBc(false);
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         krylov_solver->solveSystem(u_vec, f_vec);
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
