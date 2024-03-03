@@ -193,7 +193,6 @@ main(int argc, char* argv[])
         // At specified intervals, write visualization files
         if (IBTK::abs_equal_eps(loop_time, next_viz_dump_time, 0.1 * dt) || loop_time >= next_viz_dump_time)
         {
-            pout << "\nWriting visualization files...\n\n";
             ins_integrator->setupPlotData();
             int coarsest_ln = 0;
             int finest_ln = patch_hierarchy->getFinestLevelNumber();

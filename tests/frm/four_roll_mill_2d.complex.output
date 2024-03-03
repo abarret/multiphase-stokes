@@ -5,9 +5,6 @@ INSHierarchyIntegrator::getFromInput()
   setting to quiet_NaN
 FluidSolver::initializePatchHierarchy(): tag_buffer = 1
 
-Writing visualization files...
-
-
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 0
 Simulation time is 0
@@ -20,8 +17,6 @@ CartCellDoubleCubicCoarsen::coarsen():
 Conformation tensor is SPD
 Largest det:  1
 Smallest det: 1
-Weighted integral = 0
-Weighted integral = 0
 Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/ibtk/src/coarsen_ops/CartSideDoubleCubicCoarsen.cpp'' at line 133
 WARNING MESSAGE: 
 CartSideDoubleCubicCoarsen::coarsen():
@@ -40,8 +35,6 @@ Simulation time is 0.0003125
 Conformation tensor is SPD
 Largest det:  1.00001
 Smallest det: 0.999994
-Weighted integral = 0
-Weighted integral = 0
 
 At end       of timestep # 1
 Simulation time is 0.000625
@@ -54,38 +47,8 @@ Simulation time is 0.000625
 Conformation tensor is SPD
 Largest det:  1.00002
 Smallest det: 0.999977
-Weighted integral = 0
-Weighted integral = 0
 
 At end       of timestep # 2
 Simulation time is 0.0009375
-+++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++
-At beginning of timestep # 3
-Simulation time is 0.0009375
-Conformation tensor is SPD
-Largest det:  1.00006
-Smallest det: 0.999938
-Weighted integral = 0
-Weighted integral = 0
-
-At end       of timestep # 3
-Simulation time is 0.00125
-+++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++
-At beginning of timestep # 4
-Simulation time is 0.00125
-Conformation tensor is SPD
-Largest det:  1.00012
-Smallest det: 0.999882
-Weighted integral = 0
-Weighted integral = 0
-
-At end       of timestep # 4
-Simulation time is 0.0015625
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -20,7 +20,7 @@ ADD_CUSTOM_TARGET(tests)
 #    only compiles the IBFE tests.
 # 2. all input and output files in these source directories are symlinked into
 #    their corresponding build directories.
-SET(TEST_DIRECTORIES frm)
+SET(TEST_DIRECTORIES frm time_stepping)
 
 FOREACH(_dir ${TEST_DIRECTORIES})
   ADD_CUSTOM_TARGET("tests-${_dir}")
@@ -105,6 +105,7 @@ FOREACH(_dir ${TEST_DIRECTORIES})
 ENDFOREACH()
 
 SETUP_2D(frm four_roll_mill.cpp)
+SETUP_2D(time_stepping time_stepping.cpp)
 
 # Find numdiff, if possible (we only need it for tests so its not essential that
 # we find it now)

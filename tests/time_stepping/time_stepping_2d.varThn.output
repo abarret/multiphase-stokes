@@ -1,0 +1,82 @@
+Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/src/navier_stokes/INSHierarchyIntegrator.cpp'' at line 675
+WARNING MESSAGE: 
+INSHierarchyIntegrator::getFromInput()
+  no constant viscosity specified;
+  setting to quiet_NaN
+FluidSolver::initializePatchHierarchy(): tag_buffer = 0
+
+Writing visualization files...
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 0
+Simulation time is 0
+Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/ibtk/src/coarsen_ops/CartSideDoubleCubicCoarsen.cpp'' at line 133
+WARNING MESSAGE: 
+CartSideDoubleCubicCoarsen::coarsen():
+  cubic coarsening requires a refinement ratio of 4 or larger.
+  reverting to weighted averaging.
+
+Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/ibtk/src/coarsen_ops/CartCellDoubleCubicCoarsen.cpp'' at line 125
+WARNING MESSAGE: 
+CartCellDoubleCubicCoarsen::coarsen():
+  cubic coarsening requires a refinement ratio of 4 or larger.
+  reverting to weighted averaging.
+
+
+At end       of timestep # 0
+Simulation time is 0.03125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 1
+Simulation time is 0.03125
+
+At end       of timestep # 1
+Simulation time is 0.0625
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 2
+Simulation time is 0.0625
+
+At end       of timestep # 2
+Simulation time is 0.09375
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 3
+Simulation time is 0.09375
+
+At end       of timestep # 3
+Simulation time is 0.125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 4
+Simulation time is 0.125
+
+At end       of timestep # 4
+Simulation time is 0.15625
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Printing error norms
+
+Newtork velocity
+Un L1-norm:  0.0249454
+Un L2-norm:  0.0218996
+Un max-norm: 0.0360571
+
+Solvent velocity
+Us L1-norm:  0.0226519
+Us L2-norm:  0.0189143
+Us max-norm: 0.0298936
+
+Pressure
+P L1-norm:  0.0162835
+P L2-norm:  0.0191338
+P max-norm: 0.0494533
