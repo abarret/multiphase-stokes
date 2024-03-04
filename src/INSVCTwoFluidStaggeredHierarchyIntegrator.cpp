@@ -913,7 +913,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
         HierarchyGhostCellInterpolation ghost_cell_fill;
         ghost_cell_fill.initializeOperatorState(
             ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(0.0);
+        ghost_cell_fill.fillData(new_time);
     }
 
     // Set the forcing data if applicable.
@@ -1036,7 +1036,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
             HierarchyGhostCellInterpolation ghost_cell_fill;
             ghost_cell_fill.initializeOperatorState(
                 ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-            ghost_cell_fill.fillData(0.0);
+            ghost_cell_fill.fillData(new_time);
         }
     }
     const double dt = new_time - current_time;
@@ -1253,7 +1253,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     };
     HierarchyGhostCellInterpolation hier_bdry_fill;
     hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
-    hier_bdry_fill.fillData(0.0);
+    hier_bdry_fill.fillData(d_integrator_time);
 
     // interpolate
     d_hier_math_ops->interp(un_draw_idx,
@@ -1283,7 +1283,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     ghost_comp = { ITC(div_draw_idx, "NONE", false, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr) };
     hier_bdry_fill.deallocateOperatorState();
     hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
-    hier_bdry_fill.fillData(0.0);
+    hier_bdry_fill.fillData(d_integrator_time);
 
     // Deallocate scratch data
     deallocatePatchData(un_scr_idx, coarsest_ln, finest_ln);
