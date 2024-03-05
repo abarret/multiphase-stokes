@@ -142,6 +142,7 @@ thn_bc {
 
 
 INSVCTwoFluidStaggeredHierarchyIntegrator {
+   creeping_flow                 = FALSE
    rho                           = RHO
    start_time                    = START_TIME
    end_time                      = END_TIME
@@ -154,6 +155,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    grad_abs_thresh = 0.75
    use_grad_tagging = TRUE
    tag_buffer = TAG_BUFFER
+
+   convec_limiter_type = "CUI"
 
    solver_db {
       ksp_type = "fgmres"

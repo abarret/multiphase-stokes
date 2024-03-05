@@ -377,7 +377,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
 
     bool d_make_div_rhs_sum_to_zero = true;
 

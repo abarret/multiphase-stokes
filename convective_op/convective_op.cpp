@@ -59,6 +59,27 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
+        // Create boundary condition objects for velocity
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
+        std::unique_ptr<RobinBcCoefStrategy<NDIM>> thn_bc_coef = nullptr;
+        const bool periodic_domain = grid_geometry->getPeriodicShift().min() > 0;
+        if (!periodic_domain)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                std::string un_bc_coef_name = "un_bcs_" + std::to_string(d);
+                un_bc_coefs[d] =
+                    new muParserRobinBcCoefs(un_bc_coef_name, input_db->getDatabase(un_bc_coef_name), grid_geometry);
+                std::string us_bc_coef_name = "us_bcs_" + std::to_string(d);
+                us_bc_coefs[d] =
+                    new muParserRobinBcCoefs(us_bc_coef_name, input_db->getDatabase(us_bc_coef_name), grid_geometry);
+            }
+
+            // Create boundary condition objects for volume fraction
+            thn_bc_coef =
+                std::make_unique<muParserRobinBcCoefs>("thn_bc", input_db->getDatabase("thn_bc"), grid_geometry);
+        }
+
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = var_db->getContext("context");
@@ -207,7 +228,12 @@ main(int argc, char* argv[])
         N_us_fcn.setDataOnPatchHierarchy(e_us_idx, e_us_var, patch_hierarchy, 0.0);
 
         // Apply convective operator
-        INSVCTwoFluidConvectiveManager convec_op("convec_op", patch_hierarchy, input_db->getDatabase("ConvecOp"));
+        INSVCTwoFluidConvectiveManager convec_op("convec_op",
+                                                 patch_hierarchy,
+                                                 input_db->getDatabase("ConvecOp"),
+                                                 un_bc_coefs,
+                                                 us_bc_coefs,
+                                                 thn_bc_coef.get());
         convec_op.approximateConvectiveOperator(N_un_idx,
                                                 N_us_idx,
                                                 TimeSteppingType::FORWARD_EULER,

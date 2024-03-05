@@ -711,8 +711,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeCompositeHierarchyDataSpeci
 {
     // Set up the convective operator
     if (!d_creeping_flow)
-        d_convec_op = std::make_unique<INSVCTwoFluidConvectiveManager>(
-            d_object_name + "::ConvectiveOp", d_hierarchy, d_convec_limiter_type);
+        d_convec_op = std::make_unique<INSVCTwoFluidConvectiveManager>(d_object_name + "::ConvectiveOp",
+                                                                       d_hierarchy,
+                                                                       d_convec_limiter_type,
+                                                                       d_un_bc_coefs,
+                                                                       d_us_bc_coefs,
+                                                                       d_thn_bc_coef);
 }
 
 void

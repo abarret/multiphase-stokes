@@ -227,26 +227,41 @@ get_var(const std::string& var_name)
     return var;
 }
 
-INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string object_name,
-                                                               Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                                               Pointer<Database> input_db)
-    : d_object_name(std::move(object_name)),
-      d_hierarchy(hierarchy),
-      d_hier_sc_data_ops(hierarchy),
-      d_hier_cc_data_ops(hierarchy)
-{
-    d_limiter = IBAMR::string_to_enum<IBAMR::LimiterType>(input_db->getString("limiter_type"));
-    commonConstructor();
-}
-
-INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(std::string object_name,
-                                                               Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                                               LimiterType limiter_type)
+INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(
+    std::string object_name,
+    Pointer<PatchHierarchy<NDIM>> hierarchy,
+    Pointer<Database> input_db,
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
       d_hier_sc_data_ops(hierarchy),
       d_hier_cc_data_ops(hierarchy),
-      d_limiter(limiter_type)
+      d_un_bc_coefs(un_bc_coefs),
+      d_us_bc_coefs(us_bc_coefs),
+      d_thn_bc_coef(thn_bc_coef)
+{
+    d_limiter = IBAMR::string_to_enum<IBAMR::LimiterType>(input_db->getString("limiter_type"));
+    d_bdry_interp_order = input_db->getStringWithDefault("bdry_interp_order", d_bdry_interp_order);
+    commonConstructor();
+}
+
+INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(
+    std::string object_name,
+    Pointer<PatchHierarchy<NDIM>> hierarchy,
+    LimiterType limiter_type,
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+    : d_object_name(std::move(object_name)),
+      d_hierarchy(hierarchy),
+      d_hier_sc_data_ops(hierarchy),
+      d_hier_cc_data_ops(hierarchy),
+      d_limiter(limiter_type),
+      d_un_bc_coefs(un_bc_coefs),
+      d_us_bc_coefs(us_bc_coefs),
+      d_thn_bc_coef(thn_bc_coef)
 {
     commonConstructor();
 }
@@ -258,7 +273,6 @@ INSVCTwoFluidConvectiveManager::commonConstructor()
     Pointer<VariableContext> network_ctx = var_db->getContext(d_object_name + "::NetworkCTX");
     Pointer<VariableContext> solvent_ctx = var_db->getContext(d_object_name + "::SolventCTX");
     const int gcw = get_limiter_gcw(d_limiter);
-    static const IntVector<NDIM> one_gcw = 1;
 
     // Grab the variables.
     d_mom_var = get_var<SideVariable<NDIM, double>>(d_object_name + "::Mom_var");
@@ -274,9 +288,9 @@ INSVCTwoFluidConvectiveManager::commonConstructor()
     d_N_us_idx = var_db->registerVariableAndContext(d_N_var, solvent_ctx);
     d_N0_un_idx = var_db->registerVariableAndContext(d_N0_var, network_ctx);
     d_N0_us_idx = var_db->registerVariableAndContext(d_N0_var, solvent_ctx);
-    d_un_scr_idx = var_db->registerVariableAndContext(d_U_var, network_ctx, one_gcw);
-    d_us_scr_idx = var_db->registerVariableAndContext(d_U_var, solvent_ctx, one_gcw);
-    d_thn_scr_idx = var_db->registerVariableAndContext(d_thn_var, network_ctx, one_gcw);
+    d_un_scr_idx = var_db->registerVariableAndContext(d_U_var, network_ctx, gcw);
+    d_us_scr_idx = var_db->registerVariableAndContext(d_U_var, solvent_ctx, gcw);
+    d_thn_scr_idx = var_db->registerVariableAndContext(d_thn_var, network_ctx, gcw + 1);
 }
 
 INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
@@ -287,6 +301,16 @@ INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
     std::array<int, 9> idxs{ d_mom_un_idx, d_mom_us_idx, d_N_un_idx,   d_N_us_idx,   d_N0_un_idx,
                              d_N0_us_idx,  d_un_scr_idx, d_us_scr_idx, d_thn_scr_idx };
     for (const auto& idx : idxs) var_db->removePatchDataIndex(idx);
+}
+
+void
+INSVCTwoFluidConvectiveManager::setBoundaryConditions(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                                                      const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                                                      RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+{
+    d_un_bc_coefs = un_bc_coefs;
+    d_us_bc_coefs = us_bc_coefs;
+    d_thn_bc_coef = thn_bc_coef;
 }
 
 void
@@ -308,7 +332,6 @@ INSVCTwoFluidConvectiveManager::deallocateData()
                           finest_ln);
 
     d_thn_ghost_fill.deallocateOperatorState();
-    d_mom_ghost_fill.deallocateOperatorState();
     d_u_ghost_fill.deallocateOperatorState();
 
     d_is_allocated = false;
@@ -342,17 +365,35 @@ INSVCTwoFluidConvectiveManager::allocateData(const double time)
                             finest_ln);
 
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> thn_ghost_comp = { ITC(d_thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+        std::vector<ITC> thn_ghost_comp = { ITC(d_thn_scr_idx,
+                                                "CONSERVATIVE_LINEAR_REFINE",
+                                                true,
+                                                "NONE",
+                                                "LINEAR",
+                                                false,
+                                                d_thn_bc_coef,
+                                                nullptr,
+                                                d_bdry_interp_order) };
         d_thn_ghost_fill.initializeOperatorState(thn_ghost_comp, d_hierarchy, coarsest_ln, finest_ln);
 
-        std::vector<ITC> mom_ghost_comp = {
-            ITC(d_mom_un_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN"),
-            ITC(d_mom_us_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN")
-        };
-        d_mom_ghost_fill.initializeOperatorState(mom_ghost_comp, d_hierarchy, coarsest_ln, finest_ln);
-
-        std::vector<ITC> u_ghost_fill_itc = { ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE"),
-                                              ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+        std::vector<ITC> u_ghost_fill_itc = { ITC(d_un_scr_idx,
+                                                  "CONSERVATIVE_LINEAR_REFINE",
+                                                  true,
+                                                  "NONE",
+                                                  "LINEAR",
+                                                  false,
+                                                  d_un_bc_coefs,
+                                                  nullptr,
+                                                  d_bdry_interp_order),
+                                              ITC(d_us_scr_idx,
+                                                  "CONSERVATIVE_LINEAR_REFINE",
+                                                  true,
+                                                  "NONE",
+                                                  "LINEAR",
+                                                  false,
+                                                  d_us_bc_coefs,
+                                                  nullptr,
+                                                  d_bdry_interp_order) };
         d_u_ghost_fill.initializeOperatorState(u_ghost_fill_itc, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
 
         d_is_allocated = true;
@@ -447,13 +488,9 @@ INSVCTwoFluidConvectiveManager::approximateOperator(const int dst_un_idx,
     d_u_ghost_fill.fillData(eval_time);
 
     // Fill in N0 approximations and N approximations.
-    // First find the respective momentums.
+    // First find the respective momentums. Note that this should also fill in ghost cells of the momentum operator.
     findNetworkMomentum(d_mom_un_idx, d_thn_scr_idx, d_un_scr_idx);
     findSolventMomentum(d_mom_us_idx, d_thn_scr_idx, d_us_scr_idx);
-
-    // Fill in ghost cells for momentum. Because the indices filled in here are owned by this class, we do not need to
-    // reinitialize the ghost filling routines.
-    d_mom_ghost_fill.fillData(eval_time);
 
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
@@ -598,13 +635,13 @@ void
 INSVCTwoFluidConvectiveManager::findNetworkMomentum(const int dst_idx, const int thn_idx, const int u_idx)
 {
     // Interpolate thn to sides.
-    multiply_sc_and_thn(dst_idx, u_idx, thn_idx, d_hierarchy);
+    multiply_sc_and_thn(dst_idx, u_idx, thn_idx, d_hierarchy, true);
 }
 
 void
 INSVCTwoFluidConvectiveManager::findSolventMomentum(const int dst_idx, const int thn_idx, const int u_idx)
 {
-    multiply_sc_and_ths(dst_idx, u_idx, thn_idx, d_hierarchy);
+    multiply_sc_and_ths(dst_idx, u_idx, thn_idx, d_hierarchy, true);
 }
 
 void

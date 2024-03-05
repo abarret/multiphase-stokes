@@ -29,19 +29,32 @@ public:
      */
     INSVCTwoFluidConvectiveManager(std::string object_name,
                                    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                                   SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
+                                   SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs = {},
+                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs = {},
+                                   SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr);
 
     /*!
      * Constructor that takes in the limiter. The limiter must be one of "UPWIND", "CUI", "FBICS", or "MGAMMA".
      */
     INSVCTwoFluidConvectiveManager(std::string object_name,
                                    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                                   IBAMR::LimiterType limiter_type);
+                                   IBAMR::LimiterType limiter_type,
+                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs = {},
+                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs = {},
+                                   SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr);
 
     /*!
      * Destructor that deallocates patch data and removes patch indices from the variable database.
      */
     ~INSVCTwoFluidConvectiveManager();
+
+    /*!
+     * Set the boundary condition objects. Any can be null. This class does not assume ownership of any of the objects.
+     */
+    void setBoundaryConditions(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                               const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                               SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
 
     /*!
      * Deallocate the patch data associated with this object.
@@ -254,7 +267,18 @@ private:
     /*!
      * Cached ghost filling routines.
      */
-    IBTK::HierarchyGhostCellInterpolation d_thn_ghost_fill, d_mom_ghost_fill, d_u_ghost_fill;
+    IBTK::HierarchyGhostCellInterpolation d_thn_ghost_fill, d_u_ghost_fill;
+
+    /*!
+     * Boundary condition routines
+     */
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs, d_us_bc_coefs;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
+
+    /*!
+     * Order of boundary interpolation
+     */
+    std::string d_bdry_interp_order = "LINEAR";
 };
 } // namespace multiphase
 
