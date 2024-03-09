@@ -1,37 +1,79 @@
-D = 1.0
-C = 10.0
 USE_PRECOND = TRUE
+w = 0.75
+C = 100.0
+D = -1.0
+IS_VEL_NULLSPACE = FALSE
 
-Q {
-   function_0 = "cos(2*PI*X_0)*sin(2*PI*X_1)"
+XI = 1.0
+ETAN = 1.0
+ETAS = 1.0
+NU = 1.0
+
+MAX_MULTIGRID_LEVELS = 2
+
+un {
+   function_0 = "sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "cos(2*PI*X_0)*sin(2*PI*X_1)"
 }
 
-RHS {
+us {
+   function_0 = "-sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "-cos(2*PI*X_0)*sin(2*PI*X_1)"
+} // so that average of un + us is 0
+
+p {
+   function = "0.0"
+} // pressure has mean 0
+
+f_un {
    c = C
    d = D
-   function_0 = "(c - 8.0 * d * PI * PI) * cos(2*PI*X_0)*sin(2*PI*X_1)"
+   nu = NU
+   etan = ETAN
+   xi = XI
+   etas = ETAS
+   function_0 = "(3*(2*c*nu-d*(16*etan*nu*PI^2+xi))*cos(2*PI*X_1)*sin(2*PI*X_0))/(8*nu)"
+   function_1 = "(3*(2*c*nu-d*(16*etan*nu*PI^2+xi))*cos(2*PI*X_0)*sin(2*PI*X_1))/(8*nu)"
 }
 
-PoissonSolver {
+f_us {
+   c = C
+   d = D
+   nu = NU
+   etan = ETAN
+   xi = XI
+   etas = ETAS
+   function_0 = "((-2*c*nu+16*d*etas*nu*PI^2+3*d*xi)*cos(2*PI*X_1)*sin(2*PI*X_0))/(8*nu)"
+   function_1 = "((-2*c*nu+16*d*etas*nu*PI^2+3*d*xi)*cos(2*PI*X_0)*sin(2*PI*X_1))/(8*nu)"
+}
+
+f_p {
+   function = "2*PI*cos(2*PI*X_0)*cos(2*PI*X_1)"
+}
+
+thn {
+   function = "0.75"
+}
+
+KrylovSolver {
 
 }
 
-PoissonPrecondStrategy {
+KrylovPrecondStrategy {
 
 }
 
-multigrid_max_levels = 5
-
-PoissonPrecond {
+KrylovPrecond {
    cycle_type = "V_CYCLE"
-   num_pre_sweeps = 1
-   num_post_sweeps = 1
-   enable_logging = TRUE
+   num_pre_sweeps = 3
+   num_post_sweeps = 3
+   enable_logging = FALSE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
 Main {
 // log file parameters
-   log_file_name = "output"
+   log_file_name = "logfile"
    log_all_nodes = FALSE
 
 // visualization dump parameters
@@ -43,7 +85,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 128*2
+N = 16
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
@@ -66,7 +108,7 @@ GriddingAlgorithm {
    max_levels = 2                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
-      level_1 = 4, 4              // vector ratio to next coarser level
+      level_1 = 2, 2              // vector ratio to next coarser level
    }
 
    largest_patch_size {
@@ -87,7 +129,11 @@ GriddingAlgorithm {
 StandardTagAndInitialize {
    tagging_method = "REFINE_BOXES"
    RefineBoxes {
-    level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
+    // level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
+     level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+    // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
+    // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
+    // level_0 = [(1,1), (30,30)] 
    }
 }
 
