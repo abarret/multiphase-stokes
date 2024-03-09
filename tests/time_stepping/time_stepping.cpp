@@ -169,7 +169,7 @@ main(int argc, char* argv[])
         }
         // Main time step loop
         while (!IBTK::rel_equal_eps(loop_time, time_end) && ins_integrator->stepsRemaining())
-        {
+        {   
             pout << "\n";
             pout << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
             pout << "At beginning of timestep # " << iteration_num << "\n";
@@ -250,7 +250,7 @@ main(int argc, char* argv[])
         hier_sc_data_ops.subtract(us_idx, us_idx, us_exa_idx);
         hier_cc_data_ops.subtract(p_idx, p_idx, p_exa_idx);
         pout << "Printing error norms\n\n";
-        pout << "Newtork velocity\n";
+        pout << "Network velocity\n";
         pout << "Un L1-norm:  " << hier_sc_data_ops.L1Norm(un_idx, wgt_sc_idx) << "\n";
         pout << "Un L2-norm:  " << hier_sc_data_ops.L2Norm(un_idx, wgt_sc_idx) << "\n";
         pout << "Un max-norm: " << hier_sc_data_ops.maxNorm(un_idx, wgt_sc_idx) << "\n\n";
@@ -264,6 +264,23 @@ main(int argc, char* argv[])
         pout << "P L1-norm:  " << hier_cc_data_ops.L1Norm(p_idx, wgt_cc_idx) << "\n";
         pout << "P L2-norm:  " << hier_cc_data_ops.L2Norm(p_idx, wgt_cc_idx) << "\n";
         pout << "P max-norm: " << hier_cc_data_ops.maxNorm(p_idx, wgt_cc_idx) << "\n";
+
+        std::ofstream out("output");
+        out << "Printing error norms\n\n";
+        out << "Network velocity\n";
+        out << "Un L1-norm:  " << hier_sc_data_ops.L1Norm(un_idx, wgt_sc_idx) << "\n";
+        out << "Un L2-norm:  " << hier_sc_data_ops.L2Norm(un_idx, wgt_sc_idx) << "\n";
+        out << "Un max-norm: " << hier_sc_data_ops.maxNorm(un_idx, wgt_sc_idx) << "\n\n";
+
+        out << "Solvent velocity\n";
+        out << "Us L1-norm:  " << hier_sc_data_ops.L1Norm(us_idx, wgt_sc_idx) << "\n";
+        out << "Us L2-norm:  " << hier_sc_data_ops.L2Norm(us_idx, wgt_sc_idx) << "\n";
+        out << "Us max-norm: " << hier_sc_data_ops.maxNorm(us_idx, wgt_sc_idx) << "\n\n";
+
+        out << "Pressure\n";
+        out << "P L1-norm:  " << hier_cc_data_ops.L1Norm(p_idx, wgt_cc_idx) << "\n";
+        out << "P L2-norm:  " << hier_cc_data_ops.L2Norm(p_idx, wgt_cc_idx) << "\n";
+        out << "P max-norm: " << hier_cc_data_ops.maxNorm(p_idx, wgt_cc_idx) << "\n";
 
         // Print extra viz files for the error
         ins_integrator->setupPlotData();

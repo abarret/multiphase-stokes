@@ -8,10 +8,10 @@ DX = 1.0 / N
 U_MAX = 20.0   // use a larger u_max
 CFL_MAX = 0.1
 DT_MAX = CFL_MAX * DX / U_MAX
-END_TIME = 3*DT_MAX
+END_TIME = 5*DT_MAX
 ENABLE_LOGGING = FALSE
 W = 0.75
-VIZ_DUMP_TIME_INTERVAL = 0.005
+VIZ_DUMP_TIME_INTERVAL = 0.005  
 DELTA = 0.175
 TAG_BUFFER = 1
 REGRID_INTERVAL = 10
@@ -103,7 +103,7 @@ AdvDiffIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "output"
+   log_file_name = "logfile"
    log_all_nodes = FALSE
 
 // visualization dump parameters

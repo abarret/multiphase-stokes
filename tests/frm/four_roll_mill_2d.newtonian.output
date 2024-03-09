@@ -1,25 +1,7 @@
-Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/src/navier_stokes/INSHierarchyIntegrator.cpp'' at line 675
-WARNING MESSAGE: 
-INSHierarchyIntegrator::getFromInput()
-  no constant viscosity specified;
-  setting to quiet_NaN
-FluidSolver::initializePatchHierarchy(): tag_buffer = 1
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 0
 Simulation time is 0
-Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/ibtk/src/coarsen_ops/CartCellDoubleCubicCoarsen.cpp'' at line 125
-WARNING MESSAGE: 
-CartCellDoubleCubicCoarsen::coarsen():
-  cubic coarsening requires a refinement ratio of 4 or larger.
-  reverting to weighted averaging.
-
-Warning in file ``/home/bnagda2015/sfw/ibamr/IBAMR/ibtk/src/coarsen_ops/CartSideDoubleCubicCoarsen.cpp'' at line 133
-WARNING MESSAGE: 
-CartSideDoubleCubicCoarsen::coarsen():
-  cubic coarsening requires a refinement ratio of 4 or larger.
-  reverting to weighted averaging.
-
 
 At end       of timestep # 0
 Simulation time is 0.0003125
@@ -41,5 +23,23 @@ Simulation time is 0.000625
 
 At end       of timestep # 2
 Simulation time is 0.0009375
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 3
+Simulation time is 0.0009375
+
+At end       of timestep # 3
+Simulation time is 0.00125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 4
+Simulation time is 0.00125
+
+At end       of timestep # 4
+Simulation time is 0.0015625
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -89,7 +89,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "output"
+   log_file_name = "logfile"
    log_all_nodes = FALSE
 
 // visualization dump parameters
