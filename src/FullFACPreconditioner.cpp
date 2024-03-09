@@ -44,6 +44,7 @@ FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
     : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix)
 {
     d_multigrid_max_levels = input_db->getInteger("max_multigrid_levels");
+    d_conservative_operator = input_db ->getStringWithDefault("preconditioner_conservative_op", "CONSERVATIVE_COARSEN");
 
     IBTK_DO_ONCE(
         t_solve = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::solveSystem()");
@@ -325,6 +326,7 @@ FullFACPreconditioner::transferToDense(std::set<int> idxs, bool deallocate_data)
     // TODO: These schedules should be cached and saved between calls to solveSystem.
     int level_diff = d_dense_hierarchy->getFinestLevelNumber() - d_hierarchy->getFinestLevelNumber();
     Pointer<RefineAlgorithm<NDIM>> refine_alg = new RefineAlgorithm<NDIM>();
+
     // First create the operators needed.
     for (const auto& idx : idxs)
     {
@@ -354,7 +356,7 @@ FullFACPreconditioner::transferToDense(std::set<int> idxs, bool deallocate_data)
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<Variable<NDIM>> var;
         var_db->mapIndexToVariable(idx, var);
-        Pointer<CoarsenOperator<NDIM>> coarsen_op = grid_geom->lookupCoarsenOperator(var, "CUBIC_COARSEN");
+        Pointer<CoarsenOperator<NDIM>> coarsen_op = grid_geom->lookupCoarsenOperator(var, d_conservative_operator);
         coarsen_alg->registerCoarsen(idx, idx, coarsen_op);
     }
     std::vector<Pointer<CoarsenSchedule<NDIM>>> coarsen_scheds(level_diff);
@@ -406,7 +408,7 @@ FullFACPreconditioner::transferToDense(const SAMRAIVectorReal<NDIM, double>& bas
     for (int comp = 0; comp < dense_x.getNumberOfComponents(); ++comp)
     {
         Pointer<CoarsenOperator<NDIM>> coarsen_op =
-            grid_geom->lookupCoarsenOperator(dense_x.getComponentVariable(comp), "CUBIC_COARSEN");
+            grid_geom->lookupCoarsenOperator(dense_x.getComponentVariable(comp), d_conservative_operator);
         int dense_idx = dense_x.getComponentDescriptorIndex(comp);
         coarsen_alg->registerCoarsen(dense_idx, dense_idx, coarsen_op);
     }

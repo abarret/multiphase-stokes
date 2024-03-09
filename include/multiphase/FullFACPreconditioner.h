@@ -188,6 +188,7 @@ public:
 protected:
 private:
     int d_multigrid_max_levels = -1;
+    std::string d_conservative_operator;
     void generateDenseHierarchy(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> base_hierarchy);
 
     void transferToDense(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& base_x,
