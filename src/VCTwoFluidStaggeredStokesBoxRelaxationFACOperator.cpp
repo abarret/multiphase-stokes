@@ -269,10 +269,28 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
     RobinBcCoefStrategy<NDIM>* P_bc_coef,
     RobinBcCoefStrategy<NDIM>* thn_bc_coef)
 {
-    if (!un_bc_coefs.empty()) d_un_bc_coefs = un_bc_coefs;
-    if (!us_bc_coefs.empty()) d_us_bc_coefs = us_bc_coefs;
+#ifndef NDEBUG
+    TBOX_ASSERT(un_bc_coefs.size() == NDIM);
+    TBOX_ASSERT(us_bc_coefs.size() == NDIM);
+#endif
+    // Only replace the boundary conditions that actually exist
+    for (int d = 0; d < NDIM; ++d)
+    {
+        if (un_bc_coefs[d])
+            d_un_bc_coefs[d] = un_bc_coefs[d];
+        else
+            d_un_bc_coefs[d] = d_default_un_bc_coef.get();
+        if (us_bc_coefs[d])
+            d_us_bc_coefs[d] = us_bc_coefs[d];
+        else
+            d_us_bc_coefs[d] = d_default_us_bc_coef.get();
+    }
     if (P_bc_coef) d_P_bc_coef = P_bc_coef;
+    else
+        d_P_bc_coef = d_default_P_bc_coef.get();
     if (thn_bc_coef) d_thn_bc_coef = thn_bc_coef;
+    else
+        d_thn_bc_coef = d_default_thn_bc_coef.get();
 }
 
 VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator()

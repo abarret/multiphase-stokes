@@ -161,6 +161,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
     // class to compute the CFL number.
     d_U_var = d_us_sc_var;
 
+    d_un_bc_coefs.resize(NDIM, nullptr);
+    d_us_bc_coefs.resize(NDIM, nullptr);
+
     // Make sure viscous time stepping type is valid for this class
     if (d_viscous_time_stepping_type != TimeSteppingType::BACKWARD_EULER &&
         d_viscous_time_stepping_type != TimeSteppingType::TRAPEZOIDAL_RULE)
