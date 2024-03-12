@@ -1,18 +1,26 @@
-#include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
-#include "multiphase/utility_functions.h"
+// ---------------------------------------------------------------------
+//
+// Copyright (c) 2017 - 2020 by the IBAMR developers
+// All rights reserved.
+//
+// This file is part of IBAMR.
+//
+// IBAMR is free software and is distributed under the 3-clause BSD
+// license. The full text of the license can be found in the file
+// COPYRIGHT at the top level directory of IBAMR.
+//
+// ---------------------------------------------------------------------
 
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+
+#include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
 #include <ibamr/app_namespaces.h>
 
-#include "ibtk/CartCellDoubleQuadraticRefine.h"
-#include "ibtk/CartSideDoubleRT0Refine.h"
-#include "ibtk/PETScKrylovLinearSolver.h"
 #include <ibtk/AppInitializer.h>
 #include <ibtk/IBTKInit.h>
-#include <ibtk/LinearOperator.h>
+#include <ibtk/PhysicalBoundaryUtilities.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
 
@@ -24,8 +32,6 @@
 #include <LoadBalancer.h>
 #include <SAMRAI_config.h>
 #include <StandardTagAndInitialize.h>
-
-#include <chrono>
 
 using namespace multiphase;
 
@@ -46,16 +52,13 @@ main(int argc, char* argv[])
 
         // Parse command line options, set some standard options from the input
         // file, and enable file logging.
-        Pointer<AppInitializer> app_initializer = new AppInitializer(argc, argv, "stokes.log");
+        Pointer<AppInitializer> app_initializer = new AppInitializer(argc, argv, "sc_poisson.log");
         Pointer<Database> input_db = app_initializer->getInputDatabase();
 
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
-                                                                                      // variables
-        grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables
         Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
         Pointer<StandardTagAndInitialize<NDIM>> error_detector = new StandardTagAndInitialize<NDIM>(
             "StandardTagAndInitialize", NULL, app_initializer->getComponentDatabase("StandardTagAndInitialize"));
@@ -68,6 +71,25 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
+
+        // Grab the boundary condition objects
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
+        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
+        bool is_periodic = grid_geometry->getPeriodicShift().max() == 1;
+        if (!is_periodic)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                std::string un_bc_coef_name = "un_bc_" + std::to_string(d);
+                un_bc_coefs[d] =
+                    new muParserRobinBcCoefs(un_bc_coef_name, input_db->getDatabase(un_bc_coef_name), grid_geometry);
+                std::string us_bc_coef_name = "us_bc_" + std::to_string(d);
+                us_bc_coefs[d] =
+                    new muParserRobinBcCoefs(us_bc_coef_name, input_db->getDatabase(us_bc_coef_name), grid_geometry);
+            }
+            std::string thn_bc_name = "thn_bc";
+            thn_bc_coef = new muParserRobinBcCoefs(thn_bc_name, input_db->getDatabase(thn_bc_name), grid_geometry);
+        }
 
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -119,8 +141,12 @@ main(int argc, char* argv[])
         const int draw_fs_idx = var_db->registerVariableAndContext(draw_fs_var, ctx);
         const int draw_es_idx = var_db->registerVariableAndContext(draw_es_var, ctx);
 
-        Pointer<CellVariable<NDIM, double>> draw_div_var = new CellVariable<NDIM, double>("draw_div_var");
-        const int draw_div_idx = var_db->registerVariableAndContext(draw_div_var, ctx);
+        Pointer<CellVariable<NDIM, double>> exact_cc_un_var = new CellVariable<NDIM, double>("exact_un", NDIM);
+        Pointer<CellVariable<NDIM, double>> exact_cc_us_var = new CellVariable<NDIM, double>("exact_us", NDIM);
+        Pointer<CellVariable<NDIM, double>> exact_cc_p_var = new CellVariable<NDIM, double>("exact_p");
+        const int exact_cc_un_idx = var_db->registerVariableAndContext(exact_cc_un_var, ctx);
+        const int exact_cc_us_idx = var_db->registerVariableAndContext(exact_cc_us_var, ctx);
+        const int exact_cc_p_idx = var_db->registerVariableAndContext(exact_cc_p_var, ctx);
 
         // Register variables for plotting.
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
@@ -129,8 +155,7 @@ main(int argc, char* argv[])
         visit_data_writer->registerPlotQuantity("Pressure", "SCALAR", p_cc_idx);
         visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_cc_idx);
         visit_data_writer->registerPlotQuantity("RHS_P", "SCALAR", f_cc_idx);
-        visit_data_writer->registerPlotQuantity("error_p", "SCALAR", e_cc_idx);
-        visit_data_writer->registerPlotQuantity("Div", "SCALAR", draw_div_idx);
+        visit_data_writer->registerPlotQuantity("error_RHS_p", "SCALAR", e_cc_idx);
 
         visit_data_writer->registerPlotQuantity("Un", "VECTOR", draw_un_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
@@ -144,10 +169,10 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("RHS_Un_" + std::to_string(d), "SCALAR", draw_fn_idx, d);
         }
 
-        visit_data_writer->registerPlotQuantity("error_un", "VECTOR", draw_en_idx);
+        visit_data_writer->registerPlotQuantity("error_RHS_un", "VECTOR", draw_en_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
         {
-            visit_data_writer->registerPlotQuantity("error_un_" + std::to_string(d), "SCALAR", draw_en_idx, d);
+            visit_data_writer->registerPlotQuantity("error_RHS_un_" + std::to_string(d), "SCALAR", draw_en_idx, d);
         }
 
         visit_data_writer->registerPlotQuantity("Us", "VECTOR", draw_us_idx);
@@ -162,10 +187,19 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("RHS_Us_" + std::to_string(d), "SCALAR", draw_fs_idx, d);
         }
 
-        visit_data_writer->registerPlotQuantity("error_us", "VECTOR", draw_es_idx);
+        visit_data_writer->registerPlotQuantity("error_RHS_us", "VECTOR", draw_es_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
         {
-            visit_data_writer->registerPlotQuantity("error_us_" + std::to_string(d), "SCALAR", draw_es_idx, d);
+            visit_data_writer->registerPlotQuantity("error_RHS_us_" + std::to_string(d), "SCALAR", draw_es_idx, d);
+        }
+
+        visit_data_writer->registerPlotQuantity("exact_RHS_un", "VECTOR", exact_cc_un_idx);
+        visit_data_writer->registerPlotQuantity("exact_RHS_us", "VECTOR", exact_cc_us_idx);
+        visit_data_writer->registerPlotQuantity("exact_RHS_p", "SCALAR", exact_cc_p_idx);
+        for (unsigned int d = 0; d < NDIM; ++d)
+        {
+            visit_data_writer->registerPlotQuantity("exact_RHS_un_" + std::to_string(d), "SCALAR", exact_cc_un_idx, d);
+            visit_data_writer->registerPlotQuantity("exact_RHS_us_" + std::to_string(d), "SCALAR", exact_cc_us_idx, d);
         }
 
         gridding_algorithm->makeCoarsestLevel(patch_hierarchy, 0.0);
@@ -199,7 +233,9 @@ main(int argc, char* argv[])
             level->allocatePatchData(draw_us_idx, 0.0);
             level->allocatePatchData(draw_fs_idx, 0.0);
             level->allocatePatchData(draw_es_idx, 0.0);
-            level->allocatePatchData(draw_div_idx, 0.0);
+            level->allocatePatchData(exact_cc_un_idx, 0.0);
+            level->allocatePatchData(exact_cc_us_idx, 0.0);
+            level->allocatePatchData(exact_cc_p_idx, 0.0);
         }
 
         // Setup vector objects.
@@ -227,56 +263,6 @@ main(int argc, char* argv[])
         e_vec.setToScalar(0.0);
         r_vec.setToScalar(0.0);
 
-        // There is one pressure and two velocity nullspaces (one for each component)
-        bool is_vel_nullspace = input_db->getBool("IS_VEL_NULLSPACE");
-        std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs(1 + (is_vel_nullspace ? NDIM : 0));
-        null_vecs[0] = u_vec.cloneVector("PressureNull");
-        null_vecs[0]->allocateVectorData();
-        null_vecs[0]->setToScalar(0.0);
-        if (is_vel_nullspace)
-        {
-            null_vecs[1] = u_vec.cloneVector("VelNull0");
-            null_vecs[2] = u_vec.cloneVector("VelNull1");
-            null_vecs[1]->allocateVectorData();
-            null_vecs[1]->setToScalar(0.0);
-            null_vecs[2]->allocateVectorData();
-            null_vecs[2]->setToScalar(0.0);
-        }
-        // Pull out pressure component and set to constant
-        {
-            for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
-                for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-                {
-                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
-                    Pointer<CellData<NDIM, double>> p_data = null_vecs[0]->getComponentPatchData(2, *patch);
-                    p_data->fillAll(1.0);
-
-                    if (is_vel_nullspace)
-                    {
-                        Pointer<SideData<NDIM, double>> un_data = null_vecs[1]->getComponentPatchData(0, *patch);
-                        Pointer<SideData<NDIM, double>> us_data = null_vecs[1]->getComponentPatchData(1, *patch);
-                        for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++)
-                        {
-                            const SideIndex<NDIM>& idx = si();
-                            (*un_data)(idx) = 1.0;
-                            (*us_data)(idx) = 1.0;
-                        }
-
-                        un_data = null_vecs[2]->getComponentPatchData(0, *patch);
-                        us_data = null_vecs[2]->getComponentPatchData(1, *patch);
-                        for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++)
-                        {
-                            const SideIndex<NDIM>& idx = si();
-                            (*un_data)(idx) = 1.0;
-                            (*us_data)(idx) = 1.0;
-                        }
-                    }
-                }
-            }
-        }
-
         // Setup velocity and pressures functions.
         muParserCartGridFunction un_fcn("un", app_initializer->getComponentDatabase("un"), grid_geometry);
         muParserCartGridFunction us_fcn("us", app_initializer->getComponentDatabase("us"), grid_geometry);
@@ -290,140 +276,104 @@ main(int argc, char* argv[])
         muParserCartGridFunction f_us_fcn("f_us", app_initializer->getComponentDatabase("f_us"), grid_geometry);
         muParserCartGridFunction f_p_fcn("f_p", app_initializer->getComponentDatabase("f_p"), grid_geometry);
 
-        f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, patch_hierarchy, 0.0);
-        f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
-        f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
+        un_fcn.setDataOnPatchHierarchy(un_sc_idx, un_sc_var, patch_hierarchy, 0.0);
+        us_fcn.setDataOnPatchHierarchy(us_sc_idx, us_sc_var, patch_hierarchy, 0.0);
+        p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
         thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
 
-        un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
-        us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
-        p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
+        f_un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
+        f_us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
+        f_p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
-        stokes_op->setCandDCoefficients(C, D);
         const double xi = input_db->getDouble("XI");
         const double etan = input_db->getDouble("ETAN");
         const double etas = input_db->getDouble("ETAS");
         const double nu = input_db->getDouble("NU");
-        stokes_op->setDragCoefficient(xi, nu, nu);
-        stokes_op->setViscosityCoefficient(etan, etas);
-        stokes_op->setThnIdx(thn_cc_idx);
+        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", false);
+        stokes_op.setCandDCoefficients(C, D);
+        stokes_op.setDragCoefficient(xi, nu, nu);
+        stokes_op.setViscosityCoefficient(etan, etas);
+        stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
 
-        Pointer<PETScKrylovLinearSolver> krylov_solver =
-            new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
-        krylov_solver->setOperator(stokes_op);
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op.setPhysicalBoundaryHelper(bc_helper);
 
-        // Now create a preconditioner
-        Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-                "KrylovPrecondStrategy",
-                // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_");
-        fac_precondition_strategy->setThnIdx(thn_cc_idx);
-        fac_precondition_strategy->setCandDCoefficients(C, D);
-        fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
-        fac_precondition_strategy->setViscosityCoefficient(etan, etas);
-        fac_precondition_strategy->setDragCoefficient(xi, nu, nu);
-        Pointer<FullFACPreconditioner> Krylov_precond =
-            new FullFACPreconditioner("KrylovPrecond",
-                                      fac_precondition_strategy,
-                                      app_initializer->getComponentDatabase("KrylovPrecond"),
-                                      "Krylov_precond_");
-        bool use_precond = input_db->getBool("USE_PRECOND");
-        Krylov_precond->setNullspace(false, null_vecs);
-        if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
+        stokes_op.setThnIdx(thn_cc_idx);
+        stokes_op.initializeOperatorState(u_vec, f_vec);
 
-        krylov_solver->setNullspace(false, null_vecs);
-        krylov_solver->initializeSolverState(u_vec, f_vec);
-        // We need to set thn_cc_idx on the dense hierarchy.
-        // TODO: find a better way to do this
-        if (use_precond)
+        // Apply the operator
+        stokes_op.apply(u_vec, f_vec);
+
+        // Print out f_un_sc_idx and f_us_sc_idx.
+        for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
-            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-            // Allocate data
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+            Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
+            for (PatchLevel<NDIM>::Iterator p(level); p; p++)
             {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
+                Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+                if (pgeom->getTouchesRegularBoundary())
+                {
+                    Pointer<SideData<NDIM, double>> fun_data = patch->getPatchData(f_un_sc_idx);
+                    Pointer<SideData<NDIM, double>> fus_data = patch->getPatchData(f_us_sc_idx);
+                    Pointer<SideData<NDIM, double>> exact_us_data = patch->getPatchData(e_us_sc_idx);
+                    Pointer<SideData<NDIM, double>> exact_un_data = patch->getPatchData(e_un_sc_idx);
+                    const tbox::Array<BoundaryBox<NDIM>>& physical_codim1_boxes =
+                        PhysicalBoundaryUtilities::getPhysicalBoundaryCodim1Boxes(*patch);
+                    const int num_bdry_boxes = physical_codim1_boxes.size();
+                    for (int n = 0; n < num_bdry_boxes; ++n)
+                    {
+                        const BoundaryBox<NDIM>& bdry_box = physical_codim1_boxes[n];
+                        const int location_index = bdry_box.getLocationIndex();
+                        const int bdry_normal_axis = location_index / 2;
+                        const int upper_lower = ((location_index % 2) + 1) % 2;
+                        for (CellIterator<NDIM> ci(bdry_box.getBox()); ci; ci++)
+                        {
+                            const CellIndex<NDIM>& cell_idx = ci();
+                            SideIndex<NDIM> idx(cell_idx, bdry_normal_axis, upper_lower);
+                            pout << "On idx " << cell_idx << " on bdry " << bdry_normal_axis << " and "
+                                 << (upper_lower == 0 ? "lower" : "upper") << " side\n";
+                            pout << "Un: " << (*fun_data)(idx) << "\n";
+                            pout << "Exact un: " << (*exact_un_data)(idx) << "\n";
+                            pout << "Us: " << (*fus_data)(idx) << "\n";
+                            pout << "Exact us: " << (*exact_us_data)(idx) << "\n";
+                        }
+                    }
+                }
             }
-            thn_fcn.setDataOnPatchHierarchy(
-                thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
-            // Also fill in theta ghost cells
-            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-            std::vector<ITC> ghost_cell_comp(1);
-            ghost_cell_comp[0] = ITC(thn_cc_idx,
-                                     "CONSERVATIVE_LINEAR_REFINE",
-                                     false,
-                                     "NONE",
-                                     "LINEAR",
-                                     true,
-                                     nullptr); // defaults to fill corner
-            HierarchyGhostCellInterpolation ghost_cell_fill;
-            ghost_cell_fill.initializeOperatorState(
-                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-            ghost_cell_fill.fillData(0.0);
         }
+
+        // Compute error and print error norms.
+        e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&f_vec, false),  // numerical
+                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
+        pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
+        pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
+        pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
+
         hier_math_ops.setPatchHierarchy(patch_hierarchy);
         hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
         // just computes quadrature weights
         const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
         const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
-        // Compute weighted sum for rhs divergence.
-        {
-            const int rhs_p_idx = f_vec.getComponentDescriptorIndex(2);
-            HierarchyCellDataOpsReal<NDIM, double> hier_sc_data_ops(
-                patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-            double integral = hier_sc_data_ops.integral(rhs_p_idx, wgt_cc_idx);
-            pout << "Weighted integral = " << integral << "\n";
-            hier_sc_data_ops.addScalar(rhs_p_idx, rhs_p_idx, -1.0 * integral);
-            integral = hier_sc_data_ops.integral(rhs_p_idx, wgt_cc_idx);
-            pout << "Weighted integral = " << integral << "\n";
-        }
-
-        visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
-        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        krylov_solver->solveSystem(u_vec, f_vec);
-        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        pout << "Solve took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()
-             << " milliseconds\n";
-
-        // Deallocate data
-        if (use_precond)
-        {
-            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
-            }
-        }
-
-        // Compute error and print error norms.
-        e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical
-                       Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
-        pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
-        pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
-        pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
-
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in u_n :\n"
+        pout << "Error in RHS_un :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
              << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
-        pout << "Error in u_s :\n"
+        pout << "Error in RHS_us :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
              << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
         HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        pout << "Error in p :\n"
+        pout << "Error in RHS_p :\n"
              << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
@@ -438,24 +388,15 @@ main(int argc, char* argv[])
         hier_math_ops.interp(draw_fs_idx, draw_fs_var, f_us_sc_idx, f_us_sc_var, nullptr, 0.0, synch_cf_interface);
         hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
 
-        // Compute discrete divergence.
-        // Fill ghost cells for theta
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_fill_specs = { ITC(
-            thn_cc_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR") };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_fill_specs, patch_hierarchy);
-        ghost_fill.fillData(0.0);
-        pre_div_interp(un_sc_idx, thn_cc_idx, un_sc_idx, us_sc_idx, patch_hierarchy);
-        hier_math_ops.div(draw_div_idx, draw_div_var, 1.0, un_sc_idx, un_sc_var, nullptr, 0.0, true);
-        ghost_fill_specs = { ITC(draw_div_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
-        ghost_fill.deallocateOperatorState();
-        ghost_fill.initializeOperatorState(ghost_fill_specs, patch_hierarchy);
-        ghost_fill.fillData(0.0);
+        f_un_fcn.setDataOnPatchHierarchy(exact_cc_un_idx, exact_cc_un_var, patch_hierarchy, 0.0, false);
+        f_us_fcn.setDataOnPatchHierarchy(exact_cc_us_idx, exact_cc_us_var, patch_hierarchy, 0.0, false);
+        f_p_fcn.setDataOnPatchHierarchy(exact_cc_p_idx, exact_cc_p_var, patch_hierarchy, 0.0, false);
 
         // Output data for plotting.
-        visit_data_writer->writePlotData(patch_hierarchy, 1, 0.0);
+        visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+
         // Deallocate level data
+        // Allocate data on each level of the patch hierarchy.
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
         {
             Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
@@ -475,9 +416,9 @@ main(int argc, char* argv[])
             level->deallocatePatchData(draw_us_idx);
             level->deallocatePatchData(draw_fs_idx);
             level->deallocatePatchData(draw_es_idx);
+            level->deallocatePatchData(exact_cc_un_idx);
+            level->deallocatePatchData(exact_cc_us_idx);
+            level->deallocatePatchData(exact_cc_p_idx);
         }
-
-        // Write timer data
-        TimerManager::getManager()->print(plog);
     } // cleanup dynamically allocated objects prior to shutdown
 } // main

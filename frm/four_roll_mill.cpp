@@ -1,15 +1,5 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2017 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
+#include "multiphase/CFMultiphaseOldroydB.h"
+#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/CFINSForcing.h>
@@ -36,9 +26,7 @@
 #include <SAMRAI_config.h>
 #include <StandardTagAndInitialize.h>
 
-// Local includes
-#include "CFMultiphaseOldroydB.h"
-#include "INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+using namespace multiphase;
 
 // Function prototypes
 void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,

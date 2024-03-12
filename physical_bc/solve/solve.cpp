@@ -1,3 +1,16 @@
+// ---------------------------------------------------------------------
+//
+// Copyright (c) 2017 - 2020 by the IBAMR developers
+// All rights reserved.
+//
+// This file is part of IBAMR.
+//
+// IBAMR is free software and is distributed under the 3-clause BSD
+// license. The full text of the license can be found in the file
+// COPYRIGHT at the top level directory of IBAMR.
+//
+// ---------------------------------------------------------------------
+
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
@@ -28,7 +41,6 @@
 #include <chrono>
 
 using namespace multiphase;
-
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
  * cases, the command line is:                                                 *
@@ -68,6 +80,25 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
+
+        // Grab the boundary condition objects
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
+        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
+        bool is_periodic = grid_geometry->getPeriodicShift().max() == 1;
+        if (!is_periodic)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                std::string un_bc_coef_name = "un_bc_" + std::to_string(d);
+                un_bc_coefs[d] =
+                    new muParserRobinBcCoefs(un_bc_coef_name, input_db->getDatabase(un_bc_coef_name), grid_geometry);
+                std::string us_bc_coef_name = "us_bc_" + std::to_string(d);
+                us_bc_coefs[d] =
+                    new muParserRobinBcCoefs(us_bc_coef_name, input_db->getDatabase(us_bc_coef_name), grid_geometry);
+            }
+            std::string thn_bc_name = "thn_bc";
+            thn_bc_coef = new muParserRobinBcCoefs(thn_bc_name, input_db->getDatabase(thn_bc_name), grid_geometry);
+        }
 
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -227,7 +258,7 @@ main(int argc, char* argv[])
         e_vec.setToScalar(0.0);
         r_vec.setToScalar(0.0);
 
-        // There is one pressure and two velocity nullspaces (one for each component)
+        // There is one pressure nullspace and (possibly) two velocity nullspaces (one for each component)
         bool is_vel_nullspace = input_db->getBool("IS_VEL_NULLSPACE");
         std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>> null_vecs(1 + (is_vel_nullspace ? NDIM : 0));
         null_vecs[0] = u_vec.cloneVector("PressureNull");
@@ -312,6 +343,10 @@ main(int argc, char* argv[])
         stokes_op->setViscosityCoefficient(etan, etas);
         stokes_op->setThnIdx(thn_cc_idx);
 
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op->setPhysicalBoundaryHelper(bc_helper);
+        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
+
         Pointer<PETScKrylovLinearSolver> krylov_solver =
             new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
         krylov_solver->setOperator(stokes_op);
@@ -322,6 +357,7 @@ main(int argc, char* argv[])
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
                 "Krylov_precond_");
+        fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
@@ -385,6 +421,7 @@ main(int argc, char* argv[])
         }
 
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
+        krylov_solver->setHomogeneousBc(false);
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         krylov_solver->solveSystem(u_vec, f_vec);
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

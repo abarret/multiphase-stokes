@@ -1,24 +1,14 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2008 - 2022 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
-/////////////////////////////// INCLUDE GUARD ////////////////////////////////
-
-#ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
-#define included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
+#ifndef included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
+#define included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include <ibamr/config.h>
+
+#include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/INSVCTwoFluidConvectiveManager.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
 
 #include "ibamr/INSHierarchyIntegrator.h"
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
@@ -27,6 +17,7 @@
 #include "ibamr/ibamr_enums.h"
 
 #include "ibtk/SideDataSynchronization.h"
+#include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/muParserCartGridFunction.h>
 
 #include "CellVariable.h"
@@ -43,20 +34,15 @@
 #include <string>
 #include <vector>
 
-// Local includes
-#include "FullFACPreconditioner.h"
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
-
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
-namespace IBAMR
+namespace multiphase
 {
 /*!
  * \brief Class INSVCTwoFluidStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
  */
-class INSVCTwoFluidStaggeredHierarchyIntegrator : public INSHierarchyIntegrator
+class INSVCTwoFluidStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
 {
 public:
     /*!
@@ -81,7 +67,7 @@ public:
     /*!
      * Non-zero Reynolds numbers are not implemented. Returns nullptr.
      */
-    SAMRAI::tbox::Pointer<ConvectiveOperator> getConvectiveOperator() override;
+    SAMRAI::tbox::Pointer<IBAMR::ConvectiveOperator> getConvectiveOperator() override;
 
     /*!
      * Not in use. Returns nullptr.
@@ -112,6 +98,26 @@ public:
     {
         return d_thn_cc_var;
     }
+
+    /*!
+     * Register physical boundary condition objects. Note that we currently only work with periodic and Dirichlet
+     * conditions on the velocity.
+     *
+     * This class does not assume ownership of the bc objects, so they must be deleted by the user.
+     */
+    void registerPhysicalBoundaryConditions(std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
+                                            std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> us_bc_coefs);
+
+    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getNetworkBoundaryConditions() const;
+    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getSolventBoundaryConditions() const;
+
+    /*!
+     * Optionally register the volume fraction boundary conditions. This will only be used when the volume fraction is
+     * not an advected quantity. This conditions are ignored at periodic boundaries.
+     *
+     * If this is not set, then linear extrapolation will be used at physical boundaries.
+     */
+    void registerVolumeFractionBoundaryConditions(SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coefs);
 
     /*!
      * \brief Set the viscosity coefficients for the viscous stresses.
@@ -163,8 +169,13 @@ public:
     /*!
      * Sets that the network volume fraction should be advected with the specified advection diffusion integrator. Also
      * registers the integrator with the hierarchy.
+     *
+     * The optional input has_meaningful_mid_value should be set to false if there is no meaningful "new" time value
+     * after a single evolution. In particular, this should be set to false if using semi-Lagrangian methods to evolve
+     * the volume fraction.
      */
-    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator);
+    void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator,
+                                     bool has_meaningful_mid_value = true);
 
     /*!
      * Initialize the variables, basic communications algorithms, solvers, and
@@ -231,10 +242,30 @@ public:
                                           bool initial_time,
                                           bool uses_richardson_extrapolation_too);
 
+    void regridHierarchyBeginSpecialized() override;
+    void initializeCompositeHierarchyDataSpecialized(double init_data_time, bool initial_time) override;
+
 protected:
     void setupPlotDataSpecialized() override;
 
 private:
+    void setThnAtHalf(int& thn_cur_idx,
+                      int& thn_new_idx,
+                      int& thn_scr_idx,
+                      double current_time,
+                      double new_time,
+                      bool start_of_ts);
+
+    void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
+                        double current_time,
+                        double new_time,
+                        int un_cur_idx,
+                        int us_cur_idx,
+                        int thn_cur_idx,
+                        int un_new_idx,
+                        int us_new_idx,
+                        int thn_new_idx);
+
     /*!
      * \brief Default constructor.
      *
@@ -268,6 +299,11 @@ private:
 
     // CartGridFunctions that set the initial values for state variables.
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_un_init_fcn, d_us_init_fcn, d_p_init_fcn, d_thn_init_fcn;
+
+    /*!
+     * Boundary conditions
+     */
+    std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs, d_us_bc_coefs;
 
     /*!
      * Fluid solver variables.
@@ -313,7 +349,7 @@ private:
      * Preconditioner information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
-    SAMRAI::tbox::Pointer<IBTK::FullFACPreconditioner> d_stokes_precond;
+    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
     SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;
@@ -341,10 +377,28 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
 
     bool d_make_div_rhs_sum_to_zero = true;
+
+    /*!
+     * Convective operator
+     */
+    std::unique_ptr<INSVCTwoFluidConvectiveManager> d_convec_op;
+    IBAMR::LimiterType d_convec_limiter_type = IBAMR::LimiterType::UNKNOWN_LIMITER_TYPE;
+
+    /*!
+     * AB2 patch index for convective operator
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_Nn_old_var, d_Ns_old_var;
+
+    // Scratch force index
+    int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
+
+    // Flag for if volume fraction has a meaningful value in middle of time step.
+    bool d_use_new_thn = true;
 };
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 
