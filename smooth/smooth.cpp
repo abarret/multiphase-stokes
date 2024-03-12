@@ -1,5 +1,5 @@
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -260,7 +260,7 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
 
         // Setup the box relaxation FAC operator
-        VCTwoFluidStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
+        MultiphaseStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "");
         box_relax.setThnIdx(thn_cc_idx);
         box_relax.setToZero(u_vec, 0);
         box_relax.setCandDCoefficients(0.0, 1.0);

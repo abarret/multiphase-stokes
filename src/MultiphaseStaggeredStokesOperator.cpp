@@ -1,6 +1,6 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
@@ -90,7 +90,7 @@ convert_to_ndim_cc(const int dst_idx, const int cc_idx, Pointer<PatchHierarchy<N
 }
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
-VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
+MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::string& object_name,
                                                                      bool homogeneous_bc,
                                                                      Pointer<Database> input_db)
     : LinearOperator(object_name, homogeneous_bc),
@@ -180,7 +180,7 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
     return;
 } // TwoFluidStaggeredStokesOperator
 
-VCTwoFluidStaggeredStokesOperator::~VCTwoFluidStaggeredStokesOperator()
+MultiphaseStaggeredStokesOperator::~MultiphaseStaggeredStokesOperator()
 {
     deallocateOperatorState();
     delete d_default_un_bc_coef;
@@ -197,7 +197,7 @@ VCTwoFluidStaggeredStokesOperator::~VCTwoFluidStaggeredStokesOperator()
 
 // Probably need another one for second fluid equation
 void
-VCTwoFluidStaggeredStokesOperator::setVelocityPoissonSpecifications(const PoissonSpecifications& coefs)
+MultiphaseStaggeredStokesOperator::setVelocityPoissonSpecifications(const PoissonSpecifications& coefs)
 {
     TBOX_WARNING(d_object_name +
                  "::setVelocityPoissonSpecifications: This function is not used. Use setCandDCoefficients instead.");
@@ -205,7 +205,7 @@ VCTwoFluidStaggeredStokesOperator::setVelocityPoissonSpecifications(const Poisso
 } // setVelocityPoissonSpecifications
 
 void
-VCTwoFluidStaggeredStokesOperator::setCandDCoefficients(const double C,
+MultiphaseStaggeredStokesOperator::setCandDCoefficients(const double C,
                                                         const double D_u,
                                                         const double D_p,
                                                         const double D_div)
@@ -217,14 +217,14 @@ VCTwoFluidStaggeredStokesOperator::setCandDCoefficients(const double C,
 }
 
 void
-VCTwoFluidStaggeredStokesOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
+MultiphaseStaggeredStokesOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
     d_eta_n = eta_n;
     d_eta_s = eta_s;
 }
 
 void
-VCTwoFluidStaggeredStokesOperator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
+MultiphaseStaggeredStokesOperator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
 {
     d_xi = xi;
     d_nu_n = nu_n;
@@ -232,13 +232,13 @@ VCTwoFluidStaggeredStokesOperator::setDragCoefficient(const double xi, const dou
 }
 
 void
-VCTwoFluidStaggeredStokesOperator::setThnIdx(const int thn_idx)
+MultiphaseStaggeredStokesOperator::setThnIdx(const int thn_idx)
 {
     d_thn_idx = thn_idx;
 }
 
 void
-VCTwoFluidStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+MultiphaseStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                                                       const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
                                                       RobinBcCoefStrategy<NDIM>* P_bc_coef,
                                                       RobinBcCoefStrategy<NDIM>* thn_bc_coef)
@@ -288,7 +288,7 @@ VCTwoFluidStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcC
 } // setPhysicalBcCoefs
 
 void
-VCTwoFluidStaggeredStokesOperator::setPhysicalBoundaryHelper(Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper)
+MultiphaseStaggeredStokesOperator::setPhysicalBoundaryHelper(Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper)
 {
 #if !defined(NDEBUG)
     TBOX_ASSERT(bc_helper);
@@ -298,7 +298,7 @@ VCTwoFluidStaggeredStokesOperator::setPhysicalBoundaryHelper(Pointer<StaggeredSt
 } // setPhysicalBoundaryHelper
 
 void
-VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMRAIVectorReal<NDIM, double>& y)
+MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMRAIVectorReal<NDIM, double>& y)
 {
     IBAMR_TIMER_START(t_apply);
 
@@ -630,7 +630,7 @@ VCTwoFluidStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 } // apply
 
 void
-VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& in,
+MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& in,
                                                            const SAMRAIVectorReal<NDIM, double>& out)
 {
     IBAMR_TIMER_START(t_initialize_operator_state);
@@ -729,7 +729,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
 } // initializeOperatorState
 
 void
-VCTwoFluidStaggeredStokesOperator::deallocateOperatorState()
+MultiphaseStaggeredStokesOperator::deallocateOperatorState()
 {
     if (!d_is_initialized) return;
 
@@ -783,7 +783,7 @@ VCTwoFluidStaggeredStokesOperator::deallocateOperatorState()
 } // deallocateOperatorState
 
 void
-VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double>& y)
+MultiphaseStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double>& y)
 {
     if (!d_homogeneous_bc)
     {
@@ -822,7 +822,7 @@ VCTwoFluidStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
 } // modifyRhsForBcs
 
 void
-VCTwoFluidStaggeredStokesOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& u)
+MultiphaseStaggeredStokesOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& u)
 {
     if (d_bc_helper)
     {
@@ -843,6 +843,6 @@ VCTwoFluidStaggeredStokesOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& 
 
 //////////////////////////////////////////////////////////////////////////////
 
-} // namespace IBAMR
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////

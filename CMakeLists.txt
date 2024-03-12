@@ -7,10 +7,10 @@ FIND_PACKAGE(IBAMR REQUIRED)
 SET(MULTIPHASE_SRC
     src/CFMultiphaseOldroydB.cpp
     src/FullFACPreconditioner.cpp
-    src/INSVCTwoFluidConvectiveManager.cpp
-    src/INSVCTwoFluidStaggeredHierarchyIntegrator.cpp
-    src/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.cpp
-    src/VCTwoFluidStaggeredStokesOperator.cpp
+    src/MultiphaseConvectiveManager.cpp
+    src/MultiphaseStaggeredHierarchyIntegrator.cpp
+    src/MultiphaseStaggeredStokesBoxRelaxationFACOperator.cpp
+    src/MultiphaseStaggeredStokesOperator.cpp
     src/RBGS.f
     )
 

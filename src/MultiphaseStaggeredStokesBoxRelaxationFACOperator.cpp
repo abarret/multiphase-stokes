@@ -1,6 +1,6 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include "ibamr/namespaces.h" // IWYU pragma: keep
@@ -175,7 +175,7 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 } // namespace
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
     const std::string& default_options_prefix)
     : FACPreconditionerStrategy(object_name),
@@ -254,16 +254,16 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
-                     "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError()");
+                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError()");
                  t_solve_coarsest_level = TimerManager::getManager()->getTimer(
-                     "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
+                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
                  t_compute_residual = TimerManager::getManager()->getTimer(
-                     "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
+                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
     return;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
     RobinBcCoefStrategy<NDIM>* P_bc_coef,
@@ -285,15 +285,17 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
         else
             d_us_bc_coefs[d] = d_default_us_bc_coef.get();
     }
-    if (P_bc_coef) d_P_bc_coef = P_bc_coef;
+    if (P_bc_coef)
+        d_P_bc_coef = P_bc_coef;
     else
         d_P_bc_coef = d_default_P_bc_coef.get();
-    if (thn_bc_coef) d_thn_bc_coef = thn_bc_coef;
+    if (thn_bc_coef)
+        d_thn_bc_coef = thn_bc_coef;
     else
         d_thn_bc_coef = d_default_thn_bc_coef.get();
 }
 
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator()
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::~MultiphaseStaggeredStokesBoxRelaxationFACOperator()
 {
     // Dallocate operator state first
     deallocateOperatorState();
@@ -303,14 +305,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBox
 // create another member function to set-up Thn
 // Thn is defined in the input file and read in using muParserCartGridFunction
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setThnIdx(int thn_idx)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setThnIdx(int thn_idx)
 {
     d_thn_idx = thn_idx;
     return;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
                                                                     SAMRAIVectorReal<NDIM, double>& dst,
                                                                     const int dst_ln)
 {
@@ -350,7 +352,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAI
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
                                                                 SAMRAIVectorReal<NDIM, double>& dst,
                                                                 const int dst_ln)
 {
@@ -371,7 +373,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVect
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
                                                                           SAMRAIVectorReal<NDIM, double>& dst,
                                                                           const int dst_ln)
 {
@@ -415,7 +417,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const 
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
     SAMRAIVectorReal<NDIM, double>& error,          // Solution
     const SAMRAIVectorReal<NDIM, double>& residual, // RHS - A*error on the entire patch level
     int level_num,
@@ -665,7 +667,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
 }
 
 bool
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVectorReal<NDIM, double>& error,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVectorReal<NDIM, double>& error,
                                                                       const SAMRAIVectorReal<NDIM, double>& residual,
                                                                       int coarsest_ln)
 {
@@ -678,7 +680,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVect
 } // solveCoarsestLevel
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
                                                                    const SAMRAIVectorReal<NDIM, double>& solution,
                                                                    const SAMRAIVectorReal<NDIM, double>& rhs,
                                                                    int coarsest_level_num,
@@ -959,7 +961,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<NDIM, double>& vec, int level_num)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<NDIM, double>& vec, int level_num)
 {
     const int un_idx = vec.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = vec.getComponentDescriptorIndex(1); // solvent velocity, Us
@@ -980,7 +982,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
 } // setToZero
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
                                                                            const SAMRAIVectorReal<NDIM, double>& rhs)
 {
     if (d_is_initialized) deallocateOperatorState();
@@ -1157,7 +1159,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
 {
     // Delete the operators, schedules, and algorithms
     d_un_restrict_op.setNull();
@@ -1192,27 +1194,27 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setUnderRelaxationParamater(const double w)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setUnderRelaxationParamater(const double w)
 {
     d_w = w;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setCandDCoefficients(const double C, const double D)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setCandDCoefficients(const double C, const double D)
 {
     d_C = C;
     d_D = D;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
     d_eta_n = eta_n;
     d_eta_s = eta_s;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setDragCoefficient(const double xi,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setDragCoefficient(const double xi,
                                                                       const double nu_n,
                                                                       const double nu_s)
 {
@@ -1222,7 +1224,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setDragCoefficient(const doub
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std::array<int, 3>& dst_idxs,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std::array<int, 3>& dst_idxs,
                                                                        const std::array<int, 3>& src_idxs,
                                                                        const int dst_ln)
 {
@@ -1247,7 +1249,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std::array<int, 3>& dst_idxs,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std::array<int, 3>& dst_idxs,
                                                                       const std::array<int, 3>& src_idxs,
                                                                       const int dst_ln)
 {
@@ -1262,7 +1264,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std:
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std::array<int, 3>& dst_idxs,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std::array<int, 3>& dst_idxs,
                                                                        const int dst_ln)
 {
     d_un_bc_op->setPatchDataIndex(dst_idxs[0]);
@@ -1287,6 +1289,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std
 /////////////////////////////// PRIVATE //////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////
-} // namespace IBTK
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////

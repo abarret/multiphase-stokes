@@ -1,5 +1,5 @@
-#ifndef included_multiphase_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
-#define included_multiphase_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#ifndef included_multiphase_MultiphaseStaggeredStokesBoxRelaxationFACOperator
+#define included_multiphase_MultiphaseStaggeredStokesBoxRelaxationFACOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -28,7 +28,7 @@
 
 namespace multiphase
 {
-class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public IBTK::FACPreconditionerStrategy
+class MultiphaseStaggeredStokesBoxRelaxationFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:
     /*!
@@ -36,13 +36,13 @@ public:
      * \param w under relaxation factor in box relaxation scheme
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
                                                       const std::string& default_options_prefix);
 
     /*!
      * \brief Destructor.
      */
-    ~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator();
+    ~MultiphaseStaggeredStokesBoxRelaxationFACOperator();
 
     void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                             const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
@@ -186,7 +186,7 @@ private:
      *
      * \note This constructor is not implemented and should not be used.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator() = delete;
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -195,7 +195,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& from) =
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator(const MultiphaseStaggeredStokesBoxRelaxationFACOperator& from) =
         delete;
 
     /*!
@@ -207,8 +207,8 @@ private:
      *
      * \return A reference to this object.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator&
-    operator=(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& that) = delete;
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator&
+    operator=(const MultiphaseStaggeredStokesBoxRelaxationFACOperator& that) = delete;
 
     /*!
      * \brief Perform prolongation or restriction on the provided indices.
@@ -293,4 +293,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#endif // #ifndef included_IBTK_MultiphaseStaggeredStokesBoxRelaxationFACOperator

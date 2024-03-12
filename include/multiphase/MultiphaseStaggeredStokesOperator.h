@@ -1,5 +1,5 @@
-#ifndef included_multiphase_StaggeredStokesOperator
-#define included_multiphase_StaggeredStokesOperator
+#ifndef included_multiphase_MultiphaseStaggeredStokesOperator
+#define included_multiphase_MultiphaseStaggeredStokesOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -68,7 +68,7 @@ namespace multiphase
  *
  * \see INSStaggeredHierarchyIntegrator
  */
-class VCTwoFluidStaggeredStokesOperator : public IBTK::LinearOperator
+class MultiphaseStaggeredStokesOperator : public IBTK::LinearOperator
 {
 public:
     /*!
@@ -83,14 +83,14 @@ public:
      *  -- "nu_n" - double
      *  -- "nu_s" - double
      */
-    VCTwoFluidStaggeredStokesOperator(const std::string& object_name,
+    MultiphaseStaggeredStokesOperator(const std::string& object_name,
                                       bool homogeneous_bc,
                                       SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db = nullptr);
 
     /*!
      * \brief Destructor.
      */
-    ~VCTwoFluidStaggeredStokesOperator();
+    ~MultiphaseStaggeredStokesOperator();
 
     /*!
      * \brief Set the PoissonSpecifications object used to specify the C and D values for the momentum equations
@@ -273,7 +273,7 @@ private:
      *
      * \note This constructor is not implemented and should not be used.
      */
-    VCTwoFluidStaggeredStokesOperator() = delete;
+    MultiphaseStaggeredStokesOperator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -282,7 +282,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    VCTwoFluidStaggeredStokesOperator(const VCTwoFluidStaggeredStokesOperator& from) = delete;
+    MultiphaseStaggeredStokesOperator(const MultiphaseStaggeredStokesOperator& from) = delete;
 
     /*!
      * \brief Assignment operator.
@@ -293,7 +293,7 @@ private:
      *
      * \return A reference to this object.
      */
-    VCTwoFluidStaggeredStokesOperator& operator=(const VCTwoFluidStaggeredStokesOperator& that) = delete;
+    MultiphaseStaggeredStokesOperator& operator=(const MultiphaseStaggeredStokesOperator& that) = delete;
 
     // Synchronization variable
     SAMRAI::tbox::Pointer<SAMRAI::pdat::OutersideVariable<NDIM, double>> d_os_var;
@@ -323,4 +323,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_IBAMR_TwoFluidStaggeredStokesOperator
+#endif // #ifndef included_multiphase_MultiphaseStaggeredStokesOperator

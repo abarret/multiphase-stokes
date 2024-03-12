@@ -1,6 +1,6 @@
 #include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -305,7 +305,7 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+        Pointer<MultiphaseStaggeredStokesOperator> stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", true);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
@@ -327,8 +327,8 @@ main(int argc, char* argv[])
         krylov_solver->setOperator(stokes_op);
 
         // Now create a preconditioner
-        Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
+        Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
                 "Krylov_precond_");

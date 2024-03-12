@@ -1,5 +1,5 @@
 #include "multiphase/CFMultiphaseOldroydB.h"
-#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/CFINSForcing.h>
@@ -29,10 +29,10 @@
 using namespace multiphase;
 
 // Function prototypes
-void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
-                 Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
+void output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
+                 Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
-                 Pointer<CFINSForcing> conformation_tensor_handler,  
+                 Pointer<CFINSForcing> conformation_tensor_handler,
                  const int iteration_num,
                  const double loop_time,
                  const string& data_dump_dirname);
@@ -61,12 +61,11 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator =
-            new INSVCTwoFluidStaggeredHierarchyIntegrator(
-                "FluidSolver",
-                app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-                grid_geometry,
-                true /*register_for_restart*/);
+        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+            "FluidSolver",
+            app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
+            grid_geometry,
+            true /*register_for_restart*/);
 
         Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator =
             new AdvDiffSemiImplicitHierarchyIntegrator("AdvDiffIntegrator",
@@ -273,13 +272,13 @@ main(int argc, char* argv[])
 } // main
 
 void
-output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
-                 Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
-                 Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
-                 Pointer<CFINSForcing> conformation_tensor_handler,
-                 const int iteration_num,
-                 const double loop_time,
-                 const string& data_dump_dirname)
+output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
+            Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
+            Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+            Pointer<CFINSForcing> conformation_tensor_handler,
+            const int iteration_num,
+            const double loop_time,
+            const string& data_dump_dirname)
 {
     plog << "writing hierarchy data at iteration " << iteration_num << " to disk" << endl;
     plog << "simulation time is " << loop_time << endl;

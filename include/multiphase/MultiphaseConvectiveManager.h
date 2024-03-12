@@ -1,5 +1,5 @@
-#ifndef included_multiphase_INSVCTwoFluidConvectiveManager
-#define included_multiphase_INSVCTwoFluidConvectiveManager
+#ifndef included_multiphase_MultiphaseConvectiveManager
+#define included_multiphase_MultiphaseConvectiveManager
 
 #include <ibamr/ConvectiveOperator.h>
 #include <ibamr/ibamr_enums.h>
@@ -11,7 +11,7 @@
 namespace multiphase
 {
 /*!
- * Class INSVCTwoFluidConvectiveManager is a class that encapsulates all the routines needed to approximate the momentum
+ * Class MultiphaseConvectiveManager is a class that encapsulates all the routines needed to approximate the momentum
  * convective operator for the multiphase equations.
  *
  * This class lazily allocates data but does not maintain state when the hierarchy changes. This class should be
@@ -20,34 +20,34 @@ namespace multiphase
  * Because this class does not maintain state across a regridding operation, this class can not be used in isolation
  * with multistep algorithms.
  */
-class INSVCTwoFluidConvectiveManager
+class MultiphaseConvectiveManager
 {
 public:
     /*!
      * Constructor that takes in a Database. The Database is searched for the string "limiter_type". The limiter must be
      * one of "UPWIND", "CUI", "FBICS", or "MGAMMA".
      */
-    INSVCTwoFluidConvectiveManager(std::string object_name,
-                                   SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                                   SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs = {},
-                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs = {},
-                                   SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr);
+    MultiphaseConvectiveManager(std::string object_name,
+                                SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                                SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                                const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs = {},
+                                const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs = {},
+                                SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr);
 
     /*!
      * Constructor that takes in the limiter. The limiter must be one of "UPWIND", "CUI", "FBICS", or "MGAMMA".
      */
-    INSVCTwoFluidConvectiveManager(std::string object_name,
-                                   SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                                   IBAMR::LimiterType limiter_type,
-                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs = {},
-                                   const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs = {},
-                                   SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr);
+    MultiphaseConvectiveManager(std::string object_name,
+                                SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                                IBAMR::LimiterType limiter_type,
+                                const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs = {},
+                                const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs = {},
+                                SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr);
 
     /*!
      * Destructor that deallocates patch data and removes patch indices from the variable database.
      */
-    ~INSVCTwoFluidConvectiveManager();
+    ~MultiphaseConvectiveManager();
 
     /*!
      * Set the boundary condition objects. Any can be null. This class does not assume ownership of any of the objects.

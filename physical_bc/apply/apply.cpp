@@ -11,7 +11,7 @@
 //
 // ---------------------------------------------------------------------
 
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 
 #include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -292,7 +292,7 @@ main(int argc, char* argv[])
         const double etan = input_db->getDouble("ETAN");
         const double etas = input_db->getDouble("ETAS");
         const double nu = input_db->getDouble("NU");
-        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", false);
+        MultiphaseStaggeredStokesOperator stokes_op("stokes_op", false);
         stokes_op.setCandDCoefficients(C, D);
         stokes_op.setDragCoefficient(xi, nu, nu);
         stokes_op.setViscosityCoefficient(etan, etas);

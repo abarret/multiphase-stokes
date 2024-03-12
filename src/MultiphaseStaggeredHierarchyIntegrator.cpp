@@ -1,9 +1,9 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include "ibamr/AdvDiffHierarchyIntegrator.h"
@@ -113,7 +113,7 @@ namespace multiphase
 {
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
-INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegrator(
+MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
     std::string object_name,
     Pointer<Database> input_db,
     Pointer<CartesianGridGeometry<NDIM>> grid_geometry,
@@ -172,51 +172,51 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
                    " not valid. Must use BACKWARD_EULER or TRAPEZOIDAL_RULE");
 
     return;
-} // INSVCTwoFluidStaggeredHierarchyIntegrator
+} // MultiphaseStaggeredHierarchyIntegrator
 
-INSVCTwoFluidStaggeredHierarchyIntegrator::~INSVCTwoFluidStaggeredHierarchyIntegrator()
+MultiphaseStaggeredHierarchyIntegrator::~MultiphaseStaggeredHierarchyIntegrator()
 {
     // intentionally blank
-} // ~INSVCTwoFluidStaggeredHierarchyIntegrator
+} // ~MultiphaseStaggeredHierarchyIntegrator
 
 Pointer<ConvectiveOperator>
-INSVCTwoFluidStaggeredHierarchyIntegrator::getConvectiveOperator()
+MultiphaseStaggeredHierarchyIntegrator::getConvectiveOperator()
 {
     return nullptr;
 } // getConvectiveOperator
 
 Pointer<PoissonSolver>
-INSVCTwoFluidStaggeredHierarchyIntegrator::getVelocitySubdomainSolver()
+MultiphaseStaggeredHierarchyIntegrator::getVelocitySubdomainSolver()
 {
     return nullptr;
 } // getVelocitySubdomainSolver
 
 Pointer<PoissonSolver>
-INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureSubdomainSolver()
+MultiphaseStaggeredHierarchyIntegrator::getPressureSubdomainSolver()
 {
     return nullptr;
 } // getPressureSubdomainSolver
 
 Pointer<SideVariable<NDIM, double>>
-INSVCTwoFluidStaggeredHierarchyIntegrator::getSolventVariable() const
+MultiphaseStaggeredHierarchyIntegrator::getSolventVariable() const
 {
     return d_us_sc_var;
 }
 
 Pointer<SideVariable<NDIM, double>>
-INSVCTwoFluidStaggeredHierarchyIntegrator::getNetworkVariable() const
+MultiphaseStaggeredHierarchyIntegrator::getNetworkVariable() const
 {
     return d_un_sc_var;
 }
 
 Pointer<CellVariable<NDIM, double>>
-INSVCTwoFluidStaggeredHierarchyIntegrator::getPressureVariable() const
+MultiphaseStaggeredHierarchyIntegrator::getPressureVariable() const
 {
     return d_P_var;
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
+MultiphaseStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
     std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
     std::vector<RobinBcCoefStrategy<NDIM>*> us_bc_coefs)
 {
@@ -225,33 +225,32 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
 }
 
 const std::vector<RobinBcCoefStrategy<NDIM>*>&
-INSVCTwoFluidStaggeredHierarchyIntegrator::getNetworkBoundaryConditions() const
+MultiphaseStaggeredHierarchyIntegrator::getNetworkBoundaryConditions() const
 {
     return d_un_bc_coefs;
 }
 
 const std::vector<RobinBcCoefStrategy<NDIM>*>&
-INSVCTwoFluidStaggeredHierarchyIntegrator::getSolventBoundaryConditions() const
+MultiphaseStaggeredHierarchyIntegrator::getSolventBoundaryConditions() const
 {
     return d_us_bc_coefs;
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::registerVolumeFractionBoundaryConditions(
-    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+MultiphaseStaggeredHierarchyIntegrator::registerVolumeFractionBoundaryConditions(RobinBcCoefStrategy<NDIM>* thn_bc_coef)
 {
     d_thn_bc_coef = thn_bc_coef;
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
+MultiphaseStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
     d_eta_n = eta_n;
     d_eta_s = eta_s;
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
+MultiphaseStaggeredHierarchyIntegrator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
 {
     d_xi = xi;
     d_nu_n = nu_n;
@@ -259,9 +258,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setDragCoefficient(const double xi, c
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
-                                                          Pointer<CartGridFunction> us_fcn,
-                                                          Pointer<CartGridFunction> p_fcn)
+MultiphaseStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFunction> un_fcn,
+                                                       Pointer<CartGridFunction> us_fcn,
+                                                       Pointer<CartGridFunction> p_fcn)
 {
     d_un_init_fcn = un_fcn;
     d_us_init_fcn = us_fcn;
@@ -270,9 +269,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialData(Pointer<CartGridFuncti
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctions(Pointer<CartGridFunction> fn_fcn,
-                                                               Pointer<CartGridFunction> fs_fcn,
-                                                               Pointer<CartGridFunction> fp_fcn)
+MultiphaseStaggeredHierarchyIntegrator::setForcingFunctions(Pointer<CartGridFunction> fn_fcn,
+                                                            Pointer<CartGridFunction> fs_fcn,
+                                                            Pointer<CartGridFunction> fp_fcn)
 {
     if (fn_fcn)
     {
@@ -346,8 +345,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctions(Pointer<CartGridF
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctionsScaled(Pointer<CartGridFunction> fn_fcn,
-                                                                     Pointer<CartGridFunction> fs_fcn)
+MultiphaseStaggeredHierarchyIntegrator::setForcingFunctionsScaled(Pointer<CartGridFunction> fn_fcn,
+                                                                  Pointer<CartGridFunction> fs_fcn)
 {
     if (fn_fcn)
     {
@@ -397,14 +396,14 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setForcingFunctionsScaled(Pointer<Car
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setInitialNetworkVolumeFraction(Pointer<CartGridFunction> thn_init_fcn)
+MultiphaseStaggeredHierarchyIntegrator::setInitialNetworkVolumeFraction(Pointer<CartGridFunction> thn_init_fcn)
 {
     d_thn_init_fcn = thn_init_fcn;
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Pointer<CartGridFunction> thn_fcn,
-                                                                            bool use_as_initial_data)
+MultiphaseStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Pointer<CartGridFunction> thn_fcn,
+                                                                         bool use_as_initial_data)
 {
     // Make sure we have a valid pointer.
     TBOX_ASSERT(thn_fcn);
@@ -413,7 +412,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Poin
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
+MultiphaseStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
     Pointer<AdvDiffHierarchyIntegrator> adv_diff_integrator,
     const bool has_meaningful_mid_value)
 {
@@ -431,8 +430,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                                                                         Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
+MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                                                      Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
 {
     if (d_integrator_is_initialized) return;
 
@@ -579,25 +578,25 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
     // also create the convective operator in ::initializeCompositeHierarchyDataSpecialized(), this object will be
     // reset.
     if (!d_creeping_flow)
-        d_convec_op = std::make_unique<INSVCTwoFluidConvectiveManager>(d_object_name + "::ConvectiveOp",
-                                                                       d_hierarchy,
-                                                                       d_convec_limiter_type,
-                                                                       d_un_bc_coefs,
-                                                                       d_us_bc_coefs,
-                                                                       d_thn_bc_coef);
+        d_convec_op = std::make_unique<MultiphaseConvectiveManager>(d_object_name + "::ConvectiveOp",
+                                                                    d_hierarchy,
+                                                                    d_convec_limiter_type,
+                                                                    d_un_bc_coefs,
+                                                                    d_us_bc_coefs,
+                                                                    d_thn_bc_coef);
 
     d_integrator_is_initialized = true;
     return;
 } // initializeHierarchyIntegrator
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointer<BasePatchHierarchy<NDIM>> hierarchy,
-                                                                          int level_number,
-                                                                          double init_data_time,
-                                                                          bool can_be_refined,
-                                                                          bool initial_time,
-                                                                          Pointer<BasePatchLevel<NDIM>> old_level,
-                                                                          bool allocate_data)
+MultiphaseStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointer<BasePatchHierarchy<NDIM>> hierarchy,
+                                                                       int level_number,
+                                                                       double init_data_time,
+                                                                       bool can_be_refined,
+                                                                       bool initial_time,
+                                                                       Pointer<BasePatchLevel<NDIM>> old_level,
+                                                                       bool allocate_data)
 {
     // Do any kind of Hierarchy specific initialization on a given patch level.
     // Note: All initialization and regridding of state variables is managed by HierarchyIntegrator.
@@ -651,7 +650,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointe
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
+MultiphaseStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
     const Pointer<BasePatchHierarchy<NDIM>> hierarchy,
     const int level_num,
     const double error_data_time,
@@ -696,7 +695,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::applyGradientDetectorSpecialized(
 } // applyGradientDetectorSpecialized
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialized(
+MultiphaseStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialized(
     SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> hierarchy,
     int coarsest_level,
     int finest_level)
@@ -716,29 +715,29 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialize
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::regridHierarchyBeginSpecialized()
+MultiphaseStaggeredHierarchyIntegrator::regridHierarchyBeginSpecialized()
 {
     if (!d_creeping_flow) d_convec_op.reset();
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::initializeCompositeHierarchyDataSpecialized(const double init_data_time,
-                                                                                       const bool initial_time)
+MultiphaseStaggeredHierarchyIntegrator::initializeCompositeHierarchyDataSpecialized(const double init_data_time,
+                                                                                    const bool initial_time)
 {
     // Set up the convective operator
     if (!d_creeping_flow)
-        d_convec_op = std::make_unique<INSVCTwoFluidConvectiveManager>(d_object_name + "::ConvectiveOp",
-                                                                       d_hierarchy,
-                                                                       d_convec_limiter_type,
-                                                                       d_un_bc_coefs,
-                                                                       d_us_bc_coefs,
-                                                                       d_thn_bc_coef);
+        d_convec_op = std::make_unique<MultiphaseConvectiveManager>(d_object_name + "::ConvectiveOp",
+                                                                    d_hierarchy,
+                                                                    d_convec_limiter_type,
+                                                                    d_un_bc_coefs,
+                                                                    d_us_bc_coefs,
+                                                                    d_thn_bc_coef);
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const double current_time,
-                                                                        const double new_time,
-                                                                        const int num_cycles)
+MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const double current_time,
+                                                                     const double new_time,
+                                                                     const int num_cycles)
 {
     // Do anything that needs to be done before we call integrateHierarchy().
     INSHierarchyIntegrator::preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
@@ -855,7 +854,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
                    ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
 
-    VCTwoFluidStaggeredStokesOperator RHS_op("RHS_op", true);
+    MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true);
     Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
     RHS_op.setPhysicalBoundaryHelper(bc_helper);
     RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
@@ -871,7 +870,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     RHS_op.apply(*d_sol_vec, *d_rhs_vec);
 
     // Set up the operators and solvers needed to solve the linear system.
-    d_stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", false);
+    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false);
     d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
     d_stokes_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
@@ -886,7 +885,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
     if (d_use_preconditioner)
     {
         d_precond_op =
-            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_");
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_");
         d_precond_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
         d_precond_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
         d_precond_op->setViscosityCoefficient(d_eta_n, d_eta_s);
@@ -977,9 +976,9 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const do
 } // preprocessIntegrateHierarchy
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const double current_time,
-                                                                         const double new_time,
-                                                                         const int cycle_num)
+MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const double current_time,
+                                                                      const double new_time,
+                                                                      const int cycle_num)
 {
     INSHierarchyIntegrator::integrateHierarchySpecialized(current_time, new_time, cycle_num);
     double half_time = 0.5 * (current_time + new_time);
@@ -1146,10 +1145,10 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
 } // integrateHierarchy
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const double current_time,
-                                                                         const double new_time,
-                                                                         const bool skip_synchronize_new_state_data,
-                                                                         const int num_cycles)
+MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const double current_time,
+                                                                      const double new_time,
+                                                                      const bool skip_synchronize_new_state_data,
+                                                                      const int num_cycles)
 {
     // Do anything that needs to be done after integrateHierarchy().
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
@@ -1218,7 +1217,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const d
 } // postprocessIntegrateHierarchy
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::regridProjection()
+MultiphaseStaggeredHierarchyIntegrator::regridProjection()
 {
     // During regridding, the coarsening and refining operations can introduce errors. Here, we project the velocity
     // onto a divergence free field.
@@ -1227,13 +1226,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::regridProjection()
 }
 
 double
-INSVCTwoFluidStaggeredHierarchyIntegrator::getStableTimestep(Pointer<Patch<NDIM>> /*patch*/) const
+MultiphaseStaggeredHierarchyIntegrator::getStableTimestep(Pointer<Patch<NDIM>> /*patch*/) const
 {
     return d_dt_init;
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
+MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
 {
     // Interpolate velocities to node centered.
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -1331,12 +1330,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
-                                                        int& thn_new_idx,
-                                                        int& thn_scr_idx,
-                                                        const double current_time,
-                                                        const double new_time,
-                                                        const bool start_of_ts)
+MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
+                                                     int& thn_new_idx,
+                                                     int& thn_scr_idx,
+                                                     const double current_time,
+                                                     const double new_time,
+                                                     const bool start_of_ts)
 {
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
@@ -1374,17 +1373,17 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
 }
 
 void
-INSVCTwoFluidStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorReal<NDIM, double>>& f_vec,
-                                                          double current_time,
-                                                          double new_time,
-                                                          int un_cur_idx,
-                                                          int us_cur_idx,
-                                                          int thn_cur_idx,
-                                                          int un_new_idx,
-                                                          int us_new_idx,
-                                                          int thn_new_idx)
+MultiphaseStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorReal<NDIM, double>>& f_vec,
+                                                       double current_time,
+                                                       double new_time,
+                                                       int un_cur_idx,
+                                                       int us_cur_idx,
+                                                       int thn_cur_idx,
+                                                       int un_new_idx,
+                                                       int us_new_idx,
+                                                       int thn_new_idx)
 {
-    // Note that INSVCTwoFluidConvectiveOperator is not smart enough to handle multistep time steppers. Therefore, we
+    // Note that MultiphaseConvectiveOperator is not smart enough to handle multistep time steppers. Therefore, we
     // have to do something special if we are using a multistep algorithm.
     TimeSteppingType ts_type = d_convective_time_stepping_type;
     if (getIntegratorStep() == 0 && is_multistep_time_stepping_type(ts_type))
