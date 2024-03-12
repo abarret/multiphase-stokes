@@ -134,7 +134,8 @@ VCTwoFluidStaggeredStokesOperator::VCTwoFluidStaggeredStokesOperator(const std::
     // Check if we've already made this variable
     if (var_db->checkVariableExists(d_object_name + "::outerside_variable"))
         d_os_var = var_db->getVariable(d_object_name + "::outerside_variable");
-    d_os_idx = var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"));
+    d_os_idx =
+        var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(0));
 
     if (var_db->checkVariableExists(d_object_name + "::ThnSide"))
         d_thn_sc_var = var_db->getVariable(d_object_name + "::ThnSide");

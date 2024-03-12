@@ -170,6 +170,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::INSVCTwoFluidStaggeredHierarchyIntegr
         TBOX_ERROR(d_object_name + ": Viscous time step type " +
                    IBAMR::enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
                    " not valid. Must use BACKWARD_EULER or TRAPEZOIDAL_RULE");
+
     return;
 } // INSVCTwoFluidStaggeredHierarchyIntegrator
 
@@ -572,6 +573,18 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer
         hier_ops_manager->getOperationsDouble(new SideVariable<NDIM, double>("sc_var"), hierarchy, true /*get_unique*/);
     d_hier_fc_data_ops =
         hier_ops_manager->getOperationsDouble(new FaceVariable<NDIM, double>("fc_var"), hierarchy, true /*get_unique*/);
+
+    // Note that we MUST create the convective operators here because they require large ghost cell widths. The maximum
+    // ghost cell width MUST be specified before the patch hierarchy is finished being created. Note that because we
+    // also create the convective operator in ::initializeCompositeHierarchyDataSpecialized(), this object will be
+    // reset.
+    if (!d_creeping_flow)
+        d_convec_op = std::make_unique<INSVCTwoFluidConvectiveManager>(d_object_name + "::ConvectiveOp",
+                                                                       d_hierarchy,
+                                                                       d_convec_limiter_type,
+                                                                       d_un_bc_coefs,
+                                                                       d_us_bc_coefs,
+                                                                       d_thn_bc_coef);
 
     d_integrator_is_initialized = true;
     return;

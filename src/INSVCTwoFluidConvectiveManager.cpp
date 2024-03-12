@@ -296,11 +296,10 @@ INSVCTwoFluidConvectiveManager::commonConstructor()
 INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
 {
     if (getIsAllocated()) deallocateData();
-    // Remove patch indices from variable database
-    auto var_db = VariableDatabase<NDIM>::getDatabase();
-    std::array<int, 9> idxs{ d_mom_un_idx, d_mom_us_idx, d_N_un_idx,   d_N_us_idx,   d_N0_un_idx,
-                             d_N0_us_idx,  d_un_scr_idx, d_us_scr_idx, d_thn_scr_idx };
-    for (const auto& idx : idxs) var_db->removePatchDataIndex(idx);
+    // Note that we can not remove indices from the variable database here. The GridGeometry object in the
+    // PatchHierarchy requires that the maximum ghost cell width of all the patch indices be constant, and removing a
+    // patch index could change the maximum ghost cell width (especially because the ghost cell widths used here are so
+    // large).
 }
 
 void
