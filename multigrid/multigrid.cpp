@@ -12,6 +12,7 @@
 #include "ibtk/PETScKrylovLinearSolver.h"
 #include <ibtk/AppInitializer.h>
 #include <ibtk/IBTKInit.h>
+#include <ibtk/PhysicalBoundaryUtilities.h>
 #include <ibtk/LinearOperator.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
@@ -68,6 +69,10 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
+        
+        // Create the boundary condition objects
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
+        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
 
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -310,6 +315,11 @@ main(int argc, char* argv[])
         const double nu = input_db->getDouble("NU");
         stokes_op->setDragCoefficient(xi, nu, nu);
         stokes_op->setViscosityCoefficient(etan, etas);
+        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
+
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op->setPhysicalBoundaryHelper(bc_helper);
+
         stokes_op->setThnIdx(thn_cc_idx);
 
         Pointer<PETScKrylovLinearSolver> krylov_solver =

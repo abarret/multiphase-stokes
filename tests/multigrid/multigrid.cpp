@@ -1,15 +1,7 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2017 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
+#include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -20,6 +12,7 @@
 #include "ibtk/PETScKrylovLinearSolver.h"
 #include <ibtk/AppInitializer.h>
 #include <ibtk/IBTKInit.h>
+#include <ibtk/PhysicalBoundaryUtilities.h>
 #include <ibtk/LinearOperator.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
@@ -35,11 +28,7 @@
 
 #include <chrono>
 
-// Local includes
-#include "FullFACPreconditioner.h"
-#include "VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "VCTwoFluidStaggeredStokesOperator.h"
-#include "utility_functions.h"
+using namespace multiphase;
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -80,6 +69,10 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
+        
+        // Create the boundary condition objects
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
+        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
 
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -322,6 +315,11 @@ main(int argc, char* argv[])
         const double nu = input_db->getDouble("NU");
         stokes_op->setDragCoefficient(xi, nu, nu);
         stokes_op->setViscosityCoefficient(etan, etas);
+        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
+
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op->setPhysicalBoundaryHelper(bc_helper);
+
         stokes_op->setThnIdx(thn_cc_idx);
 
         Pointer<PETScKrylovLinearSolver> krylov_solver =
