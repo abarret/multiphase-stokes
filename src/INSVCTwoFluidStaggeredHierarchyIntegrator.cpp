@@ -1075,10 +1075,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const d
         const int rhs_p_idx = d_rhs_vec->getComponentDescriptorIndex(2);
         HierarchyCellDataOpsReal<NDIM, double> hier_sc_data_ops(d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
         double integral = hier_sc_data_ops.integral(rhs_p_idx, d_hier_math_ops->getCellWeightPatchDescriptorIndex());
-        plog << "Weighted integral = " << integral << "\n";
         hier_sc_data_ops.addScalar(rhs_p_idx, rhs_p_idx, -1.0 * integral);
         integral = hier_sc_data_ops.integral(rhs_p_idx, d_hier_math_ops->getCellWeightPatchDescriptorIndex());
-        plog << "Weighted integral = " << integral << "\n";
     }
 
     // Set the initial guess for the system to be the most recent approximation to t^{n+1}

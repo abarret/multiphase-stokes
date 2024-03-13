@@ -70,10 +70,6 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
         
-        // Create the boundary condition objects
-        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
-        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
-
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = var_db->getContext("context");
@@ -315,7 +311,6 @@ main(int argc, char* argv[])
         const double nu = input_db->getDouble("NU");
         stokes_op->setDragCoefficient(xi, nu, nu);
         stokes_op->setViscosityCoefficient(etan, etas);
-        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
 
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
         stokes_op->setPhysicalBoundaryHelper(bc_helper);
@@ -388,18 +383,12 @@ main(int argc, char* argv[])
             HierarchyCellDataOpsReal<NDIM, double> hier_sc_data_ops(
                 patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
             double integral = hier_sc_data_ops.integral(rhs_p_idx, wgt_cc_idx);
-            pout << "Weighted integral = " << integral << "\n";
             hier_sc_data_ops.addScalar(rhs_p_idx, rhs_p_idx, -1.0 * integral);
             integral = hier_sc_data_ops.integral(rhs_p_idx, wgt_cc_idx);
-            pout << "Weighted integral = " << integral << "\n";
         }
 
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
-        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         krylov_solver->solveSystem(u_vec, f_vec);
-        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        pout << "Solve took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()
-             << " milliseconds\n";
 
         // Deallocate data
         if (use_precond)
@@ -419,8 +408,9 @@ main(int argc, char* argv[])
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
 
-        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
-            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+       
         pout << "Error in u_n :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
@@ -431,9 +421,29 @@ main(int argc, char* argv[])
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
              << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
-        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
-            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         pout << "Error in p :\n"
+             << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
+             << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
+             << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
+             << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+        
+        std::ofstream out("output");
+        out << "|e|_oo = " << e_vec.maxNorm() << "\n";
+        out << "|e|_2  = " << e_vec.L2Norm() << "\n";
+        out << "|e|_1  = " << e_vec.L1Norm() << "\n\n";
+        out << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+
+        out << "Error in u_n :\n"
+             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
+
+        out << "Error in u_s :\n"
+             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
+
+        out << "Error in p :\n"
              << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"

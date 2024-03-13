@@ -1,0 +1,45 @@
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 0
+Simulation time is 0
+
+At end       of timestep # 0
+Simulation time is 0.0003125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 1
+Simulation time is 0.0003125
+
+At end       of timestep # 1
+Simulation time is 0.000625
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 2
+Simulation time is 0.000625
+
+At end       of timestep # 2
+Simulation time is 0.0009375
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 3
+Simulation time is 0.0009375
+
+At end       of timestep # 3
+Simulation time is 0.00125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 4
+Simulation time is 0.00125
+
+At end       of timestep # 4
+Simulation time is 0.0015625
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
