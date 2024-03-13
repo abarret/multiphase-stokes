@@ -70,10 +70,6 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
         
-        // Create the boundary condition objects
-        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
-        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
-
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = var_db->getContext("context");
@@ -315,7 +311,6 @@ main(int argc, char* argv[])
         const double nu = input_db->getDouble("NU");
         stokes_op->setDragCoefficient(xi, nu, nu);
         stokes_op->setViscosityCoefficient(etan, etas);
-        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
 
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
         stokes_op->setPhysicalBoundaryHelper(bc_helper);

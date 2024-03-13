@@ -719,7 +719,7 @@ VCTwoFluidStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     }
 #endif
 
-    d_bc_helper->cacheBcCoefData(d_us_bc_coefs, d_solution_time, d_hierarchy);
+    if (d_bc_helper) d_bc_helper->cacheBcCoefData(d_us_bc_coefs, d_solution_time, d_hierarchy);
 
     // Indicate the operator is initialized.
     d_is_initialized = true;
