@@ -268,6 +268,9 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
 
 private:
+    void
+    applyConstantCoefficients(int A_P_idx, int A_un_idx, int A_us_idx, int p_idx, int un_idx, int us_idx, int thn_idx);
+
     /*!
      * \brief Default constructor.
      *
@@ -310,14 +313,14 @@ private:
            d_nu_s = std::numeric_limits<double>::quiet_NaN();
     double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
 
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_thn_sc_var;
-    int d_thn_sc_idx = IBTK::invalid_index;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_nc_scr_var;
+    int d_nc_scr_idx = IBTK::invalid_index;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_cc_ndim_var;
+    int d_cc_ndim_idx = IBTK::invalid_index;
 
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_thn_nc_var;
-    int d_thn_nc_idx = IBTK::invalid_index;
-
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
-    int d_thn_cc_idx = IBTK::invalid_index;
+    // Volume averaged velocity
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_sc_scr_var;
+    int d_sc_scr_idx = IBTK::invalid_index;
 };
 } // namespace multiphase
 
