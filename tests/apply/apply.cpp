@@ -1,4 +1,4 @@
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 
 #include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -264,7 +264,7 @@ main(int argc, char* argv[])
         const double etan = input_db->getDouble("ETAN");
         const double etas = input_db->getDouble("ETAS");
         const double nu = input_db->getDouble("NU");
-        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", true);
+        MultiphaseStaggeredStokesOperator stokes_op("stokes_op", true);
         stokes_op.setCandDCoefficients(C, D);
         stokes_op.setDragCoefficient(xi, nu, nu);
         stokes_op.setViscosityCoefficient(etan, etas);
@@ -292,8 +292,10 @@ main(int argc, char* argv[])
         const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
         const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
-        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
 
         pout << "Error in RHS_un :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
@@ -305,32 +307,31 @@ main(int argc, char* argv[])
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
              << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
-        
         pout << "Error in RHS_p :\n"
              << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
              << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-        
+
         std::ofstream out("output");
         out << "|e|_oo = " << e_vec.maxNorm() << "\n";
         out << "|e|_2  = " << e_vec.L2Norm() << "\n";
         out << "|e|_1  = " << e_vec.L1Norm() << "\n\n";
 
         out << "Error in RHS_un :\n"
-             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
+            << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+            << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+            << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
         out << "Error in RHS_us :\n"
-             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
+            << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+            << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+            << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
         out << "Error in RHS_p :\n"
-             << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n";
+            << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
+            << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
+            << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n";
 
         // Interpolate the side-centered data to cell centers for output.
         static const bool synch_cf_interface = true;

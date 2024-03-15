@@ -1,6 +1,6 @@
 #include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -12,8 +12,8 @@
 #include "ibtk/PETScKrylovLinearSolver.h"
 #include <ibtk/AppInitializer.h>
 #include <ibtk/IBTKInit.h>
-#include <ibtk/PhysicalBoundaryUtilities.h>
 #include <ibtk/LinearOperator.h>
+#include <ibtk/PhysicalBoundaryUtilities.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
 
@@ -69,7 +69,7 @@ main(int argc, char* argv[])
                                         error_detector,
                                         box_generator,
                                         load_balancer);
-        
+
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = var_db->getContext("context");
@@ -301,7 +301,7 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+        Pointer<MultiphaseStaggeredStokesOperator> stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", true);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
@@ -322,8 +322,8 @@ main(int argc, char* argv[])
         krylov_solver->setOperator(stokes_op);
 
         // Now create a preconditioner
-        Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
+        Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
                 "KrylovPrecondStrategy",
                 // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
                 "Krylov_precond_");
@@ -408,9 +408,11 @@ main(int argc, char* argv[])
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
 
-        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-       
+        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+
         pout << "Error in u_n :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
              << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
@@ -426,7 +428,7 @@ main(int argc, char* argv[])
              << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
              << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
              << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-        
+
         std::ofstream out("output");
         out << "|e|_oo = " << e_vec.maxNorm() << "\n";
         out << "|e|_2  = " << e_vec.L2Norm() << "\n";
@@ -434,20 +436,20 @@ main(int argc, char* argv[])
         out << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 
         out << "Error in u_n :\n"
-             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
-             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
+            << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+            << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
+            << "  max-norm: " << hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx) << "\n";
 
         out << "Error in u_s :\n"
-             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-             << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
+            << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+            << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
+            << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
 
         out << "Error in p :\n"
-             << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
-             << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+            << "  L1-norm:  " << hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx) << "\n"
+            << "  L2-norm:  " << hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx) << "\n"
+            << "  max-norm: " << hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx) << "\n"
+            << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 
         // Interpolate the side-centered data to cell centers for output.
         static const bool synch_cf_interface = true;
