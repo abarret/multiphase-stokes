@@ -1,6 +1,7 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/fd_operators.h"
 #include "multiphase/utility_functions.h"
 
 #include "ibamr/namespaces.h" // IWYU pragma: keep
@@ -177,7 +178,8 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 
 MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    const std::string& default_options_prefix)
+    const std::string& default_options_prefix,
+    const MultiphaseParameters& params)
     : FACPreconditionerStrategy(object_name),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
@@ -191,7 +193,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
       d_default_thn_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
       d_thn_bc_coef(d_default_thn_bc_coef.get()),
-      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
+      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
+      d_params(params)
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -611,11 +614,11 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                              f_us_gcw.min(),
                              thn_ptr_data,
                              thn_gcw.min(),
-                             d_eta_n,
-                             d_eta_s,
-                             d_nu_n,
-                             d_nu_s,
-                             d_xi,
+                             d_params.eta_n,
+                             d_params.eta_s,
+                             d_params.nu_n,
+                             d_params.nu_s,
+                             d_params.xi,
                              d_w,
                              d_C,
                              d_D,
@@ -649,11 +652,11 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                         f_us_gcw.min(),
                         thn_ptr_data,
                         thn_gcw.min(),
-                        d_eta_n,
-                        d_eta_s,
-                        d_nu_n,
-                        d_nu_s,
-                        d_xi,
+                        d_params.eta_n,
+                        d_params.eta_s,
+                        d_params.nu_n,
+                        d_params.nu_s,
+                        d_params.xi,
                         d_w,
                         d_C,
                         d_D,
@@ -764,176 +767,28 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             Pointer<CellData<NDIM, double>> res_P_data = patch->getPatchData(res_P_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
-            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
+            applyCoincompressibility(patch, res_P_idx, un_idx, us_idx, thn_idx, 1.0);
+            if (d_params.isVariableDrag())
+                applyForcesOnPatchVariableDrag(
+                    patch, res_un_idx, res_us_idx, P_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
+            else
+                applyForcesOnPatchConstantCoefficient(
+                    patch, res_un_idx, res_us_idx, P_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
+
+            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
             {
                 const CellIndex<NDIM>& idx = ci();
-
-                SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
-                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-
-                // thn at sidess
-                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
-                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
-                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
-                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-
-                // conservation of mass
-
-                double div_un_dot_thn_dx =
-                    ((thn_upper_x * (*un_data)(upper_x_idx)) - (thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
-                double div_un_dot_thn_dy =
-                    ((thn_upper_y * (*un_data)(upper_y_idx)) - (thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
-                double div_un_thn = div_un_dot_thn_dx + div_un_dot_thn_dy;
-
-                double div_us_dot_ths_dx = ((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx)) -
-                                            (convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) /
-                                           dx[0];
-                double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx)) -
-                                            (convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /
-                                           dx[1];
-                double div_us_ths = div_us_dot_ths_dx + div_us_dot_ths_dy;
-                (*res_P_data)(idx) = (*rhs_P_data)(idx) - (div_un_thn + div_us_ths);
+                (*res_P_data)(idx) = (*rhs_P_data)(idx) - (*res_P_data)(idx);
             }
 
-            for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
+            for (int axis = 0; axis < NDIM; ++axis)
             {
-                const SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
-
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-                SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
-                SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
-                SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
-
-                // thn at sides
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
-                // thn at corners
-                double thn_imhalf_jphalf =
-                    0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
-                            (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
-                double thn_imhalf_jmhalf =
-                    0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
-                            (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
-
-                // components of first row (x-component of network vel) of network equation
-                double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
-                                       (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddy_Thn_dx_vn = d_eta_n / (dx[1] * dx[0]) *
-                                       (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
-                double ddx_Thn_dy_vn = -d_eta_n / (dx[0] * dx[1]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
-
-                double drag_n =
-                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
-                double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) =
-                    (*rhs_un_data)(idx) -
-                    (d_D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n + pressure_n) +
-                     d_C * thn_lower * (*un_data)(idx));
-
-                // solvent equation
-                double ddx_Ths_dx_us =
-                    d_eta_s / (dx[0] * dx[0]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-                double ddy_Ths_dy_us = d_eta_s / (dx[1] * dx[1]) *
-                                       (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
-                                        convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddy_Ths_dx_vs =
-                    d_eta_s / (dx[1] * dx[0]) *
-                    (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
-                     convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
-                double ddx_Ths_dy_vs =
-                    -d_eta_s / (dx[0] * dx[1]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
-
-                double drag_s =
-                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
-                double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) =
-                    (*rhs_us_data)(idx) -
-                    (d_D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s) +
-                     d_C * convertToThs(thn_lower) * (*us_data)(idx));
-            }
-
-            for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
-            {
-                const SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
-
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-                SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
-                SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
-                SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
-
-                // thn at sides
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
-
-                // thn at corners
-                double thn_imhalf_jmhalf =
-                    0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) +
-                            (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
-                double thn_iphalf_jmhalf =
-                    0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
-                            (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
-
-                // components of second row (y-component of network vel) of network equation
-                double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
-                                       (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                double ddx_Thn_dy_vn = d_eta_n / (dx[1] * dx[0]) *
-                                       (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
-                double ddy_Thn_dx_vn = -d_eta_n / (dx[0] * dx[1]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
-
-                double drag_n =
-                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
-                double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) =
-                    (*rhs_un_data)(idx) -
-                    (d_D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n) +
-                     d_C * thn_lower * (*un_data)(idx));
-
-                // Solvent equation
-                double ddy_Ths_dy_us =
-                    d_eta_s / (dx[1] * dx[1]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddx_Ths_dx_us = d_eta_s / (dx[0] * dx[0]) *
-                                       (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
-                                        convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-                double ddx_Ths_dy_vs =
-                    d_eta_s / (dx[1] * dx[0]) *
-                    (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
-                     convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
-                double ddy_Ths_dx_vs =
-                    -d_eta_s / (dx[0] * dx[1]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
-
-                double drag_s =
-                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
-                double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) =
-                    (*rhs_us_data)(idx) -
-                    (d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s) +
-                     d_C * convertToThs(thn_lower) * (*us_data)(idx));
+                for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
+                {
+                    const SideIndex<NDIM>& idx = si();
+                    (*res_un_data)(idx) = (*rhs_un_data)(idx) - (*res_un_data)(idx);
+                    (*res_us_data)(idx) = (*rhs_us_data)(idx) - (*res_us_data)(idx);
+                }
             }
 
             if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
@@ -1204,23 +1059,6 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::setCandDCoefficients(const do
 {
     d_C = C;
     d_D = D;
-}
-
-void
-MultiphaseStaggeredStokesBoxRelaxationFACOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
-{
-    d_eta_n = eta_n;
-    d_eta_s = eta_s;
-}
-
-void
-MultiphaseStaggeredStokesBoxRelaxationFACOperator::setDragCoefficient(const double xi,
-                                                                      const double nu_n,
-                                                                      const double nu_s)
-{
-    d_xi = xi;
-    d_nu_n = nu_n;
-    d_nu_s = nu_s;
 }
 
 void

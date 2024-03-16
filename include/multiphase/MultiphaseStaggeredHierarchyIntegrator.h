@@ -130,6 +130,11 @@ public:
     void setDragCoefficient(double xi, double nu_n, double nu_s);
 
     /*!
+     * \brief Set the drag coefficient function. Note that this must be done prior to the integrator is initialized.
+     */
+    void setDragCoefficientFunction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> xi_fcn);
+
+    /*!
      * Set initial conditions for the state variables.
      *
      * NOTE: These pointers are set to nullptr after they are used.
@@ -151,7 +156,7 @@ public:
                              SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fp_fcn = nullptr);
 
     /*!
-     * Regiser forcing functions that should be scaled by the volume fraction.
+     * Register forcing functions that should be scaled by the volume fraction.
      */
     void setForcingFunctionsScaled(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
                                    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
@@ -249,6 +254,8 @@ protected:
     void setupPlotDataSpecialized() override;
 
 private:
+    bool isVariableDrag() const;
+
     void setThnAtHalf(int& thn_cur_idx,
                       int& thn_new_idx,
                       int& thn_scr_idx,
@@ -331,12 +338,6 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
     bool d_has_vel_nullspace = false;
 
-    // Physical parameters
-    double d_rho = std::numeric_limits<double>::quiet_NaN();
-    double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
-           d_nu_s = std::numeric_limits<double>::quiet_NaN();
-    double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
-
     /*!
      * Solver information
      */
@@ -396,6 +397,12 @@ private:
 
     // Flag for if volume fraction has a meaningful value in middle of time step.
     bool d_use_new_thn = true;
+
+    MultiphaseParameters d_params;
+
+    // Variable drag coefficient.
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_xi_var;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
 };
 } // namespace multiphase
 

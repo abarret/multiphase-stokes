@@ -5,6 +5,8 @@
 
 #include <ibtk/config.h>
 
+#include "multiphase/MultiphaseParameters.h"
+
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/FACPreconditionerStrategy.h"
 #include "ibtk/HierarchyGhostCellInterpolation.h"
@@ -37,7 +39,8 @@ public:
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
     MultiphaseStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
-                                                      const std::string& default_options_prefix);
+                                                      const std::string& default_options_prefix,
+                                                      const MultiphaseParameters& params);
 
     /*!
      * \brief Destructor.
@@ -170,16 +173,6 @@ public:
      */
     void setCandDCoefficients(double C, double D);
 
-    /*!
-     * \brief Set the viscosity coefficients for the viscous stresses.
-     */
-    void setViscosityCoefficient(double eta_n, double eta_s);
-
-    /*!
-     * \brief Set the drag coefficients for each phase.
-     */
-    void setDragCoefficient(double xi, double nu_n, double nu_s);
-
 private:
     /*!
      * \brief Default constructor.
@@ -261,11 +254,7 @@ private:
     double d_w = 0.75;                                         // under relaxation factor
     double d_C = std::numeric_limits<double>::quiet_NaN();     // C*u
     double d_D = std::numeric_limits<double>::quiet_NaN();     // D depends on time stepping scheme
-    double d_eta_n = std::numeric_limits<double>::quiet_NaN(); // Network viscosity
-    double d_eta_s = std::numeric_limits<double>::quiet_NaN(); // Solvent viscosity
-    double d_xi = std::numeric_limits<double>::quiet_NaN();    // Drag coefficient
-    double d_nu_n = std::numeric_limits<double>::quiet_NaN();
-    double d_nu_s = std::numeric_limits<double>::quiet_NaN();
+    const MultiphaseParameters& d_params;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::unique_ptr<SAMRAI::solv::RobinBcCoefStrategy<NDIM>> d_default_un_bc_coef, d_default_us_bc_coef,

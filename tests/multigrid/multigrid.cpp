@@ -301,16 +301,17 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<MultiphaseStaggeredStokesOperator> stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", true);
+        MultiphaseParameters params;
+        params.xi = input_db->getDouble("XI");
+        params.eta_n = input_db->getDouble("ETAN");
+        params.eta_s = input_db->getDouble("ETAS");
+        params.nu_n = params.nu_s = input_db->getDouble("NU");
+
+        Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
+            new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
-        const double xi = input_db->getDouble("XI");
-        const double etan = input_db->getDouble("ETAN");
-        const double etas = input_db->getDouble("ETAS");
-        const double nu = input_db->getDouble("NU");
-        stokes_op->setDragCoefficient(xi, nu, nu);
-        stokes_op->setViscosityCoefficient(etan, etas);
 
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
         stokes_op->setPhysicalBoundaryHelper(bc_helper);
@@ -323,15 +324,10 @@ main(int argc, char* argv[])
 
         // Now create a preconditioner
         Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
-                "KrylovPrecondStrategy",
-                // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_");
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
-        fac_precondition_strategy->setViscosityCoefficient(etan, etas);
-        fac_precondition_strategy->setDragCoefficient(xi, nu, nu);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,

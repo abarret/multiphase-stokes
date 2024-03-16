@@ -5,6 +5,8 @@
 
 #include <ibamr/config.h>
 
+#include "multiphase/MultiphaseParameters.h"
+
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
 
 #include "ibtk/HierarchyGhostCellInterpolation.h"
@@ -44,15 +46,15 @@ namespace multiphase
  * incompressible flow solver.
  *
  * This class knows how to apply the following operator:
- * [ C*thn + A_n + D*xi/nu_n*thn*ths   -D*xi/nu_n*thn*ths                D_p*thn*grad ][un]
- * [ -D*xi/nu_s*thn*ths                C*ths + A_s + D*xi/nu_s*thn*ths   D_p*ths*grad ][us]
+ * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths                D_p*thn*grad ][un]
+ * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   D_p*ths*grad ][us]
  * [ D_div*div(thn)                    D_div*div(ths)                    0            ][p ]
  * in which
  * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
  *   -- C: Constant, set via setCandDCoefficients().
- *   -- D: Constant, set via setCandDCoefficients().
+ *   -- D_u: Constant, set via setCandDCoefficients().
  *   -- thn: Cell centered patch index for volume fraction, set via setThnIdx().
  *   -- xi: Constant drag coefficient, set via setDragCoefficient().
  *   -- eta_n: Constant viscosity, set via setViscosityCoefficient().
@@ -74,18 +76,12 @@ public:
     /*!
      * \brief Class constructor.
      *
-     * The optional database will search for the following strings:
-     *  -- "c" - double, sets C
-     *  -- "d" - double, sets D and D_p
-     *  -- "xi" - double
-     *  -- "eta_n" - double
-     *  -- "eta_s" - double
-     *  -- "nu_n" - double
-     *  -- "nu_s" - double
+     * Note that C and D MUST be provided by the call to setCandDCoefficients(). Their default values are 0.0 and -1.0
+     * by default.
      */
     MultiphaseStaggeredStokesOperator(const std::string& object_name,
                                       bool homogeneous_bc,
-                                      SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db = nullptr);
+                                      const MultiphaseParameters& params);
 
     /*!
      * \brief Destructor.
@@ -104,16 +100,6 @@ public:
      * stepping schemes.
      */
     void setCandDCoefficients(double C, double D_u, double D_p = -1.0, double D_div = 1.0);
-
-    /*!
-     * \brief Set the viscosity coefficients for the viscous stresses.
-     */
-    void setViscosityCoefficient(double eta_n, double eta_s);
-
-    /*!
-     * \brief Set the drag coefficients for each phase.
-     */
-    void setDragCoefficient(double xi, double nu_n, double nu_s);
 
     /*!
      * \brief Set the cell centered patch index for the volume fraction.
@@ -268,8 +254,7 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
 
 private:
-    void
-    applyConstantCoefficients(int A_P_idx, int A_un_idx, int A_us_idx, int p_idx, int un_idx, int us_idx, int thn_idx);
+    void applySpecialized(int A_P_idx, int A_un_idx, int A_us_idx, int p_idx, int un_idx, int us_idx, int thn_idx);
 
     /*!
      * \brief Default constructor.
@@ -306,12 +291,9 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
 
     /// Parameters
-    double d_C = std::numeric_limits<double>::quiet_NaN(), d_D_u = std::numeric_limits<double>::quiet_NaN(),
-           d_D_p = -1.0, d_D_div = 1.0;
+    double d_C = 0.0, d_D_u = -1.0, d_D_p = -1.0, d_D_div = 1.0;
     int d_thn_idx = IBTK::invalid_index;
-    double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
-           d_nu_s = std::numeric_limits<double>::quiet_NaN();
-    double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
+    const MultiphaseParameters& d_params;
 
     SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_nc_scr_var;
     int d_nc_scr_idx = IBTK::invalid_index;

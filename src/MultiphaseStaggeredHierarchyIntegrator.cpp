@@ -137,7 +137,9 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
     if (input_db->keyExists("viscous_time_stepping_type"))
         d_viscous_time_stepping_type =
             IBAMR::string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
-    if (input_db->keyExists("rho")) d_rho = input_db->getDouble("rho");
+    if (input_db->keyExists("rho")) d_params.rho = input_db->getDouble("rho");
+    if (input_db->keyExists("eta_n")) d_params.eta_n = input_db->getDouble("eta_n");
+    if (input_db->keyExists("eta_s")) d_params.eta_s = input_db->getDouble("eta_s");
     if (input_db->keyExists("solver_db")) d_solver_db = input_db->getDatabase("solver_db");
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
     if (input_db->keyExists("w")) d_w = input_db->getDouble("w");
@@ -245,16 +247,23 @@ MultiphaseStaggeredHierarchyIntegrator::registerVolumeFractionBoundaryConditions
 void
 MultiphaseStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
-    d_eta_n = eta_n;
-    d_eta_s = eta_s;
+    d_params.eta_n = eta_n;
+    d_params.eta_s = eta_s;
 }
 
 void
 MultiphaseStaggeredHierarchyIntegrator::setDragCoefficient(const double xi, const double nu_n, const double nu_s)
 {
-    d_xi = xi;
-    d_nu_n = nu_n;
-    d_nu_s = nu_s;
+    d_params.xi = xi;
+    d_params.nu_n = nu_n;
+    d_params.nu_s = nu_s;
+}
+
+void
+MultiphaseStaggeredHierarchyIntegrator::setDragCoefficientFunction(Pointer<CartGridFunction> xi_fcn)
+{
+    d_xi_fcn = xi_fcn;
+    if (!d_xi_var) d_xi_var = new CellVariable<NDIM, double>(d_object_name + "::Xi");
 }
 
 void
@@ -494,7 +503,7 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
 
     // Everything else only gets a scratch context, which is deallocated at the end of each time step.
     // Note the forces need ghost cells for modifying the RHS to account for non-homogenous boundary conditions.
-    int thn_cur_idx, thn_scr_idx, thn_new_idx, f_p_idx, f_un_idx, f_us_idx, un_rhs_idx, us_rhs_idx, p_rhs_idx;
+    int thn_cur_idx, thn_scr_idx, thn_new_idx, f_p_idx, f_un_idx, f_us_idx, un_rhs_idx, us_rhs_idx, p_rhs_idx, xi_idx;
     registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getCurrentContext());
     registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getCurrentContext());
@@ -504,6 +513,11 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
     registerVariable(un_rhs_idx, d_un_rhs_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(us_rhs_idx, d_us_rhs_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(p_rhs_idx, d_p_rhs_var, IntVector<NDIM>(1), getScratchContext());
+    if (d_xi_var)
+    {
+        registerVariable(xi_idx, d_xi_var, IntVector<NDIM>(0), getScratchContext());
+        d_params.xi_idx = xi_idx;
+    }
 
     // Register a scratch force object
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -834,7 +848,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(viscous + drag) for  i = n, s
     double D1 = std::numeric_limits<double>::signaling_NaN();
     double D2 = std::numeric_limits<double>::signaling_NaN();
-    const double C = d_rho / dt;
+    const double C = d_params.rho / dt;
 
     switch (d_viscous_time_stepping_type)
     {
@@ -854,15 +868,13 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
                    ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
 
-    MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true);
+    MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
     Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
     RHS_op.setPhysicalBoundaryHelper(bc_helper);
     RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
     // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions in
     // the RHS.
     RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
-    RHS_op.setDragCoefficient(d_xi, d_nu_n, d_nu_s);
-    RHS_op.setViscosityCoefficient(d_eta_n, d_eta_s);
     RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
 
     // Store results of applying stokes operator in rhs_vec
@@ -870,11 +882,9 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     RHS_op.apply(*d_sol_vec, *d_rhs_vec);
 
     // Set up the operators and solvers needed to solve the linear system.
-    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false);
+    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params);
     d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
-    d_stokes_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
-    d_stokes_op->setViscosityCoefficient(d_eta_n, d_eta_s);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
     d_stokes_op->setPhysicalBoundaryHelper(bc_helper);
 
@@ -885,10 +895,8 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     if (d_use_preconditioner)
     {
         d_precond_op =
-            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_");
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
         d_precond_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
-        d_precond_op->setDragCoefficient(d_xi, d_nu_n, d_nu_s);
-        d_precond_op->setViscosityCoefficient(d_eta_n, d_eta_s);
         d_precond_op->setUnderRelaxationParamater(d_w);
         d_precond_op->setCandDCoefficients(C, D2);
         d_precond_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
@@ -1425,9 +1433,15 @@ MultiphaseStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorReal<
         d_hier_sc_data_ops->linearSum(d_fs_scr_idx, 1.0 + 0.5 * omega, d_fs_scr_idx, -0.5 * omega, Ns_old_idx);
     }
     d_hier_sc_data_ops->linearSum(
-        f_vec->getComponentDescriptorIndex(0), 1.0, f_vec->getComponentDescriptorIndex(0), -d_rho, d_fn_scr_idx);
+        f_vec->getComponentDescriptorIndex(0), 1.0, f_vec->getComponentDescriptorIndex(0), -d_params.rho, d_fn_scr_idx);
     d_hier_sc_data_ops->linearSum(
-        f_vec->getComponentDescriptorIndex(1), 1.0, f_vec->getComponentDescriptorIndex(1), -d_rho, d_fs_scr_idx);
+        f_vec->getComponentDescriptorIndex(1), 1.0, f_vec->getComponentDescriptorIndex(1), -d_params.rho, d_fs_scr_idx);
+}
+
+bool
+MultiphaseStaggeredHierarchyIntegrator::isVariableDrag() const
+{
+    return d_params.isVariableDrag();
 }
 
 //////////////////////////////////////////////////////////////////////////////
