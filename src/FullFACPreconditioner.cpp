@@ -326,15 +326,9 @@ FullFACPreconditioner::transferToDense(std::set<int> idxs, bool deallocate_data)
     // TODO: These schedules should be cached and saved between calls to solveSystem.
     int level_diff = d_dense_hierarchy->getFinestLevelNumber() - d_hierarchy->getFinestLevelNumber();
     Pointer<RefineAlgorithm<NDIM>> refine_alg = new RefineAlgorithm<NDIM>();
-    // First create the operators needed.
-    for (const auto& idx : idxs)
-    {
-        auto var_db = VariableDatabase<NDIM>::getDatabase();
-        Pointer<Variable<NDIM>> var;
-        var_db->mapIndexToVariable(idx, var);
-        Pointer<RefineOperator<NDIM>> refine_op = grid_geom->lookupRefineOperator(var, "CONSERVATIVE_LINEAR_REFINE");
-        refine_alg->registerRefine(idx, idx, idx, refine_op);
-    }
+    // First create the operators needed. Note that we don't need an operator because we only copy values on overlapping
+    // patches. Ghost cells need to be filled manually, if needed.
+    for (const auto& idx : idxs) refine_alg->registerRefine(idx, idx, idx, nullptr);
     std::vector<Pointer<RefineSchedule<NDIM>>> refine_scheds(d_hierarchy->getFinestLevelNumber() + 1);
     // Now create schedules to fill in data.
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
