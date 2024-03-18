@@ -263,7 +263,7 @@ void
 MultiphaseStaggeredHierarchyIntegrator::setDragCoefficientFunction(Pointer<CartGridFunction> xi_fcn)
 {
     d_xi_fcn = xi_fcn;
-    if (!d_xi_var) d_xi_var = new CellVariable<NDIM, double>(d_object_name + "::Xi");
+    if (!d_xi_var) d_xi_var = new SideVariable<NDIM, double>(d_object_name + "::Xi");
 }
 
 void
@@ -868,6 +868,14 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
                    ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
     }
 
+    // Set drag coefficient if necessary
+    if (isVariableDrag())
+    {
+        const double eval_time = half_time;
+        const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
+        d_xi_fcn->setDataOnPatchHierarchy(xi_idx, d_xi_var, d_hierarchy, eval_time, false, coarsest_ln, finest_ln);
+    }
+
     MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
     Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
     RHS_op.setPhysicalBoundaryHelper(bc_helper);
@@ -1023,6 +1031,13 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
         ghost_cell_fill.initializeOperatorState(
             ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(new_time);
+    }
+    // Also transfer the drag coefficient, if necessary
+    if (d_use_preconditioner && isVariableDrag())
+    {
+        const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
+        d_xi_fcn->setDataOnPatchHierarchy(xi_idx, d_xi_var, d_hierarchy, new_time);
+        d_stokes_precond->transferToDense(xi_idx, true);
     }
     const double dt = new_time - current_time;
 

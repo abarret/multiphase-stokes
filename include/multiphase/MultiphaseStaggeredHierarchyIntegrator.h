@@ -401,7 +401,7 @@ private:
     MultiphaseParameters d_params;
 
     // Variable drag coefficient.
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_xi_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
 };
 } // namespace multiphase

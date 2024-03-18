@@ -72,12 +72,22 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
-        const double xi = input_db->getDouble("XI");
+        bool using_var_xi = input_db->getBool("USING_VAR_XI");
         const double eta_n = input_db->getDouble("ETA_N");
         const double eta_s = input_db->getDouble("ETA_S");
-        const double nu = input_db->getDouble("NU");
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
-        ins_integrator->setDragCoefficient(xi, nu, nu);
+        if (using_var_xi)
+        {
+            Pointer<CartGridFunction> xi_fcn =
+                new muParserCartGridFunction("xi", app_initializer->getComponentDatabase("xi"), grid_geometry);
+            ins_integrator->setDragCoefficientFunction(xi_fcn);
+        }
+        else
+        {
+            const double xi = input_db->getDouble("XI");
+            const double nu = input_db->getDouble("NU");
+            ins_integrator->setDragCoefficient(xi, nu, nu);
+        }
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_fcn =
