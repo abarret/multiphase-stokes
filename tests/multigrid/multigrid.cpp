@@ -82,6 +82,9 @@ main(int argc, char* argv[])
         // variable coefficient: theta_n
         Pointer<CellVariable<NDIM, double>> thn_cc_var = new CellVariable<NDIM, double>("thn_cc");
 
+        // Variable drag
+        Pointer<SideVariable<NDIM, double>> xi_var = new SideVariable<NDIM, double>("xi");
+
         // Results of operator "forces" and "divergence"
         Pointer<SideVariable<NDIM, double>> f_un_sc_var = new SideVariable<NDIM, double>("f_un_sc");
         Pointer<SideVariable<NDIM, double>> f_us_sc_var = new SideVariable<NDIM, double>("f_us_sc");
@@ -98,6 +101,7 @@ main(int argc, char* argv[])
         const int p_cc_idx = var_db->registerVariableAndContext(p_cc_var, ctx, IntVector<NDIM>(1));
         const int thn_cc_idx =
             var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1)); // 1 layer of ghost cells
+        const int xi_idx = var_db->registerVariableAndContext(xi_var, ctx);
         const int f_cc_idx = var_db->registerVariableAndContext(f_cc_var, ctx, IntVector<NDIM>(1));
         const int f_un_sc_idx = var_db->registerVariableAndContext(f_un_sc_var, ctx, IntVector<NDIM>(1));
         const int f_us_sc_idx = var_db->registerVariableAndContext(f_us_sc_var, ctx, IntVector<NDIM>(1));
@@ -192,6 +196,7 @@ main(int argc, char* argv[])
             level->allocatePatchData(e_us_sc_idx, 0.0);
             level->allocatePatchData(p_cc_idx, 0.0);
             level->allocatePatchData(thn_cc_idx, 0.0);
+            level->allocatePatchData(xi_idx, 0.0);
             level->allocatePatchData(f_cc_idx, 0.0);
             level->allocatePatchData(e_cc_idx, 0.0);
             level->allocatePatchData(draw_un_idx, 0.0);
@@ -300,12 +305,23 @@ main(int argc, char* argv[])
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
+        bool using_var_xi = input_db->getBool("USING_VAR_XI");
+
         // Setup the stokes operator
         MultiphaseParameters params;
-        params.xi = input_db->getDouble("XI");
+        if (using_var_xi)
+        {
+            params.xi_idx = xi_idx;
+            muParserCartGridFunction xi_fcn("xi", app_initializer->getComponentDatabase("xi_fcn"), grid_geometry);
+            xi_fcn.setDataOnPatchHierarchy(xi_idx, xi_var, patch_hierarchy, 0.0);
+        }
+        else
+        {
+            params.xi = input_db->getDouble("XI");
+            params.nu_n = params.nu_s = input_db->getDouble("NU");
+        }
         params.eta_n = input_db->getDouble("ETAN");
         params.eta_s = input_db->getDouble("ETAS");
-        params.nu_n = params.nu_s = input_db->getDouble("NU");
 
         Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
             new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
@@ -366,6 +382,11 @@ main(int argc, char* argv[])
             ghost_cell_fill.initializeOperatorState(
                 ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
             ghost_cell_fill.fillData(0.0);
+
+            if (using_var_xi)
+            {
+                Krylov_precond->transferToDense(params.xi_idx, true);
+            }
         }
         hier_math_ops.setPatchHierarchy(patch_hierarchy);
         hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
@@ -485,6 +506,7 @@ main(int argc, char* argv[])
             level->deallocatePatchData(e_us_sc_idx);
             level->deallocatePatchData(p_cc_idx);
             level->deallocatePatchData(thn_cc_idx);
+            level->deallocatePatchData(xi_idx);
             level->deallocatePatchData(f_cc_idx);
             level->deallocatePatchData(e_cc_idx);
             level->deallocatePatchData(draw_un_idx);

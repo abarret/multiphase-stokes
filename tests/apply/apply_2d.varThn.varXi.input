@@ -1,4 +1,4 @@
-USING_VAR_XI = FALSE
+USING_VAR_XI = TRUE
 
 C = 1.0
 D = -1.0
@@ -26,6 +26,12 @@ p {
 
 thn {
    function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
+}
+
+xi_fcn {
+   xi = XI
+   nu = NU
+   function = "(0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5) * (1.0 - (0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5)) * xi / nu"
 }
 
 f_un {

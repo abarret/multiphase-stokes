@@ -1,0 +1,16 @@
+|e|_oo = 4.16553
+|e|_2  = 1.98814
+|e|_1  = 2.85205
+
+Error in RHS_un :
+  L1-norm:  0.7970525383
+  L2-norm:  0.8563738067
+  max-norm: 4.165528737
+Error in RHS_us :
+  L1-norm:  0.7533472964
+  L2-norm:  0.8248899275
+  max-norm: 4.165528737
+Error in RHS_p :
+  L1-norm:  1.301654138
+  L2-norm:  1.593389293
+  max-norm: 3.602672728
