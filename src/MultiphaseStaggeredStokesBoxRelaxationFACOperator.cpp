@@ -63,6 +63,8 @@
 // FORTRAN ROUTINES
 #define R_B_G_S IBTK_FC_FUNC_(rbgs, RBGS)
 #define R_B_G_S_mask IBTK_FC_FUNC_(rbgs_mask, RBGS)
+#define R_B_G_S_var_xi IBTK_FC_FUNC_(rbgs_var_xi, RBGS)
+#define R_B_G_S_var_xi_mask IBTK_FC_FUNC_(rbgs_mask_var_xi, RBGS)
 
 extern "C"
 {
@@ -135,6 +137,75 @@ extern "C"
                       const int*,    // mask_0
                       const int*,    // mask_1
                       const int&);   // mask_gcw
+
+    void R_B_G_S_var_xi(const double*,      // dx
+                        const int&,         // ilower0
+                        const int&,         // iupper0
+                        const int&,         // ilower1
+                        const int&,         // iupper1
+                        double* const,      // un_data_0
+                        double* const,      // un_data_1
+                        const int&,         // un_gcw
+                        double* const,      // us_data_0
+                        double* const,      // us_data_0
+                        const int&,         // us_gcw
+                        double* const,      // p_data_
+                        const int&,         // p_gcw
+                        double* const,      // f_p_data
+                        const int&,         // f_p_gcw
+                        double* const,      // f_un_data_0
+                        double* const,      // f_un_data_1
+                        const int&,         // f_un_gcw
+                        double* const,      // f_us_data_0
+                        double* const,      // f_us_data_1
+                        const int&,         // f_us_gcw
+                        double* const,      // thn_data
+                        const int&,         // thn_gcw
+                        const double&,      // eta_n
+                        const double&,      // eta_s
+                        double* const,      // xi_0
+                        double* const,      // xi_1
+                        const int&,         // xi_gcw
+                        const double&,      // w = under relaxation factor
+                        const double&,      // C in C*u term
+                        const double&,      // D
+                        const int&);        // red_or_black
+
+    void R_B_G_S_var_xi_mask(const double*, // dx
+                             const int&,    // ilower0
+                             const int&,    // iupper0
+                             const int&,    // ilower1
+                             const int&,    // iupper1
+                             double* const, // un_data_0
+                             double* const, // un_data_1
+                             const int&,    // un_gcw
+                             double* const, // us_data_0
+                             double* const, // us_data_0
+                             const int&,    // us_gcw
+                             double* const, // p_data_
+                             const int&,    // p_gcw
+                             double* const, // f_p_data
+                             const int&,    // f_p_gcw
+                             double* const, // f_un_data_0
+                             double* const, // f_un_data_1
+                             const int&,    // f_un_gcw
+                             double* const, // f_us_data_0
+                             double* const, // f_us_data_1
+                             const int&,    // f_us_gcw
+                             double* const, // thn_data
+                             const int&,    // thn_gcw
+                             const double&, // eta_n
+                             const double&, // eta_s
+                             double* const, // xi_0
+                             double* const, // xi_1
+                             const int&,    // xi_gcw
+                             const double&, // w = under relaxation factor
+                             const double&, // C in C*u term
+                             const double&, // D
+                             const int&,    // red_or_black
+                             const int*,    // mask_0
+                             const int*,    // mask_1
+                             const int&);   // mask_gcw
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace multiphase
@@ -591,76 +662,157 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
             if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
                 d_bc_us_helper->patchTouchesDirichletBoundary(patch))
             {
-                R_B_G_S_mask(dx,
-                             patch_lower(0), // ilower0
-                             patch_upper(0), // iupper0
-                             patch_lower(1), // ilower1
-                             patch_upper(1), // iupper1
-                             un_data_0,
-                             un_data_1,
-                             un_gcw.min(),
-                             us_data_0,
-                             us_data_1,
-                             us_gcw.min(),
-                             p_ptr_data,
-                             p_gcw.min(),
-                             f_p_ptr_data,
-                             f_p_gcw.min(),
-                             f_un_data_0,
-                             f_un_data_1,
-                             f_un_gcw.min(),
-                             f_us_data_0,
-                             f_us_data_1,
-                             f_us_gcw.min(),
-                             thn_ptr_data,
-                             thn_gcw.min(),
-                             d_params.eta_n,
-                             d_params.eta_s,
-                             d_params.nu_n,
-                             d_params.nu_s,
-                             d_params.xi,
-                             d_w,
-                             d_C,
-                             d_D,
-                             red_or_black,
-                             mask_data->getPointer(0),
-                             mask_data->getPointer(1),
-                             mask_data->getGhostCellWidth().max());
+                if (d_params.isVariableDrag())
+                {
+                    Pointer<SideData<NDIM, double>> xi_data = patch->getPatchData(d_params.xi_idx);
+                    R_B_G_S_var_xi_mask(dx,
+                                        patch_lower(0), // ilower0
+                                        patch_upper(0), // iupper0
+                                        patch_lower(1), // ilower1
+                                        patch_upper(1), // iupper1
+                                        un_data_0,
+                                        un_data_1,
+                                        un_gcw.min(),
+                                        us_data_0,
+                                        us_data_1,
+                                        us_gcw.min(),
+                                        p_ptr_data,
+                                        p_gcw.min(),
+                                        f_p_ptr_data,
+                                        f_p_gcw.min(),
+                                        f_un_data_0,
+                                        f_un_data_1,
+                                        f_un_gcw.min(),
+                                        f_us_data_0,
+                                        f_us_data_1,
+                                        f_us_gcw.min(),
+                                        thn_ptr_data,
+                                        thn_gcw.min(),
+                                        d_params.eta_n,
+                                        d_params.eta_s,
+                                        xi_data->getPointer(0),
+                                        xi_data->getPointer(1),
+                                        xi_data->getGhostCellWidth().min(),
+                                        d_w,
+                                        d_C,
+                                        d_D,
+                                        red_or_black,
+                                        mask_data->getPointer(0),
+                                        mask_data->getPointer(1),
+                                        mask_data->getGhostCellWidth().max());
+                }
+                else
+                {
+                    R_B_G_S_mask(dx,
+                                 patch_lower(0), // ilower0
+                                 patch_upper(0), // iupper0
+                                 patch_lower(1), // ilower1
+                                 patch_upper(1), // iupper1
+                                 un_data_0,
+                                 un_data_1,
+                                 un_gcw.min(),
+                                 us_data_0,
+                                 us_data_1,
+                                 us_gcw.min(),
+                                 p_ptr_data,
+                                 p_gcw.min(),
+                                 f_p_ptr_data,
+                                 f_p_gcw.min(),
+                                 f_un_data_0,
+                                 f_un_data_1,
+                                 f_un_gcw.min(),
+                                 f_us_data_0,
+                                 f_us_data_1,
+                                 f_us_gcw.min(),
+                                 thn_ptr_data,
+                                 thn_gcw.min(),
+                                 d_params.eta_n,
+                                 d_params.eta_s,
+                                 d_params.nu_n,
+                                 d_params.nu_s,
+                                 d_params.xi,
+                                 d_w,
+                                 d_C,
+                                 d_D,
+                                 red_or_black,
+                                 mask_data->getPointer(0),
+                                 mask_data->getPointer(1),
+                                 mask_data->getGhostCellWidth().max());
+                }
             }
             else
             {
-                R_B_G_S(dx,
-                        patch_lower(0), // ilower0
-                        patch_upper(0), // iupper0
-                        patch_lower(1), // ilower1
-                        patch_upper(1), // iupper1
-                        un_data_0,
-                        un_data_1,
-                        un_gcw.min(),
-                        us_data_0,
-                        us_data_1,
-                        us_gcw.min(),
-                        p_ptr_data,
-                        p_gcw.min(),
-                        f_p_ptr_data,
-                        f_p_gcw.min(),
-                        f_un_data_0,
-                        f_un_data_1,
-                        f_un_gcw.min(),
-                        f_us_data_0,
-                        f_us_data_1,
-                        f_us_gcw.min(),
-                        thn_ptr_data,
-                        thn_gcw.min(),
-                        d_params.eta_n,
-                        d_params.eta_s,
-                        d_params.nu_n,
-                        d_params.nu_s,
-                        d_params.xi,
-                        d_w,
-                        d_C,
-                        d_D,
-                        red_or_black);
+                if (d_params.isVariableDrag())
+                {
+                    Pointer<SideData<NDIM, double>> xi_data = patch->getPatchData(d_params.xi_idx);
+                    R_B_G_S_var_xi(dx,
+                                   patch_lower(0), // ilower0
+                                   patch_upper(0), // iupper0
+                                   patch_lower(1), // ilower1
+                                   patch_upper(1), // iupper1
+                                   un_data_0,
+                                   un_data_1,
+                                   un_gcw.min(),
+                                   us_data_0,
+                                   us_data_1,
+                                   us_gcw.min(),
+                                   p_ptr_data,
+                                   p_gcw.min(),
+                                   f_p_ptr_data,
+                                   f_p_gcw.min(),
+                                   f_un_data_0,
+                                   f_un_data_1,
+                                   f_un_gcw.min(),
+                                   f_us_data_0,
+                                   f_us_data_1,
+                                   f_us_gcw.min(),
+                                   thn_ptr_data,
+                                   thn_gcw.min(),
+                                   d_params.eta_n,
+                                   d_params.eta_s,
+                                   xi_data->getPointer(0),
+                                   xi_data->getPointer(1),
+                                   xi_data->getGhostCellWidth().min(),
+                                   d_w,
+                                   d_C,
+                                   d_D,
+                                   red_or_black);
+                }
+                else
+                {
+                    R_B_G_S(dx,
+                            patch_lower(0), // ilower0
+                            patch_upper(0), // iupper0
+                            patch_lower(1), // ilower1
+                            patch_upper(1), // iupper1
+                            un_data_0,
+                            un_data_1,
+                            un_gcw.min(),
+                            us_data_0,
+                            us_data_1,
+                            us_gcw.min(),
+                            p_ptr_data,
+                            p_gcw.min(),
+                            f_p_ptr_data,
+                            f_p_gcw.min(),
+                            f_un_data_0,
+                            f_un_data_1,
+                            f_un_gcw.min(),
+                            f_us_data_0,
+                            f_us_data_1,
+                            f_us_gcw.min(),
+                            thn_ptr_data,
+                            thn_gcw.min(),
+                            d_params.eta_n,
+                            d_params.eta_s,
+                            d_params.nu_n,
+                            d_params.nu_s,
+                            d_params.xi,
+                            d_w,
+                            d_C,
+                            d_D,
+                            red_or_black);
+                }
             }
         } // patchess
     }     // num_sweeps

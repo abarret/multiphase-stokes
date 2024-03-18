@@ -621,9 +621,8 @@ MultiphaseStaggeredStokesOperator::applySpecialized(const int A_P_idx,
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             if (d_params.isVariableDrag())
-                //                applyForcesOnPatchVariableDrag(patch, A_un_idx, A_us_idx, p_idx, un_idx, us_idx,
-                //                thn_idx, d_params, d_C, d_D_u, d_D_p);
-                TBOX_WARNING("DSFL");
+                applyForcesOnPatchVariableDrag(
+                    patch, A_un_idx, A_us_idx, p_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D_u, d_D_p);
             else
                 applyForcesOnPatchConstantCoefficient(patch,
                                                       A_un_idx,
