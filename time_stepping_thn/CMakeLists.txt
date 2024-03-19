@@ -1,3 +1,0 @@
-ADD_EXECUTABLE(time_stepping_thn time_stepping_thn.cpp)
-TARGET_LINK_LIBRARIES(time_stepping_thn MultiphaseLib)
-
