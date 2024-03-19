@@ -11,19 +11,19 @@
 namespace multiphase
 {
 inline void
-applyForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                      const int A_un_idx,
-                                      const int A_us_idx,
-                                      const int p_idx,
-                                      const int un_idx,
-                                      const int us_idx,
-                                      const int thn_idx,
-                                      const int thn_nc_idx,
-                                      const int thn_sc_idx,
-                                      const MultiphaseParameters& params,
-                                      const double C,
-                                      const double D_u,
-                                      const double D_p)
+accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                                   const int A_un_idx,
+                                                   const int A_us_idx,
+                                                   const int p_idx,
+                                                   const int un_idx,
+                                                   const int us_idx,
+                                                   const int thn_idx,
+                                                   const int thn_nc_idx,
+                                                   const int thn_sc_idx,
+                                                   const MultiphaseParameters& params,
+                                                   const double C,
+                                                   const double D_u,
+                                                   const double D_p)
 {
 #ifndef NDEBUG
     TBOX_ASSERT(!params.isVariableDrag());
@@ -162,17 +162,17 @@ applyForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<
 }
 
 inline void
-applyForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                      const int A_un_idx,
-                                      const int A_us_idx,
-                                      const int p_idx,
-                                      const int un_idx,
-                                      const int us_idx,
-                                      const int thn_idx,
-                                      const MultiphaseParameters& params,
-                                      const double C,
-                                      const double D_u,
-                                      const double D_p)
+accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                                   const int A_un_idx,
+                                                   const int A_us_idx,
+                                                   const int p_idx,
+                                                   const int un_idx,
+                                                   const int us_idx,
+                                                   const int thn_idx,
+                                                   const MultiphaseParameters& params,
+                                                   const double C,
+                                                   const double D_u,
+                                                   const double D_p)
 {
 #ifndef NDEBUG
     TBOX_ASSERT(!params.isVariableDrag());
@@ -314,17 +314,17 @@ applyForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<
 }
 
 inline void
-applyForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                               const int A_un_idx,
-                               const int A_us_idx,
-                               const int p_idx,
-                               const int un_idx,
-                               const int us_idx,
-                               const int thn_idx,
-                               const MultiphaseParameters& params,
-                               const double C,
-                               const double D_u,
-                               const double D_p)
+accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                            const int A_un_idx,
+                                            const int A_us_idx,
+                                            const int p_idx,
+                                            const int un_idx,
+                                            const int us_idx,
+                                            const int thn_idx,
+                                            const MultiphaseParameters& params,
+                                            const double C,
+                                            const double D_u,
+                                            const double D_p)
 {
 #ifndef NDEBUG
     TBOX_ASSERT(params.isVariableDrag());

@@ -56,17 +56,13 @@ namespace multiphase
  *   -- C: Constant, set via setCandDCoefficients().
  *   -- D_u: Constant, set via setCandDCoefficients().
  *   -- thn: Cell centered patch index for volume fraction, set via setThnIdx().
- *   -- xi: Constant drag coefficient, set via setDragCoefficient().
- *   -- eta_n: Constant viscosity, set via setViscosityCoefficient().
- *   -- eta_s: Constant viscosity, set via setViscosityCoefficient().
- *   -- nu_n: Constant, set via setDragCoefficient().
- *   -- nu_s: Constant, set via setDragCoefficient().
  *   -- D_p: Constant, set via setCandDCoefficients(). A default value is set to -1.0.
  *   -- D_div: Constant, set via setCandDCoefficients(). A default value is set to 1.0.
  *
- * Note that unlike StaggeredStokesOperator, xi, eta, and mu MUST be provided separately from C and D. C and D values
- * are typically set by the time stepping scheme. Default values for D_p and D_div are set for solving a standard linear
- * system.
+ * Note that C and D values are typically set by the time stepping scheme. Default values for D_p and D_div are set for
+ * solving a standard linear system.
+ *
+ * This class handles the case in which the drag coefficient is variable.
  *
  * \see INSStaggeredHierarchyIntegrator
  */

@@ -921,10 +921,10 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 
             applyCoincompressibility(patch, res_P_idx, un_idx, us_idx, thn_idx, 1.0);
             if (d_params.isVariableDrag())
-                applyForcesOnPatchVariableDrag(
+                accumulateMomentumForcesOnPatchVariableDrag(
                     patch, res_un_idx, res_us_idx, P_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
             else
-                applyForcesOnPatchConstantCoefficient(
+                accumulateMomentumForcesOnPatchConstantCoefficient(
                     patch, res_un_idx, res_us_idx, P_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
