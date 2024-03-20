@@ -109,6 +109,16 @@ public:
         return d_f_us_sc_var;
     }
 
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> getNetworkAdvectionVelocityVariable() const
+    {
+        return d_U_adv_diff_var;
+    }
+
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> getSolventAdvectionVelocityVariable() const
+    {
+        return d_us_adv_diff_var;
+    }
+
     /*!
      * Register physical boundary condition objects. Note that we currently only work with periodic and Dirichlet
      * conditions on the velocity.
@@ -457,6 +467,9 @@ private:
 
     // Dummy boundary condition objects
     std::vector<std::unique_ptr<SAMRAI::solv::LocationIndexRobinBcCoefs<NDIM>>> d_dummy_bcs;
+
+    // Solvent advection velocity variable
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> d_us_adv_diff_var;
 };
 } // namespace multiphase
 
