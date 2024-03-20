@@ -235,8 +235,6 @@ MultiphaseConvectiveManager::MultiphaseConvectiveManager(std::string object_name
                                                          RobinBcCoefStrategy<NDIM>* thn_bc_coef)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
-      d_hier_sc_data_ops(hierarchy),
-      d_hier_cc_data_ops(hierarchy),
       d_un_bc_coefs(un_bc_coefs),
       d_us_bc_coefs(us_bc_coefs),
       d_thn_bc_coef(thn_bc_coef)
@@ -254,8 +252,6 @@ MultiphaseConvectiveManager::MultiphaseConvectiveManager(std::string object_name
                                                          RobinBcCoefStrategy<NDIM>* thn_bc_coef)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
-      d_hier_sc_data_ops(hierarchy),
-      d_hier_cc_data_ops(hierarchy),
       d_limiter(limiter_type),
       d_un_bc_coefs(un_bc_coefs),
       d_us_bc_coefs(us_bc_coefs),
@@ -392,6 +388,12 @@ MultiphaseConvectiveManager::allocateData(const double time)
                                                   nullptr,
                                                   d_bdry_interp_order) };
         d_u_ghost_fill.initializeOperatorState(u_ghost_fill_itc, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        
+        // Allocate d_hier_sc_data_ops
+        d_hier_sc_data_ops = std::make_unique<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>>(d_hierarchy);
+        
+        // Allocate d_hier_cc_data_ops
+        d_hier_cc_data_ops = std::make_unique<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>>(d_hierarchy);
 
         d_is_allocated = true;
     }
@@ -450,8 +452,8 @@ MultiphaseConvectiveManager::approximateConvectiveOperator(IBAMR::TimeSteppingTy
 void
 MultiphaseConvectiveManager::fillWithConvectiveOperator(const int dst_un_idx, const int dst_us_idx)
 {
-    if (dst_un_idx != IBTK::invalid_index) d_hier_sc_data_ops.copyData(dst_un_idx, d_N_un_idx);
-    if (dst_us_idx != IBTK::invalid_index) d_hier_sc_data_ops.copyData(dst_us_idx, d_N_us_idx);
+    if (dst_un_idx != IBTK::invalid_index) d_hier_sc_data_ops->copyData(dst_un_idx, d_N_un_idx);
+    if (dst_us_idx != IBTK::invalid_index) d_hier_sc_data_ops->copyData(dst_us_idx, d_N_us_idx);
 }
 
 std::pair<int, int>
@@ -476,12 +478,12 @@ MultiphaseConvectiveManager::approximateOperator(const int dst_un_idx,
 {
     // Fill in ghost cells for thn. Because thn may have changed indices, we need to reinitialize the ghost filling
     // routines.
-    d_hier_cc_data_ops.copyData(d_thn_scr_idx, thn_idx);
+    d_hier_cc_data_ops->copyData(d_thn_scr_idx, thn_idx);
     d_thn_ghost_fill.fillData(eval_time);
 
     // Fill in velocity ghost cells. Needed to compute staggered control volume velocities
-    d_hier_sc_data_ops.copyData(d_un_scr_idx, un_idx);
-    d_hier_sc_data_ops.copyData(d_us_scr_idx, us_idx);
+    d_hier_sc_data_ops->copyData(d_un_scr_idx, un_idx);
+    d_hier_sc_data_ops->copyData(d_us_scr_idx, us_idx);
     d_u_ghost_fill.fillData(eval_time);
 
     // Fill in N0 approximations and N approximations.
@@ -546,8 +548,8 @@ MultiphaseConvectiveManager::approximateForwardEuler(const double current_time,
     approximateOperator(d_N_un_idx, d_N_us_idx, current_time, un_cur_idx, us_cur_idx, thn_cur_idx);
 
     // Now copy the data to N0.
-    d_hier_sc_data_ops.copyData(d_N0_un_idx, d_N_un_idx);
-    d_hier_sc_data_ops.copyData(d_N0_us_idx, d_N_us_idx);
+    d_hier_sc_data_ops->copyData(d_N0_un_idx, d_N_un_idx);
+    d_hier_sc_data_ops->copyData(d_N0_us_idx, d_N_us_idx);
 }
 
 void
@@ -567,8 +569,8 @@ MultiphaseConvectiveManager::approximateTrapezoidalRule(const double current_tim
     approximateOperator(d_N_un_idx, d_N_us_idx, new_time, un_new_idx, us_new_idx, thn_new_idx);
 
     // Now average N and N0
-    d_hier_sc_data_ops.linearSum(d_N_un_idx, 0.5, d_N_un_idx, 0.5, d_N0_un_idx);
-    d_hier_sc_data_ops.linearSum(d_N_us_idx, 0.5, d_N_us_idx, 0.5, d_N0_us_idx);
+    d_hier_sc_data_ops->linearSum(d_N_un_idx, 0.5, d_N_un_idx, 0.5, d_N0_un_idx);
+    d_hier_sc_data_ops->linearSum(d_N_us_idx, 0.5, d_N_us_idx, 0.5, d_N0_us_idx);
 }
 
 void
@@ -583,9 +585,9 @@ MultiphaseConvectiveManager::approximateMidpointRule(const double current_time,
 {
     double half_time = 0.5 * (current_time + new_time);
     // First compute "half" values
-    d_hier_sc_data_ops.linearSum(d_un_scr_idx, 0.5, un_cur_idx, 0.5, un_new_idx);
-    d_hier_sc_data_ops.linearSum(d_us_scr_idx, 0.5, us_cur_idx, 0.5, us_new_idx);
-    d_hier_cc_data_ops.linearSum(d_thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
+    d_hier_sc_data_ops->linearSum(d_un_scr_idx, 0.5, un_cur_idx, 0.5, un_new_idx);
+    d_hier_sc_data_ops->linearSum(d_us_scr_idx, 0.5, us_cur_idx, 0.5, us_new_idx);
+    d_hier_cc_data_ops->linearSum(d_thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
 
     // Now approximate operator
     approximateOperator(d_N_un_idx, d_N_us_idx, half_time, d_un_scr_idx, d_us_scr_idx, d_thn_scr_idx);

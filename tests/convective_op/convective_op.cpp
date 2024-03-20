@@ -174,6 +174,14 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("exact_N_un_" + std::to_string(d), "SCALAR", exact_N_un_idx, d);
             visit_data_writer->registerPlotQuantity("exact_N_us_" + std::to_string(d), "SCALAR", exact_N_us_idx, d);
         }
+        
+        // Apply convective operator. This should be created before the patch hierarchy is created.
+        INSVCTwoFluidConvectiveManager convec_op("convec_op",
+                                                 patch_hierarchy,
+                                                 input_db->getDatabase("ConvecOp"),
+                                                 un_bc_coefs,
+                                                 us_bc_coefs,
+                                                 thn_bc_coef.get());
 
         gridding_algorithm->makeCoarsestLevel(patch_hierarchy, 0.0);
         int tag_buffer = 1;
@@ -185,6 +193,7 @@ main(int argc, char* argv[])
             done = !patch_hierarchy->finerLevelExists(level_number);
             ++level_number;
         }
+    
 
         // Allocate data on each level of the patch hierarchy.
         const int coarsest_ln = 0;
@@ -227,13 +236,6 @@ main(int argc, char* argv[])
         N_un_fcn.setDataOnPatchHierarchy(e_un_idx, e_un_var, patch_hierarchy, 0.0);
         N_us_fcn.setDataOnPatchHierarchy(e_us_idx, e_us_var, patch_hierarchy, 0.0);
 
-        // Apply convective operator
-        INSVCTwoFluidConvectiveManager convec_op("convec_op",
-                                                 patch_hierarchy,
-                                                 input_db->getDatabase("ConvecOp"),
-                                                 un_bc_coefs,
-                                                 us_bc_coefs,
-                                                 thn_bc_coef.get());
         convec_op.approximateConvectiveOperator(N_un_idx,
                                                 N_us_idx,
                                                 TimeSteppingType::FORWARD_EULER,
