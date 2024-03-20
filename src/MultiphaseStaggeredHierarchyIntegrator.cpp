@@ -215,6 +215,8 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
     }
     d_U_bc_coefs = d_us_bc_coefs;
 
+    d_us_adv_diff_var = new FaceVariable<NDIM, double>(d_object_name + "::us_adv_var");
+
     IBTK_DO_ONCE(t_integrate_hierarchy = TimerManager::getManager()->getTimer(
                      "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy()");
                  t_preprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
@@ -546,6 +548,19 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
                                                                       Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
 {
     if (d_integrator_is_initialized) return;
+
+    // Note that we should be initializing before the advection diffusion integrator, so this should occur before the
+    // advection diffusion integrators register their variables.
+    for (auto& adv_diff_integrator : d_adv_diff_hier_integrators)
+    {
+        // Network velocity was already registered in the call registerAdvDiffHierarchyIntegrator, but we need to
+        // specify that the velocity is not divergence free
+        adv_diff_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false);
+
+        // Regiser the solvent velocity
+        adv_diff_integrator->registerAdvectionVelocity(d_us_adv_diff_var);
+        adv_diff_integrator->setAdvectionVelocityIsDivergenceFree(d_us_adv_diff_var, false);
+    }
 
     d_hierarchy = hierarchy;
     d_gridding_alg = gridding_alg;
@@ -1125,6 +1140,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     for (const auto& adv_diff_integrator : d_adv_diff_hier_integrators)
     {
         const int adv_diff_num_cycles = adv_diff_integrator->getNumberOfCycles();
+        // Network advection velocity
         const int U_adv_diff_cur_idx =
             var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getCurrentContext());
         const int U_adv_diff_scr_idx =
@@ -1132,11 +1148,24 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         const int U_adv_diff_new_idx =
             var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_integrator->getNewContext());
         if (isAllocatedPatchData(U_adv_diff_cur_idx)) copy_side_to_face(U_adv_diff_cur_idx, un_cur_idx, d_hierarchy);
+        const int us_adv_diff_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_us_adv_diff_var, adv_diff_integrator->getCurrentContext());
+        const int us_adv_diff_scr_idx =
+            var_db->mapVariableAndContextToIndex(d_us_adv_diff_var, adv_diff_integrator->getScratchContext());
+        const int us_adv_diff_new_idx =
+            var_db->mapVariableAndContextToIndex(d_us_adv_diff_var, adv_diff_integrator->getNewContext());
+        if (isAllocatedPatchData(us_adv_diff_cur_idx)) copy_side_to_face(us_adv_diff_cur_idx, us_cur_idx, d_hierarchy);
+
         adv_diff_integrator->preprocessIntegrateHierarchy(current_time, new_time, adv_diff_num_cycles);
+
         if (isAllocatedPatchData(U_adv_diff_scr_idx))
             d_hier_fc_data_ops->copyData(U_adv_diff_scr_idx, U_adv_diff_cur_idx);
         if (isAllocatedPatchData(U_adv_diff_new_idx))
             d_hier_fc_data_ops->copyData(U_adv_diff_new_idx, U_adv_diff_cur_idx);
+        if (isAllocatedPatchData(us_adv_diff_scr_idx))
+            d_hier_fc_data_ops->copyData(us_adv_diff_scr_idx, us_adv_diff_cur_idx);
+        if (isAllocatedPatchData(us_adv_diff_new_idx))
+            d_hier_fc_data_ops->copyData(us_adv_diff_new_idx, us_adv_diff_cur_idx);
     }
 
     executePreprocessIntegrateHierarchyCallbackFcns(current_time, new_time, num_cycles);
@@ -1167,7 +1196,7 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*start_of_ts*/ !d_use_new_thn);
 
     // Update the preconditioner with new volume fraction
-    if (d_thn_integrator && d_use_preconditioner)
+    if (d_use_preconditioner)
     {
         d_stokes_precond->transferToDense(thn_new_idx);
         // Also fill in ghost cells on the dense hierarchy
@@ -1273,6 +1302,16 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
             var_db->mapVariableAndContextToIndex(d_U_adv_diff_var, adv_diff_hier_integrator->getScratchContext());
         if (isAllocatedPatchData(U_adv_diff_scr_idx))
             d_hier_fc_data_ops->linearSum(U_adv_diff_scr_idx, 0.5, U_adv_diff_new_idx, 0.5, U_adv_diff_cur_idx);
+
+        const int us_adv_diff_new_idx =
+            var_db->mapVariableAndContextToIndex(d_us_adv_diff_var, adv_diff_hier_integrator->getNewContext());
+        if (isAllocatedPatchData(us_adv_diff_new_idx)) copy_side_to_face(us_adv_diff_new_idx, us_new_idx, d_hierarchy);
+        const int us_adv_diff_cur_idx =
+            var_db->mapVariableAndContextToIndex(d_us_adv_diff_var, adv_diff_hier_integrator->getCurrentContext());
+        const int us_adv_diff_scr_idx =
+            var_db->mapVariableAndContextToIndex(d_us_adv_diff_var, adv_diff_hier_integrator->getScratchContext());
+        if (isAllocatedPatchData(us_adv_diff_scr_idx))
+            d_hier_fc_data_ops->linearSum(us_adv_diff_scr_idx, 0.5, us_adv_diff_new_idx, 0.5, us_adv_diff_cur_idx);
 
         // Now update the state variables. Note that cycle 0 has already been performed
         const int adv_diff_num_cycles = adv_diff_hier_integrator->getNumberOfCycles();
