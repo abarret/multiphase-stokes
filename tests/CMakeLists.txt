@@ -20,7 +20,7 @@ ADD_CUSTOM_TARGET(tests)
 #    only compiles the IBFE tests.
 # 2. all input and output files in these source directories are symlinked into
 #    their corresponding build directories.
-SET(TEST_DIRECTORIES apply multigrid time_stepping time_stepping_thn frm convective_op)
+SET(TEST_DIRECTORIES apply multigrid time_stepping time_stepping_thn frm convective_op physical_bc)
 
 FOREACH(_dir ${TEST_DIRECTORIES})
   ADD_CUSTOM_TARGET("tests-${_dir}")
@@ -110,6 +110,9 @@ SETUP_2D(time_stepping time_stepping.cpp)
 SETUP_2D(time_stepping_thn time_stepping_thn.cpp)
 SETUP_2D(frm four_roll_mill.cpp)
 SETUP_2D(convective_op convective_op.cpp)
+SETUP_2D(physical_bc apply.cpp)
+SETUP_2D(physical_bc channel.cpp)
+SETUP_2D(physical_bc solve.cpp)
 
 # Find numdiff, if possible (we only need it for tests so its not essential that
 # we find it now)
