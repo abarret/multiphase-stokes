@@ -256,8 +256,8 @@ private:
     /*!
      * Data operations
      */
-    SAMRAI::math::HierarchySideDataOpsReal<NDIM, double> d_hier_sc_data_ops;
-    SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double> d_hier_cc_data_ops;
+    std::unique_ptr<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double> > d_hier_sc_data_ops;
+    std::unique_ptr<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double> > d_hier_cc_data_ops;
 
     /*!
      * Limiter for momentum interpolation.
