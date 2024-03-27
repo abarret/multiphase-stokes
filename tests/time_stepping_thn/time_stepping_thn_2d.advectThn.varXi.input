@@ -1,13 +1,16 @@
+USING_VAR_XI = TRUE
+
 RHO = 1.0
 START_TIME = 0.0
-END_TIME = 1.0
 NUM_CYCLES = 1
 N = 16
 MAX_MULTIGRID_LEVELS = 3
+PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 DX = 1.0 / N
 U_MAX = 1.0
 CFL = 0.1
 DT_MAX = CFL * DX / U_MAX
+END_TIME = 5*DT_MAX
 ENABLE_LOGGING = TRUE
 W = 0.75
 USE_PRECONDITIONER = TRUE
@@ -92,8 +95,8 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
 
    precond_db {
       cycle_type = "V_CYCLE"
-      num_pre_sweeps = 0
-      num_post_sweeps = 5
+      num_pre_sweeps = 3
+      num_post_sweeps = 3
       enable_logging = TRUE
       max_multigrid_levels = MAX_MULTIGRID_LEVELS
    }
@@ -112,7 +115,7 @@ AdvDiffIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "output"
+   log_file_name = "logfile"
    log_all_nodes = FALSE
 
 // visualization dump parameters

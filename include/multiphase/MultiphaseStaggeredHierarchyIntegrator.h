@@ -1,14 +1,14 @@
-#ifndef included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
-#define included_multiphase_INSVCTwoFluidStaggeredHierarchyIntegrator
+#ifndef included_multiphase_MultiphaseStaggeredHierarchyIntegrator
+#define included_multiphase_MultiphaseStaggeredHierarchyIntegrator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include <ibamr/config.h>
 
 #include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/INSVCTwoFluidConvectiveManager.h"
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseConvectiveManager.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 
 #include "ibamr/INSHierarchyIntegrator.h"
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
@@ -39,30 +39,30 @@
 namespace multiphase
 {
 /*!
- * \brief Class INSVCTwoFluidStaggeredHierarchyIntegrator provides a staggered-grid solver
+ * \brief Class MultiphaseStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
  */
-class INSVCTwoFluidStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
+class MultiphaseStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
 {
 public:
     /*!
-     * The constructor for class INSVCTwoFluidStaggeredHierarchyIntegrator sets some
+     * The constructor for class MultiphaseStaggeredHierarchyIntegrator sets some
      * default values, reads in configuration information from input and restart
      * databases, and registers the integrator object with the restart manager
      * when requested.
      */
-    INSVCTwoFluidStaggeredHierarchyIntegrator(
+    MultiphaseStaggeredHierarchyIntegrator(
         std::string object_name,
         SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
         SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianGridGeometry<NDIM>> grid_geometry,
         bool register_for_restart = true);
 
     /*!
-     * The destructor for class INSVCTwoFluidStaggeredHierarchyIntegrator unregisters the
+     * The destructor for class MultiphaseStaggeredHierarchyIntegrator unregisters the
      * integrator object with the restart manager when the object is so
      * registered.
      */
-    ~INSVCTwoFluidStaggeredHierarchyIntegrator();
+    ~MultiphaseStaggeredHierarchyIntegrator();
 
     /*!
      * Non-zero Reynolds numbers are not implemented. Returns nullptr.
@@ -130,6 +130,11 @@ public:
     void setDragCoefficient(double xi, double nu_n, double nu_s);
 
     /*!
+     * \brief Set the drag coefficient function. Note that this must be done prior to the integrator is initialized.
+     */
+    void setDragCoefficientFunction(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> xi_fcn);
+
+    /*!
      * Set initial conditions for the state variables.
      *
      * NOTE: These pointers are set to nullptr after they are used.
@@ -151,7 +156,7 @@ public:
                              SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fp_fcn = nullptr);
 
     /*!
-     * Regiser forcing functions that should be scaled by the volume fraction.
+     * Register forcing functions that should be scaled by the volume fraction.
      */
     void setForcingFunctionsScaled(SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fn_fcn,
                                    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> fs_fcn);
@@ -249,6 +254,8 @@ protected:
     void setupPlotDataSpecialized() override;
 
 private:
+    bool isVariableDrag() const;
+
     void setThnAtHalf(int& thn_cur_idx,
                       int& thn_new_idx,
                       int& thn_scr_idx,
@@ -271,7 +278,7 @@ private:
      *
      * \note This constructor is not implemented and should not be used.
      */
-    INSVCTwoFluidStaggeredHierarchyIntegrator() = delete;
+    MultiphaseStaggeredHierarchyIntegrator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -280,7 +287,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    INSVCTwoFluidStaggeredHierarchyIntegrator(const INSVCTwoFluidStaggeredHierarchyIntegrator& from) = delete;
+    MultiphaseStaggeredHierarchyIntegrator(const MultiphaseStaggeredHierarchyIntegrator& from) = delete;
 
     /*!
      * \brief Assignment operator.
@@ -291,8 +298,7 @@ private:
      *
      * \return A reference to this object.
      */
-    INSVCTwoFluidStaggeredHierarchyIntegrator&
-    operator=(const INSVCTwoFluidStaggeredHierarchyIntegrator& that) = delete;
+    MultiphaseStaggeredHierarchyIntegrator& operator=(const MultiphaseStaggeredHierarchyIntegrator& that) = delete;
 
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_fcn, d_f_us_fcn, d_f_p_fcn;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_f_un_thn_fcn, d_f_us_ths_fcn;
@@ -332,25 +338,19 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
     bool d_has_vel_nullspace = false;
 
-    // Physical parameters
-    double d_rho = std::numeric_limits<double>::quiet_NaN();
-    double d_xi = std::numeric_limits<double>::quiet_NaN(), d_nu_n = std::numeric_limits<double>::quiet_NaN(),
-           d_nu_s = std::numeric_limits<double>::quiet_NaN();
-    double d_eta_n = std::numeric_limits<double>::quiet_NaN(), d_eta_s = std::numeric_limits<double>::quiet_NaN();
-
     /*!
      * Solver information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_solver_db;
     SAMRAI::tbox::Pointer<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
-    SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesOperator> d_stokes_op;
+    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesOperator> d_stokes_op;
 
     /*!
      * Preconditioner information
      */
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
     SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
-    SAMRAI::tbox::Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
+    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;
 
@@ -384,7 +384,7 @@ private:
     /*!
      * Convective operator
      */
-    std::unique_ptr<INSVCTwoFluidConvectiveManager> d_convec_op;
+    std::unique_ptr<MultiphaseConvectiveManager> d_convec_op;
     IBAMR::LimiterType d_convec_limiter_type = IBAMR::LimiterType::UNKNOWN_LIMITER_TYPE;
 
     /*!
@@ -397,9 +397,15 @@ private:
 
     // Flag for if volume fraction has a meaningful value in middle of time step.
     bool d_use_new_thn = true;
+
+    MultiphaseParameters d_params;
+
+    // Variable drag coefficient.
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
+    SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
 };
 } // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_IBAMR_INSVCTwoFluidStaggeredHierarchyIntegrator
+#endif // #ifndef included_IBAMR_MultiphaseStaggeredHierarchyIntegrator

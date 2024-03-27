@@ -1,3 +1,5 @@
+USING_VAR_XI = FALSE
+
 C = 1.0
 D = -1.0
 

@@ -1,9 +1,11 @@
-#ifndef included_multiphase_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
-#define included_multiphase_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#ifndef included_multiphase_MultiphaseStaggeredStokesBoxRelaxationFACOperator
+#define included_multiphase_MultiphaseStaggeredStokesBoxRelaxationFACOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include <ibtk/config.h>
+
+#include "multiphase/MultiphaseParameters.h"
 
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/FACPreconditionerStrategy.h"
@@ -28,7 +30,7 @@
 
 namespace multiphase
 {
-class VCTwoFluidStaggeredStokesBoxRelaxationFACOperator : public IBTK::FACPreconditionerStrategy
+class MultiphaseStaggeredStokesBoxRelaxationFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:
     /*!
@@ -36,13 +38,14 @@ public:
      * \param w under relaxation factor in box relaxation scheme
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
-                                                      const std::string& default_options_prefix);
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
+                                                      const std::string& default_options_prefix,
+                                                      const MultiphaseParameters& params);
 
     /*!
      * \brief Destructor.
      */
-    ~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator();
+    ~MultiphaseStaggeredStokesBoxRelaxationFACOperator();
 
     void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                             const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
@@ -170,23 +173,13 @@ public:
      */
     void setCandDCoefficients(double C, double D);
 
-    /*!
-     * \brief Set the viscosity coefficients for the viscous stresses.
-     */
-    void setViscosityCoefficient(double eta_n, double eta_s);
-
-    /*!
-     * \brief Set the drag coefficients for each phase.
-     */
-    void setDragCoefficient(double xi, double nu_n, double nu_s);
-
 private:
     /*!
      * \brief Default constructor.
      *
      * \note This constructor is not implemented and should not be used.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator() = delete;
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -195,7 +188,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& from) =
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator(const MultiphaseStaggeredStokesBoxRelaxationFACOperator& from) =
         delete;
 
     /*!
@@ -207,8 +200,8 @@ private:
      *
      * \return A reference to this object.
      */
-    VCTwoFluidStaggeredStokesBoxRelaxationFACOperator&
-    operator=(const VCTwoFluidStaggeredStokesBoxRelaxationFACOperator& that) = delete;
+    MultiphaseStaggeredStokesBoxRelaxationFACOperator&
+    operator=(const MultiphaseStaggeredStokesBoxRelaxationFACOperator& that) = delete;
 
     /*!
      * \brief Perform prolongation or restriction on the provided indices.
@@ -261,11 +254,7 @@ private:
     double d_w = 0.75;                                         // under relaxation factor
     double d_C = std::numeric_limits<double>::quiet_NaN();     // C*u
     double d_D = std::numeric_limits<double>::quiet_NaN();     // D depends on time stepping scheme
-    double d_eta_n = std::numeric_limits<double>::quiet_NaN(); // Network viscosity
-    double d_eta_s = std::numeric_limits<double>::quiet_NaN(); // Solvent viscosity
-    double d_xi = std::numeric_limits<double>::quiet_NaN();    // Drag coefficient
-    double d_nu_n = std::numeric_limits<double>::quiet_NaN();
-    double d_nu_s = std::numeric_limits<double>::quiet_NaN();
+    const MultiphaseParameters& d_params;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::unique_ptr<SAMRAI::solv::RobinBcCoefStrategy<NDIM>> d_default_un_bc_coef, d_default_us_bc_coef,
@@ -293,4 +282,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_IBTK_VCTwoFluidStaggeredStokesBoxRelaxationFACOperator
+#endif // #ifndef included_IBTK_MultiphaseStaggeredStokesBoxRelaxationFACOperator

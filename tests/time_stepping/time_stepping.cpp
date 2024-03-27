@@ -1,4 +1,4 @@
-#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
 #include <ibamr/StokesSpecifications.h>
@@ -49,12 +49,11 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator =
-            new INSVCTwoFluidStaggeredHierarchyIntegrator(
-                "FluidSolver",
-                app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-                grid_geometry,
-                false);
+        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+            "FluidSolver",
+            app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
+            grid_geometry,
+            false);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
         grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables
@@ -73,12 +72,22 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
-        const double xi = input_db->getDouble("XI");
+        bool using_var_xi = input_db->getBool("USING_VAR_XI");
         const double eta_n = input_db->getDouble("ETA_N");
         const double eta_s = input_db->getDouble("ETA_S");
-        const double nu = input_db->getDouble("NU");
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
-        ins_integrator->setDragCoefficient(xi, nu, nu);
+        if (using_var_xi)
+        {
+            Pointer<CartGridFunction> xi_fcn =
+                new muParserCartGridFunction("xi", app_initializer->getComponentDatabase("xi"), grid_geometry);
+            ins_integrator->setDragCoefficientFunction(xi_fcn);
+        }
+        else
+        {
+            const double xi = input_db->getDouble("XI");
+            const double nu = input_db->getDouble("NU");
+            ins_integrator->setDragCoefficient(xi, nu, nu);
+        }
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_fcn =
@@ -157,7 +166,7 @@ main(int argc, char* argv[])
         }
         // Main time step loop
         while (!IBTK::rel_equal_eps(loop_time, time_end) && ins_integrator->stepsRemaining())
-        {   
+        {
             pout << "\n";
             pout << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
             pout << "At beginning of timestep # " << iteration_num << "\n";

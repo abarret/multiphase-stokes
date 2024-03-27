@@ -18,7 +18,7 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "multiphase/INSVCTwoFluidConvectiveManager.h"
+#include "multiphase/MultiphaseConvectiveManager.h"
 #include "multiphase/utility_functions.h"
 using namespace multiphase;
 
@@ -228,12 +228,12 @@ main(int argc, char* argv[])
         N_us_fcn.setDataOnPatchHierarchy(e_us_idx, e_us_var, patch_hierarchy, 0.0);
 
         // Apply convective operator
-        INSVCTwoFluidConvectiveManager convec_op("convec_op",
-                                                 patch_hierarchy,
-                                                 input_db->getDatabase("ConvecOp"),
-                                                 un_bc_coefs,
-                                                 us_bc_coefs,
-                                                 thn_bc_coef.get());
+        MultiphaseConvectiveManager convec_op("convec_op",
+                                              patch_hierarchy,
+                                              input_db->getDatabase("ConvecOp"),
+                                              un_bc_coefs,
+                                              us_bc_coefs,
+                                              thn_bc_coef.get());
         convec_op.approximateConvectiveOperator(N_un_idx,
                                                 N_us_idx,
                                                 TimeSteppingType::FORWARD_EULER,

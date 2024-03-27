@@ -1,6 +1,7 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/fd_operators.h"
 #include "multiphase/utility_functions.h"
 
 #include "ibamr/namespaces.h" // IWYU pragma: keep
@@ -62,6 +63,8 @@
 // FORTRAN ROUTINES
 #define R_B_G_S IBTK_FC_FUNC_(rbgs, RBGS)
 #define R_B_G_S_mask IBTK_FC_FUNC_(rbgs_mask, RBGS)
+#define R_B_G_S_var_xi IBTK_FC_FUNC_(rbgs_var_xi, RBGS)
+#define R_B_G_S_var_xi_mask IBTK_FC_FUNC_(rbgs_mask_var_xi, RBGS)
 
 extern "C"
 {
@@ -134,6 +137,75 @@ extern "C"
                       const int*,    // mask_0
                       const int*,    // mask_1
                       const int&);   // mask_gcw
+
+    void R_B_G_S_var_xi(const double*,      // dx
+                        const int&,         // ilower0
+                        const int&,         // iupper0
+                        const int&,         // ilower1
+                        const int&,         // iupper1
+                        double* const,      // un_data_0
+                        double* const,      // un_data_1
+                        const int&,         // un_gcw
+                        double* const,      // us_data_0
+                        double* const,      // us_data_0
+                        const int&,         // us_gcw
+                        double* const,      // p_data_
+                        const int&,         // p_gcw
+                        double* const,      // f_p_data
+                        const int&,         // f_p_gcw
+                        double* const,      // f_un_data_0
+                        double* const,      // f_un_data_1
+                        const int&,         // f_un_gcw
+                        double* const,      // f_us_data_0
+                        double* const,      // f_us_data_1
+                        const int&,         // f_us_gcw
+                        double* const,      // thn_data
+                        const int&,         // thn_gcw
+                        const double&,      // eta_n
+                        const double&,      // eta_s
+                        double* const,      // xi_0
+                        double* const,      // xi_1
+                        const int&,         // xi_gcw
+                        const double&,      // w = under relaxation factor
+                        const double&,      // C in C*u term
+                        const double&,      // D
+                        const int&);        // red_or_black
+
+    void R_B_G_S_var_xi_mask(const double*, // dx
+                             const int&,    // ilower0
+                             const int&,    // iupper0
+                             const int&,    // ilower1
+                             const int&,    // iupper1
+                             double* const, // un_data_0
+                             double* const, // un_data_1
+                             const int&,    // un_gcw
+                             double* const, // us_data_0
+                             double* const, // us_data_0
+                             const int&,    // us_gcw
+                             double* const, // p_data_
+                             const int&,    // p_gcw
+                             double* const, // f_p_data
+                             const int&,    // f_p_gcw
+                             double* const, // f_un_data_0
+                             double* const, // f_un_data_1
+                             const int&,    // f_un_gcw
+                             double* const, // f_us_data_0
+                             double* const, // f_us_data_1
+                             const int&,    // f_us_gcw
+                             double* const, // thn_data
+                             const int&,    // thn_gcw
+                             const double&, // eta_n
+                             const double&, // eta_s
+                             double* const, // xi_0
+                             double* const, // xi_1
+                             const int&,    // xi_gcw
+                             const double&, // w = under relaxation factor
+                             const double&, // C in C*u term
+                             const double&, // D
+                             const int&,    // red_or_black
+                             const int*,    // mask_0
+                             const int*,    // mask_1
+                             const int&);   // mask_gcw
 }
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace multiphase
@@ -175,9 +247,10 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 } // namespace
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxRelaxationFACOperator(
     const std::string& object_name,
-    const std::string& default_options_prefix)
+    const std::string& default_options_prefix,
+    const MultiphaseParameters& params)
     : FACPreconditionerStrategy(object_name),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
@@ -191,7 +264,8 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
       d_default_thn_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
       d_thn_bc_coef(d_default_thn_bc_coef.get()),
-      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
+      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
+      d_params(params)
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -254,16 +328,16 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::VCTwoFluidStaggeredStokesBoxR
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
-                     "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError()");
+                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError()");
                  t_solve_coarsest_level = TimerManager::getManager()->getTimer(
-                     "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
+                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
                  t_compute_residual = TimerManager::getManager()->getTimer(
-                     "IBTK::VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
+                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
     return;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
     RobinBcCoefStrategy<NDIM>* P_bc_coef,
@@ -285,15 +359,17 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setPhysicalBcCoefs(
         else
             d_us_bc_coefs[d] = d_default_us_bc_coef.get();
     }
-    if (P_bc_coef) d_P_bc_coef = P_bc_coef;
+    if (P_bc_coef)
+        d_P_bc_coef = P_bc_coef;
     else
         d_P_bc_coef = d_default_P_bc_coef.get();
-    if (thn_bc_coef) d_thn_bc_coef = thn_bc_coef;
+    if (thn_bc_coef)
+        d_thn_bc_coef = thn_bc_coef;
     else
         d_thn_bc_coef = d_default_thn_bc_coef.get();
 }
 
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBoxRelaxationFACOperator()
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::~MultiphaseStaggeredStokesBoxRelaxationFACOperator()
 {
     // Dallocate operator state first
     deallocateOperatorState();
@@ -303,14 +379,14 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::~VCTwoFluidStaggeredStokesBox
 // create another member function to set-up Thn
 // Thn is defined in the input file and read in using muParserCartGridFunction
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setThnIdx(int thn_idx)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setThnIdx(int thn_idx)
 {
     d_thn_idx = thn_idx;
     return;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
                                                                     SAMRAIVectorReal<NDIM, double>& dst,
                                                                     const int dst_ln)
 {
@@ -350,7 +426,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAI
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
                                                                 SAMRAIVectorReal<NDIM, double>& dst,
                                                                 const int dst_ln)
 {
@@ -371,7 +447,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongError(const SAMRAIVect
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
                                                                           SAMRAIVectorReal<NDIM, double>& dst,
                                                                           const int dst_ln)
 {
@@ -415,7 +491,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::prolongErrorAndCorrect(const 
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
     SAMRAIVectorReal<NDIM, double>& error,          // Solution
     const SAMRAIVectorReal<NDIM, double>& residual, // RHS - A*error on the entire patch level
     int level_num,
@@ -586,76 +662,157 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
             if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
                 d_bc_us_helper->patchTouchesDirichletBoundary(patch))
             {
-                R_B_G_S_mask(dx,
-                             patch_lower(0), // ilower0
-                             patch_upper(0), // iupper0
-                             patch_lower(1), // ilower1
-                             patch_upper(1), // iupper1
-                             un_data_0,
-                             un_data_1,
-                             un_gcw.min(),
-                             us_data_0,
-                             us_data_1,
-                             us_gcw.min(),
-                             p_ptr_data,
-                             p_gcw.min(),
-                             f_p_ptr_data,
-                             f_p_gcw.min(),
-                             f_un_data_0,
-                             f_un_data_1,
-                             f_un_gcw.min(),
-                             f_us_data_0,
-                             f_us_data_1,
-                             f_us_gcw.min(),
-                             thn_ptr_data,
-                             thn_gcw.min(),
-                             d_eta_n,
-                             d_eta_s,
-                             d_nu_n,
-                             d_nu_s,
-                             d_xi,
-                             d_w,
-                             d_C,
-                             d_D,
-                             red_or_black,
-                             mask_data->getPointer(0),
-                             mask_data->getPointer(1),
-                             mask_data->getGhostCellWidth().max());
+                if (d_params.isVariableDrag())
+                {
+                    Pointer<SideData<NDIM, double>> xi_data = patch->getPatchData(d_params.xi_idx);
+                    R_B_G_S_var_xi_mask(dx,
+                                        patch_lower(0), // ilower0
+                                        patch_upper(0), // iupper0
+                                        patch_lower(1), // ilower1
+                                        patch_upper(1), // iupper1
+                                        un_data_0,
+                                        un_data_1,
+                                        un_gcw.min(),
+                                        us_data_0,
+                                        us_data_1,
+                                        us_gcw.min(),
+                                        p_ptr_data,
+                                        p_gcw.min(),
+                                        f_p_ptr_data,
+                                        f_p_gcw.min(),
+                                        f_un_data_0,
+                                        f_un_data_1,
+                                        f_un_gcw.min(),
+                                        f_us_data_0,
+                                        f_us_data_1,
+                                        f_us_gcw.min(),
+                                        thn_ptr_data,
+                                        thn_gcw.min(),
+                                        d_params.eta_n,
+                                        d_params.eta_s,
+                                        xi_data->getPointer(0),
+                                        xi_data->getPointer(1),
+                                        xi_data->getGhostCellWidth().min(),
+                                        d_w,
+                                        d_C,
+                                        d_D,
+                                        red_or_black,
+                                        mask_data->getPointer(0),
+                                        mask_data->getPointer(1),
+                                        mask_data->getGhostCellWidth().max());
+                }
+                else
+                {
+                    R_B_G_S_mask(dx,
+                                 patch_lower(0), // ilower0
+                                 patch_upper(0), // iupper0
+                                 patch_lower(1), // ilower1
+                                 patch_upper(1), // iupper1
+                                 un_data_0,
+                                 un_data_1,
+                                 un_gcw.min(),
+                                 us_data_0,
+                                 us_data_1,
+                                 us_gcw.min(),
+                                 p_ptr_data,
+                                 p_gcw.min(),
+                                 f_p_ptr_data,
+                                 f_p_gcw.min(),
+                                 f_un_data_0,
+                                 f_un_data_1,
+                                 f_un_gcw.min(),
+                                 f_us_data_0,
+                                 f_us_data_1,
+                                 f_us_gcw.min(),
+                                 thn_ptr_data,
+                                 thn_gcw.min(),
+                                 d_params.eta_n,
+                                 d_params.eta_s,
+                                 d_params.nu_n,
+                                 d_params.nu_s,
+                                 d_params.xi,
+                                 d_w,
+                                 d_C,
+                                 d_D,
+                                 red_or_black,
+                                 mask_data->getPointer(0),
+                                 mask_data->getPointer(1),
+                                 mask_data->getGhostCellWidth().max());
+                }
             }
             else
             {
-                R_B_G_S(dx,
-                        patch_lower(0), // ilower0
-                        patch_upper(0), // iupper0
-                        patch_lower(1), // ilower1
-                        patch_upper(1), // iupper1
-                        un_data_0,
-                        un_data_1,
-                        un_gcw.min(),
-                        us_data_0,
-                        us_data_1,
-                        us_gcw.min(),
-                        p_ptr_data,
-                        p_gcw.min(),
-                        f_p_ptr_data,
-                        f_p_gcw.min(),
-                        f_un_data_0,
-                        f_un_data_1,
-                        f_un_gcw.min(),
-                        f_us_data_0,
-                        f_us_data_1,
-                        f_us_gcw.min(),
-                        thn_ptr_data,
-                        thn_gcw.min(),
-                        d_eta_n,
-                        d_eta_s,
-                        d_nu_n,
-                        d_nu_s,
-                        d_xi,
-                        d_w,
-                        d_C,
-                        d_D,
-                        red_or_black);
+                if (d_params.isVariableDrag())
+                {
+                    Pointer<SideData<NDIM, double>> xi_data = patch->getPatchData(d_params.xi_idx);
+                    R_B_G_S_var_xi(dx,
+                                   patch_lower(0), // ilower0
+                                   patch_upper(0), // iupper0
+                                   patch_lower(1), // ilower1
+                                   patch_upper(1), // iupper1
+                                   un_data_0,
+                                   un_data_1,
+                                   un_gcw.min(),
+                                   us_data_0,
+                                   us_data_1,
+                                   us_gcw.min(),
+                                   p_ptr_data,
+                                   p_gcw.min(),
+                                   f_p_ptr_data,
+                                   f_p_gcw.min(),
+                                   f_un_data_0,
+                                   f_un_data_1,
+                                   f_un_gcw.min(),
+                                   f_us_data_0,
+                                   f_us_data_1,
+                                   f_us_gcw.min(),
+                                   thn_ptr_data,
+                                   thn_gcw.min(),
+                                   d_params.eta_n,
+                                   d_params.eta_s,
+                                   xi_data->getPointer(0),
+                                   xi_data->getPointer(1),
+                                   xi_data->getGhostCellWidth().min(),
+                                   d_w,
+                                   d_C,
+                                   d_D,
+                                   red_or_black);
+                }
+                else
+                {
+                    R_B_G_S(dx,
+                            patch_lower(0), // ilower0
+                            patch_upper(0), // iupper0
+                            patch_lower(1), // ilower1
+                            patch_upper(1), // iupper1
+                            un_data_0,
+                            un_data_1,
+                            un_gcw.min(),
+                            us_data_0,
+                            us_data_1,
+                            us_gcw.min(),
+                            p_ptr_data,
+                            p_gcw.min(),
+                            f_p_ptr_data,
+                            f_p_gcw.min(),
+                            f_un_data_0,
+                            f_un_data_1,
+                            f_un_gcw.min(),
+                            f_us_data_0,
+                            f_us_data_1,
+                            f_us_gcw.min(),
+                            thn_ptr_data,
+                            thn_gcw.min(),
+                            d_params.eta_n,
+                            d_params.eta_s,
+                            d_params.nu_n,
+                            d_params.nu_s,
+                            d_params.xi,
+                            d_w,
+                            d_C,
+                            d_D,
+                            red_or_black);
+                }
             }
         } // patchess
     }     // num_sweeps
@@ -665,7 +822,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::smoothError(
 }
 
 bool
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVectorReal<NDIM, double>& error,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVectorReal<NDIM, double>& error,
                                                                       const SAMRAIVectorReal<NDIM, double>& residual,
                                                                       int coarsest_ln)
 {
@@ -678,7 +835,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel(SAMRAIVect
 } // solveCoarsestLevel
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
                                                                    const SAMRAIVectorReal<NDIM, double>& solution,
                                                                    const SAMRAIVectorReal<NDIM, double>& rhs,
                                                                    int coarsest_level_num,
@@ -762,176 +919,28 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             Pointer<CellData<NDIM, double>> res_P_data = patch->getPatchData(res_P_idx);
             IntVector<NDIM> xp(1, 0), yp(0, 1);
 
-            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
+            applyCoincompressibility(patch, res_P_idx, un_idx, us_idx, thn_idx, 1.0);
+            if (d_params.isVariableDrag())
+                accumulateMomentumForcesOnPatchVariableDrag(
+                    patch, res_un_idx, res_us_idx, P_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
+            else
+                accumulateMomentumForcesOnPatchConstantCoefficient(
+                    patch, res_un_idx, res_us_idx, P_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
+
+            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
             {
                 const CellIndex<NDIM>& idx = ci();
-
-                SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
-                SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-
-                // thn at sidess
-                double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
-                double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
-                double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
-                double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
-
-                // conservation of mass
-
-                double div_un_dot_thn_dx =
-                    ((thn_upper_x * (*un_data)(upper_x_idx)) - (thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
-                double div_un_dot_thn_dy =
-                    ((thn_upper_y * (*un_data)(upper_y_idx)) - (thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
-                double div_un_thn = div_un_dot_thn_dx + div_un_dot_thn_dy;
-
-                double div_us_dot_ths_dx = ((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx)) -
-                                            (convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) /
-                                           dx[0];
-                double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx)) -
-                                            (convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /
-                                           dx[1];
-                double div_us_ths = div_us_dot_ths_dx + div_us_dot_ths_dy;
-                (*res_P_data)(idx) = (*rhs_P_data)(idx) - (div_un_thn + div_us_ths);
+                (*res_P_data)(idx) = (*rhs_P_data)(idx) - (*res_P_data)(idx);
             }
 
-            for (SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
+            for (int axis = 0; axis < NDIM; ++axis)
             {
-                const SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
-
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-                SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
-                SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
-                SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
-                SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
-
-                // thn at sides
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
-                // thn at corners
-                double thn_imhalf_jphalf =
-                    0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
-                            (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
-                double thn_imhalf_jmhalf =
-                    0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
-                            (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
-
-                // components of first row (x-component of network vel) of network equation
-                double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
-                                       (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddy_Thn_dx_vn = d_eta_n / (dx[1] * dx[0]) *
-                                       (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
-                double ddx_Thn_dy_vn = -d_eta_n / (dx[0] * dx[1]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
-
-                double drag_n =
-                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
-                double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) =
-                    (*rhs_un_data)(idx) -
-                    (d_D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n + pressure_n) +
-                     d_C * thn_lower * (*un_data)(idx));
-
-                // solvent equation
-                double ddx_Ths_dx_us =
-                    d_eta_s / (dx[0] * dx[0]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-                double ddy_Ths_dy_us = d_eta_s / (dx[1] * dx[1]) *
-                                       (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
-                                        convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddy_Ths_dx_vs =
-                    d_eta_s / (dx[1] * dx[0]) *
-                    (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
-                     convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
-                double ddx_Ths_dy_vs =
-                    -d_eta_s / (dx[0] * dx[1]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
-
-                double drag_s =
-                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
-                double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) =
-                    (*rhs_us_data)(idx) -
-                    (d_D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s + pressure_s) +
-                     d_C * convertToThs(thn_lower) * (*us_data)(idx));
-            }
-
-            for (SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
-            {
-                const SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
-
-                CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
-                CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-                SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
-                SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
-                SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
-                SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
-
-                // thn at sides
-                double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
-
-                // thn at corners
-                double thn_imhalf_jmhalf =
-                    0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) +
-                            (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
-                double thn_iphalf_jmhalf =
-                    0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
-                            (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
-
-                // components of second row (y-component of network vel) of network equation
-                double ddy_Thn_dy_un = d_eta_n / (dx[1] * dx[1]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-                double ddx_Thn_dx_un = d_eta_n / (dx[0] * dx[0]) *
-                                       (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
-                double ddx_Thn_dy_vn = d_eta_n / (dx[1] * dx[0]) *
-                                       (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
-                                        thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
-                double ddy_Thn_dx_vn = -d_eta_n / (dx[0] * dx[1]) *
-                                       ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
-                                        (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
-
-                double drag_n =
-                    -d_xi / d_nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
-                double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_un_data)(idx) =
-                    (*rhs_un_data)(idx) -
-                    (d_D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n + pressure_n) +
-                     d_C * thn_lower * (*un_data)(idx));
-
-                // Solvent equation
-                double ddy_Ths_dy_us =
-                    d_eta_s / (dx[1] * dx[1]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-                double ddx_Ths_dx_us = d_eta_s / (dx[0] * dx[0]) *
-                                       (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
-                                        convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-                double ddx_Ths_dy_vs =
-                    d_eta_s / (dx[1] * dx[0]) *
-                    (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
-                     convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
-                double ddy_Ths_dx_vs =
-                    -d_eta_s / (dx[0] * dx[1]) *
-                    (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
-                     convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
-
-                double drag_s =
-                    -d_xi / d_nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
-                double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-                (*res_us_data)(idx) =
-                    (*rhs_us_data)(idx) -
-                    (d_D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s + pressure_s) +
-                     d_C * convertToThs(thn_lower) * (*us_data)(idx));
+                for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
+                {
+                    const SideIndex<NDIM>& idx = si();
+                    (*res_un_data)(idx) = (*rhs_un_data)(idx) - (*res_un_data)(idx);
+                    (*res_us_data)(idx) = (*rhs_us_data)(idx) - (*res_us_data)(idx);
+                }
             }
 
             if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
@@ -959,7 +968,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<NDIM, double>& vec, int level_num)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<NDIM, double>& vec, int level_num)
 {
     const int un_idx = vec.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = vec.getComponentDescriptorIndex(1); // solvent velocity, Us
@@ -980,7 +989,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setToZero(SAMRAIVectorReal<ND
 } // setToZero
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
                                                                            const SAMRAIVectorReal<NDIM, double>& rhs)
 {
     if (d_is_initialized) deallocateOperatorState();
@@ -1157,7 +1166,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
 {
     // Delete the operators, schedules, and algorithms
     d_un_restrict_op.setNull();
@@ -1192,37 +1201,20 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setUnderRelaxationParamater(const double w)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setUnderRelaxationParamater(const double w)
 {
     d_w = w;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setCandDCoefficients(const double C, const double D)
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::setCandDCoefficients(const double C, const double D)
 {
     d_C = C;
     d_D = D;
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setViscosityCoefficient(const double eta_n, const double eta_s)
-{
-    d_eta_n = eta_n;
-    d_eta_s = eta_s;
-}
-
-void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::setDragCoefficient(const double xi,
-                                                                      const double nu_n,
-                                                                      const double nu_s)
-{
-    d_xi = xi;
-    d_nu_n = nu_n;
-    d_nu_s = nu_s;
-}
-
-void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std::array<int, 3>& dst_idxs,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std::array<int, 3>& dst_idxs,
                                                                        const std::array<int, 3>& src_idxs,
                                                                        const int dst_ln)
 {
@@ -1247,7 +1239,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std::array<int, 3>& dst_idxs,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std::array<int, 3>& dst_idxs,
                                                                       const std::array<int, 3>& src_idxs,
                                                                       const int dst_ln)
 {
@@ -1262,7 +1254,7 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performRestriction(const std:
 }
 
 void
-VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std::array<int, 3>& dst_idxs,
+MultiphaseStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std::array<int, 3>& dst_idxs,
                                                                        const int dst_ln)
 {
     d_un_bc_op->setPatchDataIndex(dst_idxs[0]);
@@ -1287,6 +1279,6 @@ VCTwoFluidStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std
 /////////////////////////////// PRIVATE //////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////
-} // namespace IBTK
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////

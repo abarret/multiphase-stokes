@@ -11,7 +11,7 @@
 //
 // ---------------------------------------------------------------------
 
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 
 #include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -286,16 +286,15 @@ main(int argc, char* argv[])
         f_p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
+        MultiphaseParameters params;
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
-        const double xi = input_db->getDouble("XI");
-        const double etan = input_db->getDouble("ETAN");
-        const double etas = input_db->getDouble("ETAS");
-        const double nu = input_db->getDouble("NU");
-        VCTwoFluidStaggeredStokesOperator stokes_op("stokes_op", false);
+        params.xi = input_db->getDouble("XI");
+        params.eta_n = input_db->getDouble("ETAN");
+        params.eta_s = input_db->getDouble("ETAS");
+        params.nu_n = params.nu_s = input_db->getDouble("NU");
+        MultiphaseStaggeredStokesOperator stokes_op("stokes_op", false, params);
         stokes_op.setCandDCoefficients(C, D);
-        stokes_op.setDragCoefficient(xi, nu, nu);
-        stokes_op.setViscosityCoefficient(etan, etas);
         stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
 
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();

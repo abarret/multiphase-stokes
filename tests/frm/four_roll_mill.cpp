@@ -1,5 +1,5 @@
 #include "multiphase/CFMultiphaseOldroydB.h"
-#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/CFINSForcing.h>
@@ -29,10 +29,10 @@
 using namespace multiphase;
 
 // Function prototypes
-void output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
-                 Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
+void output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
+                 Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
-                 Pointer<CFINSForcing> conformation_tensor_handler,  
+                 Pointer<CFINSForcing> conformation_tensor_handler,
                  const int iteration_num,
                  const double loop_time,
                  const string& data_dump_dirname);
@@ -61,12 +61,11 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator =
-            new INSVCTwoFluidStaggeredHierarchyIntegrator(
-                "FluidSolver",
-                app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-                grid_geometry,
-                true /*register_for_restart*/);
+        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+            "FluidSolver",
+            app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
+            grid_geometry,
+            true /*register_for_restart*/);
 
         Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator =
             new AdvDiffSemiImplicitHierarchyIntegrator("AdvDiffIntegrator",
@@ -207,7 +206,7 @@ main(int argc, char* argv[])
         std::ofstream out("output");
         // Main time step loop
         while (!IBTK::rel_equal_eps(loop_time, time_end) && ins_integrator->stepsRemaining())
-        {   
+        {
             out << "\n";
             out << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
             out << "At beginning of timestep # " << iteration_num << "\n";
@@ -276,20 +275,26 @@ main(int argc, char* argv[])
             if (dump_postproc_data && (iteration_num % postproc_data_dump_interval == 0 || last_step))
             {
                 pout << "\nWriting hierarchy data files...\n\n";
-                output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
+                output_data(patch_hierarchy,
+                            ins_integrator,
+                            adv_diff_integrator,
+                            cf_un_forcing,
+                            iteration_num,
+                            loop_time,
+                            postproc_data_dump_dirname);
             }
         }
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
 
 void
-output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
-                 Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator,
-                 Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
-                 Pointer<CFINSForcing> conformation_tensor_handler,
-                 const int iteration_num,
-                 const double loop_time,
-                 const string& data_dump_dirname)
+output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
+            Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
+            Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
+            Pointer<CFINSForcing> conformation_tensor_handler,
+            const int iteration_num,
+            const double loop_time,
+            const string& data_dump_dirname)
 {
     plog << "writing hierarchy data at iteration " << iteration_num << " to disk" << endl;
     plog << "simulation time is " << loop_time << endl;
@@ -301,16 +306,18 @@ output_data(Pointer<PatchHierarchy<NDIM> > patch_hierarchy,
     hier_db->create(file_name);
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     ComponentSelector hier_data;
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),    // Network velocity
-                                                        ins_integrator->getCurrentContext()));
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(),    // Solvent velocity
-                                                        ins_integrator->getCurrentContext()));                                                    
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(),   // Pressure
-                                                        ins_integrator->getCurrentContext()));
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction 
-                                                        adv_diff_integrator->getCurrentContext())); 
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(conformation_tensor_handler->getVariable(),      // Conformation tensor
-                                                            adv_diff_integrator->getCurrentContext()));    
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),  // Network velocity
+                                                           ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(),  // Solvent velocity
+                                                           ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(), // Pressure
+                                                           ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(
+        ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction
+        adv_diff_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(conformation_tensor_handler->getVariable(), // Conformation
+                                                                                                       // tensor
+                                                           adv_diff_integrator->getCurrentContext()));
     pout << "network variable name: " << ins_integrator->getNetworkVariable()->getName() << "\n";
     pout << "solvent variable name: " << ins_integrator->getSolventVariable()->getName() << "\n";
     pout << "pressure variable name: " << ins_integrator->getPressureVariable()->getName() << "\n";

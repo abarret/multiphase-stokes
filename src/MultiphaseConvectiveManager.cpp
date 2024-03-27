@@ -1,6 +1,6 @@
 
 // Local includes
-#include "multiphase/INSVCTwoFluidConvectiveManager.h"
+#include "multiphase/MultiphaseConvectiveManager.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/INSStaggeredConvectiveOperatorManager.h>
@@ -227,13 +227,12 @@ get_var(const std::string& var_name)
     return var;
 }
 
-INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(
-    std::string object_name,
-    Pointer<PatchHierarchy<NDIM>> hierarchy,
-    Pointer<Database> input_db,
-    const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+MultiphaseConvectiveManager::MultiphaseConvectiveManager(std::string object_name,
+                                                         Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                                         Pointer<Database> input_db,
+                                                         const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                                                         const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                                                         RobinBcCoefStrategy<NDIM>* thn_bc_coef)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
       d_hier_sc_data_ops(hierarchy),
@@ -247,13 +246,12 @@ INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(
     commonConstructor();
 }
 
-INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(
-    std::string object_name,
-    Pointer<PatchHierarchy<NDIM>> hierarchy,
-    LimiterType limiter_type,
-    const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+MultiphaseConvectiveManager::MultiphaseConvectiveManager(std::string object_name,
+                                                         Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                                         LimiterType limiter_type,
+                                                         const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                                                         const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                                                         RobinBcCoefStrategy<NDIM>* thn_bc_coef)
     : d_object_name(std::move(object_name)),
       d_hierarchy(hierarchy),
       d_hier_sc_data_ops(hierarchy),
@@ -267,7 +265,7 @@ INSVCTwoFluidConvectiveManager::INSVCTwoFluidConvectiveManager(
 }
 
 void
-INSVCTwoFluidConvectiveManager::commonConstructor()
+MultiphaseConvectiveManager::commonConstructor()
 {
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     Pointer<VariableContext> network_ctx = var_db->getContext(d_object_name + "::NetworkCTX");
@@ -293,7 +291,7 @@ INSVCTwoFluidConvectiveManager::commonConstructor()
     d_thn_scr_idx = var_db->registerVariableAndContext(d_thn_var, network_ctx, gcw + 1);
 }
 
-INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
+MultiphaseConvectiveManager::~MultiphaseConvectiveManager()
 {
     if (getIsAllocated()) deallocateData();
     // Note that we can not remove indices from the variable database here. The GridGeometry object in the
@@ -303,9 +301,9 @@ INSVCTwoFluidConvectiveManager::~INSVCTwoFluidConvectiveManager()
 }
 
 void
-INSVCTwoFluidConvectiveManager::setBoundaryConditions(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-                                                      const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                                      RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+MultiphaseConvectiveManager::setBoundaryConditions(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                                                   const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+                                                   RobinBcCoefStrategy<NDIM>* thn_bc_coef)
 {
     d_un_bc_coefs = un_bc_coefs;
     d_us_bc_coefs = us_bc_coefs;
@@ -313,7 +311,7 @@ INSVCTwoFluidConvectiveManager::setBoundaryConditions(const std::vector<RobinBcC
 }
 
 void
-INSVCTwoFluidConvectiveManager::deallocateData()
+MultiphaseConvectiveManager::deallocateData()
 {
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
@@ -337,13 +335,13 @@ INSVCTwoFluidConvectiveManager::deallocateData()
 }
 
 void
-INSVCTwoFluidConvectiveManager::resetData()
+MultiphaseConvectiveManager::resetData()
 {
     d_is_initial_approximation_filled = false;
 }
 
 void
-INSVCTwoFluidConvectiveManager::allocateData(const double time)
+MultiphaseConvectiveManager::allocateData(const double time)
 {
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
@@ -400,17 +398,17 @@ INSVCTwoFluidConvectiveManager::allocateData(const double time)
 }
 
 void
-INSVCTwoFluidConvectiveManager::approximateConvectiveOperator(const int dst_un_idx,
-                                                              const int dst_us_idx,
-                                                              IBAMR::TimeSteppingType ts_type,
-                                                              const double current_time,
-                                                              const double new_time,
-                                                              const int un_cur_idx,
-                                                              const int us_cur_idx,
-                                                              const int thn_cur_idx,
-                                                              const int un_new_idx,
-                                                              const int us_new_idx,
-                                                              const int thn_new_idx)
+MultiphaseConvectiveManager::approximateConvectiveOperator(const int dst_un_idx,
+                                                           const int dst_us_idx,
+                                                           IBAMR::TimeSteppingType ts_type,
+                                                           const double current_time,
+                                                           const double new_time,
+                                                           const int un_cur_idx,
+                                                           const int us_cur_idx,
+                                                           const int thn_cur_idx,
+                                                           const int un_new_idx,
+                                                           const int us_new_idx,
+                                                           const int thn_new_idx)
 {
     approximateConvectiveOperator(
         ts_type, current_time, new_time, un_cur_idx, us_cur_idx, thn_cur_idx, un_new_idx, us_new_idx, thn_new_idx);
@@ -418,15 +416,15 @@ INSVCTwoFluidConvectiveManager::approximateConvectiveOperator(const int dst_un_i
 }
 
 void
-INSVCTwoFluidConvectiveManager::approximateConvectiveOperator(IBAMR::TimeSteppingType ts_type,
-                                                              const double current_time,
-                                                              const double new_time,
-                                                              const int un_cur_idx,
-                                                              const int us_cur_idx,
-                                                              const int thn_cur_idx,
-                                                              const int un_new_idx,
-                                                              const int us_new_idx,
-                                                              const int thn_new_idx)
+MultiphaseConvectiveManager::approximateConvectiveOperator(IBAMR::TimeSteppingType ts_type,
+                                                           const double current_time,
+                                                           const double new_time,
+                                                           const int un_cur_idx,
+                                                           const int us_cur_idx,
+                                                           const int thn_cur_idx,
+                                                           const int un_new_idx,
+                                                           const int us_new_idx,
+                                                           const int thn_new_idx)
 {
     allocateData(current_time);
     switch (ts_type)
@@ -450,31 +448,31 @@ INSVCTwoFluidConvectiveManager::approximateConvectiveOperator(IBAMR::TimeSteppin
 }
 
 void
-INSVCTwoFluidConvectiveManager::fillWithConvectiveOperator(const int dst_un_idx, const int dst_us_idx)
+MultiphaseConvectiveManager::fillWithConvectiveOperator(const int dst_un_idx, const int dst_us_idx)
 {
     if (dst_un_idx != IBTK::invalid_index) d_hier_sc_data_ops.copyData(dst_un_idx, d_N_un_idx);
     if (dst_us_idx != IBTK::invalid_index) d_hier_sc_data_ops.copyData(dst_us_idx, d_N_us_idx);
 }
 
 std::pair<int, int>
-INSVCTwoFluidConvectiveManager::getConvectiveIndices() const
+MultiphaseConvectiveManager::getConvectiveIndices() const
 {
     return std::make_pair(d_N_un_idx, d_N_us_idx);
 }
 
 bool
-INSVCTwoFluidConvectiveManager::getIsAllocated() const
+MultiphaseConvectiveManager::getIsAllocated() const
 {
     return d_is_allocated;
 }
 
 void
-INSVCTwoFluidConvectiveManager::approximateOperator(const int dst_un_idx,
-                                                    const int dst_us_idx,
-                                                    const double eval_time,
-                                                    const int un_idx,
-                                                    const int us_idx,
-                                                    const int thn_idx)
+MultiphaseConvectiveManager::approximateOperator(const int dst_un_idx,
+                                                 const int dst_us_idx,
+                                                 const double eval_time,
+                                                 const int un_idx,
+                                                 const int us_idx,
+                                                 const int thn_idx)
 {
     // Fill in ghost cells for thn. Because thn may have changed indices, we need to reinitialize the ghost filling
     // routines.
@@ -537,11 +535,11 @@ INSVCTwoFluidConvectiveManager::approximateOperator(const int dst_un_idx,
 }
 
 void
-INSVCTwoFluidConvectiveManager::approximateForwardEuler(const double current_time,
-                                                        const double new_time,
-                                                        const int un_cur_idx,
-                                                        const int us_cur_idx,
-                                                        const int thn_cur_idx)
+MultiphaseConvectiveManager::approximateForwardEuler(const double current_time,
+                                                     const double new_time,
+                                                     const int un_cur_idx,
+                                                     const int us_cur_idx,
+                                                     const int thn_cur_idx)
 {
     // We only recompute ForwardEuler if we haven't performed it yet this time step.
     if (d_is_initial_approximation_filled) return;
@@ -553,14 +551,14 @@ INSVCTwoFluidConvectiveManager::approximateForwardEuler(const double current_tim
 }
 
 void
-INSVCTwoFluidConvectiveManager::approximateTrapezoidalRule(const double current_time,
-                                                           const double new_time,
-                                                           const int un_cur_idx,
-                                                           const int us_cur_idx,
-                                                           const int thn_cur_idx,
-                                                           const int un_new_idx,
-                                                           const int us_new_idx,
-                                                           const int thn_new_idx)
+MultiphaseConvectiveManager::approximateTrapezoidalRule(const double current_time,
+                                                        const double new_time,
+                                                        const int un_cur_idx,
+                                                        const int us_cur_idx,
+                                                        const int thn_cur_idx,
+                                                        const int un_new_idx,
+                                                        const int us_new_idx,
+                                                        const int thn_new_idx)
 {
     // First approximate using forward euler
     approximateForwardEuler(current_time, new_time, un_cur_idx, us_cur_idx, thn_cur_idx);
@@ -574,14 +572,14 @@ INSVCTwoFluidConvectiveManager::approximateTrapezoidalRule(const double current_
 }
 
 void
-INSVCTwoFluidConvectiveManager::approximateMidpointRule(const double current_time,
-                                                        const double new_time,
-                                                        const int un_cur_idx,
-                                                        const int us_cur_idx,
-                                                        const int thn_cur_idx,
-                                                        const int un_new_idx,
-                                                        const int us_new_idx,
-                                                        const int thn_new_idx)
+MultiphaseConvectiveManager::approximateMidpointRule(const double current_time,
+                                                     const double new_time,
+                                                     const int un_cur_idx,
+                                                     const int us_cur_idx,
+                                                     const int thn_cur_idx,
+                                                     const int un_new_idx,
+                                                     const int us_new_idx,
+                                                     const int thn_new_idx)
 {
     double half_time = 0.5 * (current_time + new_time);
     // First compute "half" values
@@ -596,7 +594,7 @@ INSVCTwoFluidConvectiveManager::approximateMidpointRule(const double current_tim
 }
 
 void
-INSVCTwoFluidConvectiveManager::computeAdvectionVelocity(
+MultiphaseConvectiveManager::computeAdvectionVelocity(
     const Pointer<Patch<NDIM>>& patch,
     std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& u_adv_data,
     const SideData<NDIM, double>& U_data)
@@ -631,25 +629,24 @@ INSVCTwoFluidConvectiveManager::computeAdvectionVelocity(
 }
 
 void
-INSVCTwoFluidConvectiveManager::findNetworkMomentum(const int dst_idx, const int thn_idx, const int u_idx)
+MultiphaseConvectiveManager::findNetworkMomentum(const int dst_idx, const int thn_idx, const int u_idx)
 {
     // Interpolate thn to sides.
     multiply_sc_and_thn(dst_idx, u_idx, thn_idx, d_hierarchy, true);
 }
 
 void
-INSVCTwoFluidConvectiveManager::findSolventMomentum(const int dst_idx, const int thn_idx, const int u_idx)
+MultiphaseConvectiveManager::findSolventMomentum(const int dst_idx, const int thn_idx, const int u_idx)
 {
     multiply_sc_and_ths(dst_idx, u_idx, thn_idx, d_hierarchy, true);
 }
 
 void
-INSVCTwoFluidConvectiveManager::interpolateToSides(
-    Pointer<Patch<NDIM>>& patch,
-    std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& interp_data,
-    const SideData<NDIM, double>& mom_data,
-    const std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& u_data,
-    const LimiterType& limiter)
+MultiphaseConvectiveManager::interpolateToSides(Pointer<Patch<NDIM>>& patch,
+                                                std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& interp_data,
+                                                const SideData<NDIM, double>& mom_data,
+                                                const std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& u_data,
+                                                const LimiterType& limiter)
 {
     const Box<NDIM>& patch_box = patch->getBox();
     const Box<NDIM>& u0_box = u_data[0]->getBox();
@@ -798,11 +795,10 @@ INSVCTwoFluidConvectiveManager::interpolateToSides(
 }
 
 void
-INSVCTwoFluidConvectiveManager::fluxDifference(
-    Pointer<Patch<NDIM>>& patch,
-    SideData<NDIM, double>& N_data,
-    const std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& mom_data,
-    const std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& U_adv_data)
+MultiphaseConvectiveManager::fluxDifference(Pointer<Patch<NDIM>>& patch,
+                                            SideData<NDIM, double>& N_data,
+                                            const std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& mom_data,
+                                            const std::array<std::unique_ptr<FaceData<NDIM, double>>, NDIM>& U_adv_data)
 {
     Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     const double* const dx = pgeom->getDx();

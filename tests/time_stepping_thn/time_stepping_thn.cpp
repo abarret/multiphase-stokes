@@ -1,4 +1,5 @@
-#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/utility_functions.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -25,6 +26,85 @@
 
 using namespace multiphase;
 
+class DragCoefficient : public CartGridFunction
+{
+public:
+    DragCoefficient(std::string object_name,
+                    Pointer<MultiphaseStaggeredHierarchyIntegrator> integrator,
+                    double xi,
+                    double nu)
+        : CartGridFunction(std::move(object_name)), d_integrator(integrator), d_xi(xi), d_nu(nu)
+    {
+        // intentionally blank
+    }
+
+    bool isTimeDependent() const override
+    {
+        return true;
+    }
+
+    void setDataOnPatchHierarchy(int data_idx,
+                                 Pointer<Variable<NDIM>> var,
+                                 Pointer<PatchHierarchy<NDIM>> hierarchy,
+                                 double time,
+                                 bool initial_time = false,
+                                 int coarsest_ln = invalid_level_number,
+                                 int finest_ln = invalid_level_number) override
+    {
+        coarsest_ln = coarsest_ln == invalid_level_number ? 0 : coarsest_ln;
+        finest_ln = finest_ln == invalid_level_number ? hierarchy->getFinestLevelNumber() : finest_ln;
+        bool current_time = IBTK::abs_equal_eps(time, d_integrator->getIntegratorTime());
+        Pointer<SideVariable<NDIM, double>> sc_var = var;
+
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int thn_idx = var_db->mapVariableAndContextToIndex(d_integrator->getNetworkVolumeFractionVariable(),
+                                                                 current_time ? d_integrator->getCurrentContext() :
+                                                                                d_integrator->getNewContext());
+
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(1);
+        ghost_cell_comp[0] = ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE");
+        Pointer<HierarchyGhostCellInterpolation> hier_ghost_fill = new HierarchyGhostCellInterpolation();
+        hier_ghost_fill->initializeOperatorState(ghost_cell_comp, hierarchy, coarsest_ln, finest_ln);
+        hier_ghost_fill->fillData(time);
+
+        for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+            setDataOnPatchLevel(data_idx, var, level, time, initial_time);
+        }
+    }
+
+    void setDataOnPatch(const int data_idx,
+                        Pointer<Variable<NDIM>> var,
+                        Pointer<Patch<NDIM>> patch,
+                        const double time,
+                        const bool initial_time = false,
+                        Pointer<PatchLevel<NDIM>> level = nullptr) override
+    {
+        bool current_time = IBTK::abs_equal_eps(time, d_integrator->getIntegratorTime());
+        Pointer<SideData<NDIM, double>> drag_data = patch->getPatchData(data_idx);
+        Pointer<CellData<NDIM, double>> thn_data =
+            patch->getPatchData(d_integrator->getNetworkVolumeFractionVariable(),
+                                current_time ? d_integrator->getCurrentContext() : d_integrator->getNewContext());
+
+        for (int axis = 0; axis < NDIM; ++axis)
+        {
+            for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
+            {
+                const SideIndex<NDIM>& idx = si();
+                const double thn = 0.5 * ((*thn_data)(idx.toCell(0)) + (*thn_data)(idx.toCell(1)));
+                (*drag_data)(idx) = thn * convertToThs(thn) * d_xi / d_nu;
+            }
+        }
+    }
+
+private:
+    Pointer<MultiphaseStaggeredHierarchyIntegrator> d_integrator;
+    double d_xi = std::numeric_limits<double>::quiet_NaN();
+    double d_nu = std::numeric_limits<double>::quiet_NaN();
+};
+
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
  * cases, the command line is:                                                 *
@@ -49,12 +129,11 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator =
-            new INSVCTwoFluidStaggeredHierarchyIntegrator(
-                "FluidSolver",
-                app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-                grid_geometry,
-                false);
+        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+            "FluidSolver",
+            app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
+            grid_geometry,
+            false);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
         grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables
@@ -77,12 +156,21 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
+        bool using_var_xi = input_db->getBool("USING_VAR_XI");
         const double xi = input_db->getDouble("XI");
         const double eta_n = input_db->getDouble("ETA_N");
         const double eta_s = input_db->getDouble("ETA_S");
         const double nu = input_db->getDouble("NU");
+        if (using_var_xi)
+        {
+            Pointer<CartGridFunction> xi_fcn = new DragCoefficient("xi_fcn", ins_integrator, xi, nu);
+            ins_integrator->setDragCoefficientFunction(xi_fcn);
+        }
+        else
+        {
+            ins_integrator->setDragCoefficient(xi, nu, nu);
+        }
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
-        ins_integrator->setDragCoefficient(xi, nu, nu);
 
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_fcn =
