@@ -18,7 +18,7 @@
 #include <StandardTagAndInitialize.h>
 
 // Local includes
-#include "multiphase/INSVCTwoFluidConvectiveManager.h"
+#include "multiphase/MultiphaseConvectiveManager.h"
 #include "multiphase/utility_functions.h"
 using namespace multiphase;
 
@@ -174,14 +174,14 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("exact_N_un_" + std::to_string(d), "SCALAR", exact_N_un_idx, d);
             visit_data_writer->registerPlotQuantity("exact_N_us_" + std::to_string(d), "SCALAR", exact_N_us_idx, d);
         }
-        
+
         // Apply convective operator. This should be created before the patch hierarchy is created.
-        INSVCTwoFluidConvectiveManager convec_op("convec_op",
-                                                 patch_hierarchy,
-                                                 input_db->getDatabase("ConvecOp"),
-                                                 un_bc_coefs,
-                                                 us_bc_coefs,
-                                                 thn_bc_coef.get());
+        MultiphaseConvectiveManager convec_op("convec_op",
+                                              patch_hierarchy,
+                                              input_db->getDatabase("ConvecOp"),
+                                              un_bc_coefs,
+                                              us_bc_coefs,
+                                              thn_bc_coef.get());
 
         gridding_algorithm->makeCoarsestLevel(patch_hierarchy, 0.0);
         int tag_buffer = 1;
@@ -193,7 +193,6 @@ main(int argc, char* argv[])
             done = !patch_hierarchy->finerLevelExists(level_number);
             ++level_number;
         }
-    
 
         // Allocate data on each level of the patch hierarchy.
         const int coarsest_ln = 0;

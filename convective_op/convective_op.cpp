@@ -175,6 +175,14 @@ main(int argc, char* argv[])
             visit_data_writer->registerPlotQuantity("exact_N_us_" + std::to_string(d), "SCALAR", exact_N_us_idx, d);
         }
 
+        // Apply convective operator. This should be created before the patch hierarchy is created.
+        MultiphaseConvectiveManager convec_op("convec_op",
+                                              patch_hierarchy,
+                                              input_db->getDatabase("ConvecOp"),
+                                              un_bc_coefs,
+                                              us_bc_coefs,
+                                              thn_bc_coef.get());
+
         gridding_algorithm->makeCoarsestLevel(patch_hierarchy, 0.0);
         int tag_buffer = 1;
         int level_number = 0;
@@ -227,13 +235,6 @@ main(int argc, char* argv[])
         N_un_fcn.setDataOnPatchHierarchy(e_un_idx, e_un_var, patch_hierarchy, 0.0);
         N_us_fcn.setDataOnPatchHierarchy(e_us_idx, e_us_var, patch_hierarchy, 0.0);
 
-        // Apply convective operator
-        MultiphaseConvectiveManager convec_op("convec_op",
-                                              patch_hierarchy,
-                                              input_db->getDatabase("ConvecOp"),
-                                              un_bc_coefs,
-                                              us_bc_coefs,
-                                              thn_bc_coef.get());
         convec_op.approximateConvectiveOperator(N_un_idx,
                                                 N_us_idx,
                                                 TimeSteppingType::FORWARD_EULER,

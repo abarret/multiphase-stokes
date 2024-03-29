@@ -1,3 +1,5 @@
+USING_VAR_XI = FALSE
+
 USE_PRECONDITIONER =  TRUE
 W = 0.75  // under relaxation factor for box relaxation scheme
 RHO = 1.0

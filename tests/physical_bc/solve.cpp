@@ -1,19 +1,6 @@
-// ---------------------------------------------------------------------
-//
-// Copyright (c) 2017 - 2020 by the IBAMR developers
-// All rights reserved.
-//
-// This file is part of IBAMR.
-//
-// IBAMR is free software and is distributed under the 3-clause BSD
-// license. The full text of the license can be found in the file
-// COPYRIGHT at the top level directory of IBAMR.
-//
-// ---------------------------------------------------------------------
-
 #include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/VCTwoFluidStaggeredStokesBoxRelaxationFACOperator.h"
-#include "multiphase/VCTwoFluidStaggeredStokesOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -331,16 +318,16 @@ main(int argc, char* argv[])
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
 
         // Setup the stokes operator
-        Pointer<VCTwoFluidStaggeredStokesOperator> stokes_op = new VCTwoFluidStaggeredStokesOperator("stokes_op", true);
+        MultiphaseParameters params;
+        params.xi = input_db->getDouble("XI");
+        params.eta_n = input_db->getDouble("ETAN");
+        params.eta_s = input_db->getDouble("ETAS");
+        params.nu_n = params.nu_s = input_db->getDouble("NU");
+        Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
+            new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
-        const double xi = input_db->getDouble("XI");
-        const double etan = input_db->getDouble("ETAN");
-        const double etas = input_db->getDouble("ETAS");
-        const double nu = input_db->getDouble("NU");
-        stokes_op->setDragCoefficient(xi, nu, nu);
-        stokes_op->setViscosityCoefficient(etan, etas);
         stokes_op->setThnIdx(thn_cc_idx);
 
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
@@ -352,17 +339,12 @@ main(int argc, char* argv[])
         krylov_solver->setOperator(stokes_op);
 
         // Now create a preconditioner
-        Pointer<VCTwoFluidStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new VCTwoFluidStaggeredStokesBoxRelaxationFACOperator(
-                "KrylovPrecondStrategy",
-                // app_initializer->getComponentDatabase("KrylovPrecondStrategy"),
-                "Krylov_precond_");
+        Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
         fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
-        fac_precondition_strategy->setViscosityCoefficient(etan, etas);
-        fac_precondition_strategy->setDragCoefficient(xi, nu, nu);
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,

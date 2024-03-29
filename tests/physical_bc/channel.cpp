@@ -1,4 +1,4 @@
-#include "multiphase/INSVCTwoFluidStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -50,12 +50,11 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<INSVCTwoFluidStaggeredHierarchyIntegrator> ins_integrator =
-            new INSVCTwoFluidStaggeredHierarchyIntegrator(
-                "FluidSolver",
-                app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-                grid_geometry,
-                false);
+        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+            "FluidSolver",
+            app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
+            grid_geometry,
+            false);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
         grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables
