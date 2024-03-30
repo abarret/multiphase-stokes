@@ -50,14 +50,14 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
 
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
-        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
+        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
 
         SAMRAI::pdat::NodeIndex<NDIM> idx_n_l(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerLeft);
         SAMRAI::pdat::NodeIndex<NDIM> idx_n_u(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::UpperLeft);
@@ -106,14 +106,14 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
 
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
-        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
+        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
 
         SAMRAI::pdat::NodeIndex<NDIM> idx_n_l(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerLeft);
         SAMRAI::pdat::NodeIndex<NDIM> idx_n_u(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerRight);
@@ -197,14 +197,14 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
 
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
-        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
+        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
 
         // thn at sides
         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
@@ -255,14 +255,14 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
 
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
-        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
+        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
 
         // thn at sides
         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
@@ -347,14 +347,14 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();                    // axis = 0, (i-1/2,j)
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
 
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i-1,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0);          // (i,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1);          // (i,j+1/2)
-        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);             // (i-1,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);             // (i-1,j+1/2)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
+        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
 
         // thn at sides
         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
@@ -405,14 +405,14 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();                    // axis = 1, (i,j-1/2)
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
 
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);            // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);             // (i,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0);          // (i-1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1);          // (i+1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);             // (i-1/2,j-1)
-        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);             // (i+1/2,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
+        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
 
         // thn at sides
         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)

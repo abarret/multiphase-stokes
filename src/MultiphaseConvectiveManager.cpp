@@ -388,10 +388,10 @@ MultiphaseConvectiveManager::allocateData(const double time)
                                                   nullptr,
                                                   d_bdry_interp_order) };
         d_u_ghost_fill.initializeOperatorState(u_ghost_fill_itc, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        
+
         // Allocate d_hier_sc_data_ops
         d_hier_sc_data_ops = std::make_unique<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>>(d_hierarchy);
-        
+
         // Allocate d_hier_cc_data_ops
         d_hier_cc_data_ops = std::make_unique<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>>(d_hierarchy);
 

@@ -306,9 +306,9 @@ output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
     hier_db->create(file_name);
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     ComponentSelector hier_data;
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),  // Network velocity
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(), // Network velocity
                                                            ins_integrator->getCurrentContext()));
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(),  // Solvent velocity
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(), // Solvent velocity
                                                            ins_integrator->getCurrentContext()));
     hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(), // Pressure
                                                            ins_integrator->getCurrentContext()));
