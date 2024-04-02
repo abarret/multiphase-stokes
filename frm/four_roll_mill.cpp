@@ -164,7 +164,7 @@ main(int argc, char* argv[])
         // Get simulation restart information
         const bool dump_restart_data = app_initializer->dumpRestartData();
         const int restart_dump_interval = app_initializer->getRestartDumpInterval();
-        const string restart_dump_dirname = app_initializer->getRestartDumpDirectory(); 
+        const string restart_dump_dirname = app_initializer->getRestartDumpDirectory();
 
         // Get hierarchy data dump information
         const bool dump_postproc_data = app_initializer->dumpPostProcessingData();
@@ -265,7 +265,13 @@ main(int argc, char* argv[])
             if (dump_postproc_data && (iteration_num % postproc_data_dump_interval == 0 || last_step))
             {
                 pout << "\nWriting hierarchy data files...\n\n";
-                output_data(patch_hierarchy, ins_integrator, adv_diff_integrator, cf_un_forcing, iteration_num, loop_time, postproc_data_dump_dirname);
+                output_data(patch_hierarchy,
+                            ins_integrator,
+                            adv_diff_integrator,
+                            cf_un_forcing,
+                            iteration_num,
+                            loop_time,
+                            postproc_data_dump_dirname);
             }
         }
     } // cleanup dynamically allocated objects prior to shutdown
@@ -290,23 +296,25 @@ output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
     hier_db->create(file_name);
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
     ComponentSelector hier_data;
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(),    // Network velocity
-                                                        ins_integrator->getCurrentContext()));
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(),    // Solvent velocity
-                                                        ins_integrator->getCurrentContext()));                                                    
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(),   // Pressure
-                                                        ins_integrator->getCurrentContext()));
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction 
-                                                        adv_diff_integrator->getCurrentContext())); 
-    hier_data.setFlag(var_db->mapVariableAndContextToIndex(conformation_tensor_handler->getVariable(),      // Conformation tensor
-                                                            adv_diff_integrator->getCurrentContext()));    
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getNetworkVariable(), // Network velocity
+                                                           ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getSolventVariable(), // Solvent velocity
+                                                           ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(ins_integrator->getPressureVariable(), // Pressure
+                                                           ins_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(
+        ins_integrator->getNetworkVolumeFractionVariable(), // Network volume fraction
+        adv_diff_integrator->getCurrentContext()));
+    hier_data.setFlag(var_db->mapVariableAndContextToIndex(conformation_tensor_handler->getVariable(), // Conformation
+                                                                                                       // tensor
+                                                           adv_diff_integrator->getCurrentContext()));
     pout << "network variable name: " << ins_integrator->getNetworkVariable()->getName() << "\n";
     pout << "solvent variable name: " << ins_integrator->getSolventVariable()->getName() << "\n";
     pout << "pressure variable name: " << ins_integrator->getPressureVariable()->getName() << "\n";
     pout << "Thn variable name: " << ins_integrator->getNetworkVolumeFractionVariable()->getName() << "\n";
     pout << "Conformation tensor variable name: " << conformation_tensor_handler->getVariable()->getName() << "\n";
     pout << "ins context: " << ins_integrator->getCurrentContext()->getName() << "\n";
-    pout << "ins context: " << adv_diff_integrator->getCurrentContext()->getName() << "\n";                                                                                                    
+    pout << "ins context: " << adv_diff_integrator->getCurrentContext()->getName() << "\n";
     patch_hierarchy->putToDatabase(hier_db->putDatabase("PatchHierarchy"), hier_data);
     hier_db->putDouble("loop_time", loop_time);
     hier_db->putInteger("iteration_num", iteration_num);

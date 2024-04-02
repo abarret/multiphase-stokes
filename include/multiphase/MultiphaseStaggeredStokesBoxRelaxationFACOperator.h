@@ -251,9 +251,9 @@ private:
 
     int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
-    double d_w = 0.75;                                         // under relaxation factor
-    double d_C = std::numeric_limits<double>::quiet_NaN();     // C*u
-    double d_D = std::numeric_limits<double>::quiet_NaN();     // D depends on time stepping scheme
+    double d_w = 0.75;                                     // under relaxation factor
+    double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
+    double d_D = std::numeric_limits<double>::quiet_NaN(); // D depends on time stepping scheme
     const MultiphaseParameters& d_params;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy

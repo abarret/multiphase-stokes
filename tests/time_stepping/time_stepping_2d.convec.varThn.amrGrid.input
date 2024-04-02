@@ -1,0 +1,161 @@
+USING_VAR_XI = FALSE
+
+USE_PRECONDITIONER =  TRUE
+W = 0.75  // under relaxation factor for box relaxation scheme
+RHO = 1.0
+N = 16
+MAX_MULTIGRID_LEVELS = 3
+START_TIME = 0.0
+NUM_CYCLES = 1
+DX = 1.0 / N 
+U_MAX = 1.0 
+CFL = 0.3
+DT_MAX = CFL * DX / U_MAX
+END_TIME = 5*DT_MAX
+ENABLE_LOGGING = TRUE
+DIR_NAME = "viz2d"
+VIZ_DUMP_TIME_INTERVAL = 0.02
+VISCOUS_TIME_STEPPING_TYPE = "TRAPEZOIDAL_RULE"
+
+CREEPING_FLOW = FALSE
+
+ETA_S = 0.04
+ETA_N = 4.0
+NU = 1.0
+XI = 250.0*ETA_S
+
+// Inital conditions
+un {
+   function_0 = "cos(2*PI*(X_0-t))*sin(2*PI*(X_1-t))"
+   function_1 = "sin(2*PI*(X_0-t))*cos(2*PI*(X_1-t))"
+}
+
+us {
+   function_0 = "-cos(2*PI*(X_0-t))*sin(2*PI*(X_1-t))"
+   function_1 = "-sin(2*PI*(X_0-t))*cos(2*PI*(X_1-t))"
+} 
+
+p {
+   function = "0.0"
+} 
+
+f_un {
+   xi = XI
+   nu  = NU
+   etan = ETA_N
+   etas = ETA_S
+   function_0 = "-(1/(128*nu))*(128*nu*PI*cos(2*PI*(t-X_0))*cos(2*PI*(t-X_1))+32*nu*PI*(cos(4*PI*(t-X_0))-2*sin(4*PI*(t-X_0)))-32*nu*PI*cos(4*PI*(t-X_1))*(cos(4*PI*(t-X_0))+4*(-1+etan*PI)*sin(4*PI*(t-X_0)))+((8*nu*PI*(1+64*etan*PI)+61*xi)*cos(2*PI*(t-X_0))+(40*nu*PI+3*xi)*cos(6*PI*(t-X_0))-128*nu*PI*sin(2*PI*(t-X_0)))*sin(2*PI*(t-X_1))+32*nu*PI*sin(4*PI*(t-X_0))*sin(4*PI*(t-X_1))-2*cos(2*PI*(t-X_0))*(-16*nu*PI-xi+(24*nu*PI+xi)*cos(4*PI*(t-X_0)))*sin(6*PI*(t-X_1)))"
+   function_1 = "(1/(8*nu))*(1/8*(8*nu*PI+xi-(24*nu*PI+xi)*cos(4*PI*(-t+X_0)))*cos(6*PI*(-t+X_1))*sin(2*PI*(-t+X_0))-4*nu*PI*cos(4*PI*(-t+X_1))*sin(2*PI*(-t+X_0))^2+1/16*cos(2*PI*(-t+X_1))*(-128*nu*PI*cos(2*PI*(-t+X_0))+(8*nu*PI*(1+64*etan*PI)+61*xi)*sin(2*PI*(-t+X_0))+(8*nu*PI+xi)*sin(6*PI*(-t+X_0)))+8*nu*PI*sin(2*PI*(-t+X_0))*sin(2*PI*(-t+X_1))-2*nu*PI*(2+4*(-1+etan*PI)*cos(4*PI*(-t+X_0))+sin(4*PI*(-t+X_0)))*sin(4*PI*(-t+X_1)))"
+}
+
+f_us {
+   xi = XI
+   nu  = NU
+   etan = ETA_N
+   etas = ETA_S
+   function_0 = "(1/(128*nu))*(128*nu*PI*cos(2*PI*(t-X_0))*cos(2*PI*(t-X_1))-32*nu*PI*(cos(4*PI*(t-X_0))-2*sin(4*PI*(t-X_0)))+32*nu*PI*cos(4*PI*(t-X_1))*(cos(4*PI*(t-X_0))+4*(-1+etas*PI)*sin(4*PI*(t-X_0)))+((8*nu*PI*(1+64*etas*PI)+61*xi)*cos(2*PI*(t-X_0))+(40*nu*PI+3*xi)*cos(6*PI*(t-X_0))-128*nu*PI*sin(2*PI*(t-X_0)))*sin(2*PI*(t-X_1))-32*nu*PI*sin(4*PI*(t-X_0))*sin(4*PI*(t-X_1))+2*cos(2*PI*(t-X_0))*(16*nu*PI+xi-(24*nu*PI+xi)*cos(4*PI*(t-X_0)))*sin(6*PI*(t-X_1)))"
+   function_1 = "(1/(8*nu))*(1/16*cos(2*PI*(t-X_1))*(128*nu*PI*cos(2*PI*(t-X_0))+(8*nu*PI*(1+64*etas*PI)+61*xi)*sin(2*PI*(t-X_0))+(8*nu*PI+xi)*sin(6*PI*(t-X_0)))+1/8*(-8*nu*PI-xi+(24*nu*PI+xi)*cos(4*PI*(-t+X_0)))*cos(6*PI*(-t+X_1))*sin(2*PI*(-t+X_0))-4*nu*PI*cos(4*PI*(-t+X_1))*sin(2*PI*(-t+X_0))^2-8*nu*PI*sin(2*PI*(-t+X_0))*sin(2*PI*(-t+X_1))-2*nu*PI*(2+4*(-1+etas*PI)*cos(4*PI*(-t+X_0))+sin(4*PI*(-t+X_0)))*sin(4*PI*(-t+X_1)))"
+}
+
+f_p {
+   function = "1/2*PI*(cos(4*PI*(-t+X_0))-cos(4*PI*(X_0-X_1))+cos(4*PI*(-t+X_1))-cos(4*PI*(-2*t+X_0+X_1)))"
+}
+
+thn {
+   function = "1/2+1/4*sin(2*PI*(X_0-t))*sin(2*PI*(X_1-t))"
+}
+
+INSVCTwoFluidStaggeredHierarchyIntegrator {
+   creeping_flow                 = CREEPING_FLOW
+   convec_limiter_type                  = "MGAMMA"
+   rho                           = RHO
+   start_time                    = START_TIME
+   end_time                      = END_TIME
+   num_cycles                    = NUM_CYCLES
+   dt_max                        = DT_MAX
+   enable_logging                = ENABLE_LOGGING
+   w = W
+   use_preconditioner = USE_PRECONDITIONER
+   viscous_time_stepping_type = VISCOUS_TIME_STEPPING_TYPE
+   regrid_interval = 1000000000
+   convec_ts_type = "ADAMS_BASHFORTH"
+
+   solver_db {
+      ksp_type = "fgmres"
+   }
+
+   precond_db {
+      cycle_type = "V_CYCLE"
+      num_pre_sweeps = 3
+      num_post_sweeps = 3
+      enable_logging = TRUE
+      max_multigrid_levels = MAX_MULTIGRID_LEVELS
+   }
+}
+
+Main {
+// log file parameters
+   log_file_name = "output"
+   log_all_nodes = FALSE
+
+// visualization dump parameters
+   viz_writer = "VisIt"
+   viz_dump_dirname = DIR_NAME
+   visit_number_procs_per_file = 1
+
+// timer dump parameters
+   timer_enabled = TRUE
+}
+
+CartesianGeometry {
+   domain_boxes       = [(0,0), (N - 1,N - 1)]
+   x_lo               = -0.5, -0.5      // lower end of computational domain.
+   x_up               = 0.5, 0.5        // upper end of computational domain.
+   periodic_dimension = 1, 1  
+}
+
+GriddingAlgorithm {
+   max_levels = 2              // Maximum number of levels in hierarchy.
+
+   ratio_to_coarser {
+      level_1 = 2, 2              // vector ratio to next coarser level
+   }
+
+   largest_patch_size {
+      level_0 = 512, 512          // largest patch allowed in hierarchy
+                                  // all finer levels will use same values as level_0...
+   }
+
+   smallest_patch_size {
+      level_0 =   4,   4          // smallest patch allowed in hierarchy
+                                  // all finer levels will use same values as level_0...
+   }
+
+   efficiency_tolerance = 0.70e0  // min % of tag cells in new patch level
+   combine_efficiency   = 0.85e0  // chop box if sum of volumes of smaller
+                                  // boxes < efficiency * vol of large box
+}
+
+StandardTagAndInitialize {
+   tagging_method = "REFINE_BOXES"
+   RefineBoxes {
+    // level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
+    // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+    // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
+    // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
+    // level_0 = [(1,1), (30,30)] 
+    // level_1 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
+   }
+}
+
+LoadBalancer {
+   bin_pack_method = "SPATIAL"
+   max_workload_factor = 1 
+}
+
+TimerManager{
+   print_exclusive = FALSE
+   print_total = TRUE
+   print_threshold = 1.0
+   timer_list = "IBTK::*::*"
+}

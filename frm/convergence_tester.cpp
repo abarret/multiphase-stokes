@@ -84,8 +84,7 @@ main(int argc, char* argv[])
     const int p_interp_idx = var_db->registerClonedPatchDataIndex(p_var, p_idx);
     const int p_scratch_idx = var_db->registerVariableAndContext(p_var, scratch_ctx, 2);
 
-    Pointer<CellVariable<NDIM, double>> thn_var =
-        new CellVariable<NDIM, double>("FluidSolver::thn_cc");
+    Pointer<CellVariable<NDIM, double>> thn_var = new CellVariable<NDIM, double>("FluidSolver::thn_cc");
     const int thn_idx = var_db->registerVariableAndContext(thn_var, thn_ctx);
     const int thn_interp_idx = var_db->registerClonedPatchDataIndex(thn_var, thn_idx);
     const int thn_scratch_idx = var_db->registerVariableAndContext(thn_var, scratch_ctx, 2);
@@ -98,15 +97,15 @@ main(int argc, char* argv[])
     Pointer<VariableContext> s_c_ctx = var_db->getContext("AdvDiffIntegrator::CURRENT");
     Pointer<VariableContext> s_s_ctx = var_db->getContext("AdvDiffIntegrator::SCRATCH");
 
-    Pointer<CellVariable<NDIM, double> > S_var =
+    Pointer<CellVariable<NDIM, double>> S_var =
         new CellVariable<NDIM, double>("CFINSForcing::W_cc", NDIM * (NDIM + 1) / 2);
     const int S_idx = var_db->registerVariableAndContext(S_var, s_c_ctx);
     const int S_interp_idx = var_db->registerClonedPatchDataIndex(S_var, S_idx);
     const int S_scratch_idx = var_db->registerVariableAndContext(S_var, scratch_ctx, 2);
 
-    Pointer<CellVariable<NDIM, double> > Sxx_var = new CellVariable<NDIM, double>("Sxx");
-    Pointer<CellVariable<NDIM, double> > Syy_var = new CellVariable<NDIM, double>("Syy");
-    Pointer<CellVariable<NDIM, double> > Sxy_var = new CellVariable<NDIM, double>("Sxy");
+    Pointer<CellVariable<NDIM, double>> Sxx_var = new CellVariable<NDIM, double>("Sxx");
+    Pointer<CellVariable<NDIM, double>> Syy_var = new CellVariable<NDIM, double>("Syy");
+    Pointer<CellVariable<NDIM, double>> Sxy_var = new CellVariable<NDIM, double>("Sxy");
     const int Sxx_idx = var_db->registerVariableAndContext(Sxx_var, s_c_ctx);
     const int Syy_idx = var_db->registerVariableAndContext(Syy_var, s_c_ctx);
     const int Sxy_idx = var_db->registerVariableAndContext(Sxy_var, s_c_ctx);
@@ -439,14 +438,14 @@ main(int argc, char* argv[])
 
     for (int ln = 0; ln <= coarse_patch_hierarchy->getFinestLevelNumber(); ++ln)
     {
-        Pointer<PatchLevel<NDIM> > level = coarse_patch_hierarchy->getPatchLevel(ln);
+        Pointer<PatchLevel<NDIM>> level = coarse_patch_hierarchy->getPatchLevel(ln);
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
-            Pointer<Patch<NDIM> > patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double> > S_data = patch->getPatchData(S_interp_idx);
-            Pointer<CellData<NDIM, double> > Sxx_data = patch->getPatchData(Sxx_idx);
-            Pointer<CellData<NDIM, double> > Syy_data = patch->getPatchData(Syy_idx);
-            Pointer<CellData<NDIM, double> > Sxy_data = patch->getPatchData(Sxy_idx);
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<CellData<NDIM, double>> S_data = patch->getPatchData(S_interp_idx);
+            Pointer<CellData<NDIM, double>> Sxx_data = patch->getPatchData(Sxx_idx);
+            Pointer<CellData<NDIM, double>> Syy_data = patch->getPatchData(Syy_idx);
+            Pointer<CellData<NDIM, double>> Sxy_data = patch->getPatchData(Sxy_idx);
             Sxx_data->copyDepth(0, *S_data, 0);
             Syy_data->copyDepth(0, *S_data, 1);
             Sxy_data->copyDepth(0, *S_data, 2);
@@ -504,22 +503,22 @@ main(int argc, char* argv[])
          << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(p_interp_idx, wgt_cc_idx) << "\n";
 
     pout << "\n"
-            << "Error in " << Sxx_var->getName() << " at time " << loop_time << ":\n"
-            << "  L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Sxx_idx, wgt_cc_idx) << "\n"
-            << "  L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Sxx_idx, wgt_cc_idx) << "\n"
-            << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(Sxx_idx, wgt_cc_idx) << "\n";
+         << "Error in " << Sxx_var->getName() << " at time " << loop_time << ":\n"
+         << "  L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Sxx_idx, wgt_cc_idx) << "\n"
+         << "  L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Sxx_idx, wgt_cc_idx) << "\n"
+         << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(Sxx_idx, wgt_cc_idx) << "\n";
 
     pout << "\n"
-            << "Error in " << Syy_var->getName() << " at time " << loop_time << ":\n"
-            << "  L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Syy_idx, wgt_cc_idx) << "\n"
-            << "  L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Syy_idx, wgt_cc_idx) << "\n"
-            << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(Syy_idx, wgt_cc_idx) << "\n";
+         << "Error in " << Syy_var->getName() << " at time " << loop_time << ":\n"
+         << "  L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Syy_idx, wgt_cc_idx) << "\n"
+         << "  L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Syy_idx, wgt_cc_idx) << "\n"
+         << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(Syy_idx, wgt_cc_idx) << "\n";
 
     pout << "\n"
-            << "Error in " << Sxy_var->getName() << " at time " << loop_time << ":\n"
-            << "  L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Sxy_idx, wgt_cc_idx) << "\n"
-            << "  L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Sxy_idx, wgt_cc_idx) << "\n"
-            << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(Sxy_idx, wgt_cc_idx) << "\n";
+         << "Error in " << Sxy_var->getName() << " at time " << loop_time << ":\n"
+         << "  L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Sxy_idx, wgt_cc_idx) << "\n"
+         << "  L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Sxy_idx, wgt_cc_idx) << "\n"
+         << "  max-norm: " << coarse_hier_cc_data_ops.maxNorm(Sxy_idx, wgt_cc_idx) << "\n";
 
     // Output plot data after taking norms of differences.
     visit_data_writer->writePlotData(coarse_patch_hierarchy, coarse_iter_num + 1, loop_time);

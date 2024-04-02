@@ -138,38 +138,38 @@ extern "C"
                       const int*,    // mask_1
                       const int&);   // mask_gcw
 
-    void R_B_G_S_var_xi(const double*,      // dx
-                        const int&,         // ilower0
-                        const int&,         // iupper0
-                        const int&,         // ilower1
-                        const int&,         // iupper1
-                        double* const,      // un_data_0
-                        double* const,      // un_data_1
-                        const int&,         // un_gcw
-                        double* const,      // us_data_0
-                        double* const,      // us_data_0
-                        const int&,         // us_gcw
-                        double* const,      // p_data_
-                        const int&,         // p_gcw
-                        double* const,      // f_p_data
-                        const int&,         // f_p_gcw
-                        double* const,      // f_un_data_0
-                        double* const,      // f_un_data_1
-                        const int&,         // f_un_gcw
-                        double* const,      // f_us_data_0
-                        double* const,      // f_us_data_1
-                        const int&,         // f_us_gcw
-                        double* const,      // thn_data
-                        const int&,         // thn_gcw
-                        const double&,      // eta_n
-                        const double&,      // eta_s
-                        double* const,      // xi_0
-                        double* const,      // xi_1
-                        const int&,         // xi_gcw
-                        const double&,      // w = under relaxation factor
-                        const double&,      // C in C*u term
-                        const double&,      // D
-                        const int&);        // red_or_black
+    void R_B_G_S_var_xi(const double*, // dx
+                        const int&,    // ilower0
+                        const int&,    // iupper0
+                        const int&,    // ilower1
+                        const int&,    // iupper1
+                        double* const, // un_data_0
+                        double* const, // un_data_1
+                        const int&,    // un_gcw
+                        double* const, // us_data_0
+                        double* const, // us_data_0
+                        const int&,    // us_gcw
+                        double* const, // p_data_
+                        const int&,    // p_gcw
+                        double* const, // f_p_data
+                        const int&,    // f_p_gcw
+                        double* const, // f_un_data_0
+                        double* const, // f_un_data_1
+                        const int&,    // f_un_gcw
+                        double* const, // f_us_data_0
+                        double* const, // f_us_data_1
+                        const int&,    // f_us_gcw
+                        double* const, // thn_data
+                        const int&,    // thn_gcw
+                        const double&, // eta_n
+                        const double&, // eta_s
+                        double* const, // xi_0
+                        double* const, // xi_1
+                        const int&,    // xi_gcw
+                        const double&, // w = under relaxation factor
+                        const double&, // C in C*u term
+                        const double&, // D
+                        const int&);   // red_or_black
 
     void R_B_G_S_var_xi_mask(const double*, // dx
                              const int&,    // ilower0
@@ -504,9 +504,9 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
     IBTK_TIMER_START(t_smooth_error);
 
     // Get the vector components. These pull out patch data indices
-    const int un_idx = error.getComponentDescriptorIndex(0);      // network velocity, Un
-    const int us_idx = error.getComponentDescriptorIndex(1);      // solvent velocity, Us
-    const int P_idx = error.getComponentDescriptorIndex(2);       // pressure
+    const int un_idx = error.getComponentDescriptorIndex(0); // network velocity, Un
+    const int us_idx = error.getComponentDescriptorIndex(1); // solvent velocity, Us
+    const int P_idx = error.getComponentDescriptorIndex(2);  // pressure
     const int thn_idx = d_thn_idx;
     const int f_un_idx = residual.getComponentDescriptorIndex(0); // RHS_Un
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
@@ -902,7 +902,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
             const double* const xlow =
-                pgeom->getXLower();                  // {xlow[0], xlow[1]} -> physical location of bottom left of box.
+                pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
             const hier::Index<NDIM>& idx_low = patch->getBox().lower();
             Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
             Pointer<CellData<NDIM, double>> rhs_P_data =

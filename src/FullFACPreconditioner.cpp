@@ -44,7 +44,7 @@ FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
     : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix)
 {
     d_multigrid_max_levels = input_db->getInteger("max_multigrid_levels");
-    d_coarsening_operator = input_db ->getStringWithDefault("preconditioner_coarsening_op", "CONSERVATIVE_COARSEN");
+    d_coarsening_operator = input_db->getStringWithDefault("preconditioner_coarsening_op", "CONSERVATIVE_COARSEN");
 
     IBTK_DO_ONCE(
         t_solve = TimerManager::getManager()->getTimer("IBTK::FullFACPreconditioner::solveSystem()");
@@ -446,6 +446,6 @@ FullFACPreconditioner::transferToBase(const SAMRAIVectorReal<NDIM, double>& base
 
 //////////////////////////////////////////////////////////////////////////////
 
-} // namespace IBTK
+} // namespace multiphase
 
 //////////////////////////////////////////////////////////////////////////////
