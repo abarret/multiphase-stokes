@@ -218,11 +218,11 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
     d_us_adv_diff_var = new FaceVariable<NDIM, double>(d_object_name + "::us_adv_var");
 
     IBTK_DO_ONCE(t_integrate_hierarchy = TimerManager::getManager()->getTimer(
-                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy()");
+                     "multiphase::MultiphaseStaggeredHierarchyIntegrator::integrateHierarchy()");
                  t_preprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
-                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::preprocess()");
+                     "multiphase::MultiphaseStaggeredHierarchyIntegrator::preprocess()");
                  t_postprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
-                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::postprocess()"););
+                     "multiphase::MultiphaseStaggeredHierarchyIntegrator::postprocess()"););
     return;
 } // MultiphaseStaggeredHierarchyIntegrator
 
@@ -298,6 +298,27 @@ MultiphaseStaggeredHierarchyIntegrator::registerVolumeFractionBoundaryConditions
 {
     d_thn_bc_coef = thn_bc_coef;
 }
+
+void
+MultiphaseStaggeredHierarchyIntegrator::registerAdvDiffHierarchyIntegrator(
+    Pointer<AdvDiffHierarchyIntegrator> adv_diff_hier_integrator)
+{
+#if !defined(NDEBUG)
+    TBOX_ASSERT(adv_diff_hier_integrator);
+    // Bad things happen if the same integrator is registered twice.
+    auto pointer_compare = [adv_diff_hier_integrator](Pointer<AdvDiffHierarchyIntegrator> integrator) -> bool
+    { return adv_diff_hier_integrator.getPointer() == integrator.getPointer(); };
+    TBOX_ASSERT(std::find_if(d_adv_diff_hier_integrators.begin(), d_adv_diff_hier_integrators.end(), pointer_compare) ==
+                d_adv_diff_hier_integrators.end());
+#endif
+    d_adv_diff_hier_integrators.push_back(adv_diff_hier_integrator);
+    registerChildHierarchyIntegrator(adv_diff_hier_integrator);
+    adv_diff_hier_integrator->registerAdvectionVelocity(d_U_adv_diff_var);
+    adv_diff_hier_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, true);
+    adv_diff_hier_integrator->registerAdvectionVelocity(d_us_adv_diff_var);
+    adv_diff_hier_integrator->setAdvectionVelocityIsDivergenceFree(d_us_adv_diff_var, true);
+    return;
+} // registerAdvDiffHierarchyIntegrator
 
 void
 MultiphaseStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
@@ -549,19 +570,6 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
 {
     if (d_integrator_is_initialized) return;
 
-    // Note that we should be initializing before the advection diffusion integrator, so this should occur before the
-    // advection diffusion integrators register their variables.
-    for (auto& adv_diff_integrator : d_adv_diff_hier_integrators)
-    {
-        // Network velocity was already registered in the call registerAdvDiffHierarchyIntegrator, but we need to
-        // specify that the velocity is not divergence free
-        adv_diff_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false);
-
-        // Regiser the solvent velocity
-        adv_diff_integrator->registerAdvectionVelocity(d_us_adv_diff_var);
-        adv_diff_integrator->setAdvectionVelocityIsDivergenceFree(d_us_adv_diff_var, false);
-    }
-
     d_hierarchy = hierarchy;
     d_gridding_alg = gridding_alg;
 
@@ -647,6 +655,7 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
     {
         registerVariable(xi_idx, d_xi_var, IntVector<NDIM>(0), getScratchContext());
         d_params.xi_idx = xi_idx;
+        pout << "Setting xi idx in parameter list\n";
     }
 
     // Register a scratch force object.
@@ -1087,26 +1096,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     if (d_use_preconditioner)
     {
         Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
-        if (d_thn_fcn)
-        {
-            // Allocate data
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (!level->checkAllocated(thn_new_idx)) level->allocatePatchData(thn_new_idx, new_time);
-            }
-            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx,
-                                               d_thn_cc_var,
-                                               dense_hierarchy,
-                                               new_time,
-                                               false,
-                                               0,
-                                               dense_hierarchy->getFinestLevelNumber());
-        }
-        else
-        {
-            d_stokes_precond->transferToDense(thn_new_idx, true);
-        }
+        d_stokes_precond->transferToDense(thn_new_idx, true);
 
         // Also fill in ghost cells on the dense hierarchy
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;

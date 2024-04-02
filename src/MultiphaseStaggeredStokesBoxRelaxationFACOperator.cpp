@@ -328,11 +328,11 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError()");
+                     "multiphase::MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError()");
                  t_solve_coarsest_level = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
+                     "multiphase::MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
                  t_compute_residual = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
+                     "multiphase::MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
     return;
 }
 
