@@ -50,6 +50,8 @@ main(int argc, char* argv[])
     // Initialize IBAMR and libraries. Deinitialization is handled by this object as well.
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
 
+    PetscOptionsSetValue(nullptr, "-solver_ksp_rtol", "1.0e-12");
+
     { // cleanup dynamically allocated objects prior to shutdown
 
         // Parse command line options, set some standard options from the input

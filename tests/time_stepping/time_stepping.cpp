@@ -38,6 +38,8 @@ main(int argc, char* argv[])
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
     SAMRAIManager::setMaxNumberPatchDataEntries(8192);
 
+    PetscOptionsSetValue(nullptr, "-solver_ksp_rtol", "1.0e-12");
+
     { // cleanup dynamically allocated objects prior to shutdown
 
         // Parse command line options, set some standard options from the input
