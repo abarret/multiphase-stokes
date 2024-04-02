@@ -159,11 +159,12 @@ MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::
                        d_default_thn_bc_coef);
 
     // Setup Timers.
-    IBAMR_DO_ONCE(t_apply = TimerManager::getManager()->getTimer("IBAMR::TwoFluidStaggeredStokesOperator::apply()");
+    IBAMR_DO_ONCE(t_apply =
+                      TimerManager::getManager()->getTimer("multiphase::MultiphaseStaggeredStokesOperator::apply()");
                   t_initialize_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::initializeOperatorState()");
+                      "multiphase::MultiphaseStaggeredStokesOperator::initializeOperatorState()");
                   t_deallocate_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::deallocateOperatorState()"););
+                      "multiphase::MultiphaseStaggeredStokesOperator::deallocateOperatorState()"););
     return;
 } // TwoFluidStaggeredStokesOperator
 
