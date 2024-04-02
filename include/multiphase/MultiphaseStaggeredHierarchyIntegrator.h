@@ -120,6 +120,16 @@ public:
     }
 
     /*!
+     * Register an advection-diffusion solver with this incompressible
+     * Navier-Stokes solver.
+     *
+     * Note that this covers up the INSHierarchyIntegrator registration call, resulting in different behavior if this
+     * function is called while the class is used polymorphically.
+     */
+    void registerAdvDiffHierarchyIntegrator(
+        SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_hier_integrator);
+
+    /*!
      * Register physical boundary condition objects. Note that we currently only work with periodic and Dirichlet
      * conditions on the velocity.
      *
