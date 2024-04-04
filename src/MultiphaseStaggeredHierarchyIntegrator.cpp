@@ -164,6 +164,7 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
     if (input_db->keyExists("make_div_rhs_sum_to_zero"))
         d_make_div_rhs_sum_to_zero = input_db->getBool("make_div_rhs_sum_to_zero");
     d_has_vel_nullspace = input_db->getBoolWithDefault("has_vel_nullspace", d_has_vel_nullspace);
+    d_has_pressure_nullspace = input_db->getBoolWithDefault("has_pressure_nullspace", d_has_pressure_nullspace);
     d_convec_limiter_type = IBAMR::string_to_enum<LimiterType>(
         input_db->getStringWithDefault("convec_limiter_type", IBAMR::enum_to_string(d_convec_limiter_type)));
     d_convective_time_stepping_type = IBAMR::string_to_enum<IBAMR::TimeSteppingType>(
@@ -270,7 +271,8 @@ MultiphaseStaggeredHierarchyIntegrator::getPressureVariable() const
 void
 MultiphaseStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
     std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
-    std::vector<RobinBcCoefStrategy<NDIM>*> us_bc_coefs)
+    std::vector<RobinBcCoefStrategy<NDIM>*> us_bc_coefs,
+    RobinBcCoefStrategy<NDIM>* p_bc_coef)
 {
     for (int d = 0; d < NDIM; ++d)
     {
@@ -279,6 +281,7 @@ MultiphaseStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
     }
     // Treat solvent as U
     d_U_bc_coefs = d_us_bc_coefs;
+    d_p_bc_coef = p_bc_coef;
 }
 
 const std::vector<RobinBcCoefStrategy<NDIM>*>&
@@ -954,7 +957,8 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
 
     // Set up null vectors (if applicable). Note that "d_has_vel_nullspace" corresponds to cases when rho=0 and drag
     // coefficient != 0. If the drag coefficient is zero, there are additional elements in the nullspace.
-    d_nul_vecs.resize(1 + (d_has_vel_nullspace ? NDIM : 0));
+    int num_null_vecs = (d_has_pressure_nullspace ? 1 : 0) + (d_has_vel_nullspace ? NDIM : 0);
+    d_nul_vecs.resize(num_null_vecs);
     for (size_t i = 0; i < d_nul_vecs.size(); ++i)
     {
         d_nul_vecs[i] = d_sol_vec->cloneVector("NullVec_" + std::to_string(i)); // should delete the vector at the end
@@ -968,15 +972,19 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> p_data = d_nul_vecs[0]->getComponentPatchData(2, *patch);
-            p_data->fillAll(1.0);
+            if (d_has_pressure_nullspace)
+            {
+                Pointer<CellData<NDIM, double>> p_data = d_nul_vecs[0]->getComponentPatchData(2, *patch);
+                p_data->fillAll(1.0);
+            }
 
             if (d_has_vel_nullspace)
             {
+                int shft = d_has_pressure_nullspace ? 1 : 0;
                 for (int axis = 0; axis < NDIM; ++axis)
                 {
-                    Pointer<SideData<NDIM, double>> un_data = d_nul_vecs[axis + 1]->getComponentPatchData(0, *patch);
-                    Pointer<SideData<NDIM, double>> us_data = d_nul_vecs[axis + 1]->getComponentPatchData(1, *patch);
+                    Pointer<SideData<NDIM, double>> un_data = d_nul_vecs[axis + shft]->getComponentPatchData(0, *patch);
+                    Pointer<SideData<NDIM, double>> us_data = d_nul_vecs[axis + shft]->getComponentPatchData(1, *patch);
                     un_data->getArrayData(axis).fillAll(1.0);
                     us_data->getArrayData(axis).fillAll(1.0);
                 }
@@ -1054,7 +1062,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     {
         MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
         RHS_op.setPhysicalBoundaryHelper(bc_helper);
-        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
+        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
         // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions
         // in the RHS.
         RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
@@ -1067,7 +1075,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
 
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params);
-    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
+    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
     d_stokes_op->setPhysicalBoundaryHelper(bc_helper);
@@ -1083,7 +1091,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         d_precond_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
         d_precond_op->setUnderRelaxationParamater(d_w);
         d_precond_op->setCandDCoefficients(C, D2);
-        d_precond_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
+        d_precond_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
         d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
         d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);
