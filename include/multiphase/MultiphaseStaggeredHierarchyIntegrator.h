@@ -136,7 +136,8 @@ public:
      * This class does not assume ownership of the bc objects, so they must be deleted by the user.
      */
     void registerPhysicalBoundaryConditions(std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
-                                            std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> us_bc_coefs);
+                                            std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> us_bc_coefs,
+                                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_bc_coef = nullptr);
 
     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getNetworkBoundaryConditions() const;
     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getSolventBoundaryConditions() const;
@@ -370,6 +371,7 @@ private:
      * Boundary conditions
      */
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs, d_us_bc_coefs;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_p_bc_coef = nullptr;
 
     /*!
      * Fluid solver variables.
@@ -396,7 +398,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
-    bool d_has_vel_nullspace = false;
+    bool d_has_vel_nullspace = false, d_has_pressure_nullspace = true;
 
     /*!
      * Solver information
