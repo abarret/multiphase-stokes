@@ -538,6 +538,8 @@ void
 MultiphaseStaggeredHierarchyIntegrator::setInitialNetworkVolumeFraction(Pointer<CartGridFunction> thn_init_fcn)
 {
     d_thn_init_fcn = thn_init_fcn;
+    // If we have already registered the volume fraction to be advected, overwrite the initial conditions
+    if (d_thn_integrator) d_thn_integrator->setInitialConditions(d_thn_cc_var, d_thn_init_fcn);
 }
 
 void
@@ -553,6 +555,7 @@ MultiphaseStaggeredHierarchyIntegrator::setNetworkVolumeFractionFunction(Pointer
 void
 MultiphaseStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
     Pointer<AdvDiffHierarchyIntegrator> adv_diff_integrator,
+    RobinBcCoefStrategy<NDIM>* thn_bc_coef,
     const bool has_meaningful_mid_value)
 {
     registerAdvDiffHierarchyIntegrator(adv_diff_integrator);
@@ -563,6 +566,8 @@ MultiphaseStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
     d_thn_integrator->setAdvectionVelocity(d_thn_cc_var, d_U_adv_diff_var);
     d_thn_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false); // Not divergence free in general.
     d_thn_integrator->setInitialConditions(d_thn_cc_var, d_thn_init_fcn);
+    d_thn_integrator->setPhysicalBcCoef(d_thn_cc_var, thn_bc_coef);
+    d_thn_bc_coef = thn_bc_coef;
 
     d_use_new_thn = has_meaningful_mid_value;
 }
@@ -1024,7 +1029,8 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         d_xi_fcn->setDataOnPatchHierarchy(xi_idx, d_xi_var, d_hierarchy, eval_time, false, coarsest_ln, finest_ln);
     }
     // Boundary Condition helper.
-    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
+    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper = new StaggeredStokesPhysicalBoundaryHelper();
+    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper = new StaggeredStokesPhysicalBoundaryHelper();
 
     if (getIntegratorStep() != 0 && d_viscous_ts_type == TimeSteppingType::BDF2)
     {
@@ -1061,8 +1067,10 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     else
     {
         MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
-        RHS_op.setPhysicalBoundaryHelper(bc_helper);
+        RHS_op.setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
         RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
+        RHS_op.setSolutionTime(current_time);
+        RHS_op.setTimeInterval(current_time, new_time);
         // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions
         // in the RHS.
         RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
@@ -1078,7 +1086,9 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
-    d_stokes_op->setPhysicalBoundaryHelper(bc_helper);
+    d_stokes_op->setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
+    d_stokes_op->setSolutionTime(new_time);
+    d_stokes_op->setTimeInterval(current_time, new_time);
 
     d_stokes_solver = new PETScKrylovLinearSolver("solver", d_solver_db, "solver_");
     d_stokes_solver->setOperator(d_stokes_op);
@@ -1092,11 +1102,15 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         d_precond_op->setUnderRelaxationParamater(d_w);
         d_precond_op->setCandDCoefficients(C, D2);
         d_precond_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
+        d_precond_op->setSolutionTime(new_time);
+        d_precond_op->setTimeInterval(current_time, new_time);
         d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
         d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);
     }
 
+    d_stokes_solver->setSolutionTime(new_time);
+    d_stokes_solver->setTimeInterval(current_time, new_time);
     d_stokes_solver->setNullspace(false, d_nul_vecs);
     d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
 
@@ -1330,6 +1344,32 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
                                                                       const int num_cycles)
 {
     IBTK_TIMER_START(t_postprocess_integrate_hierarchy);
+    // Compute the network CFL number. Note the solvent CFL number is computed by the base class and is available in
+    // d_cfl_current.
+    PatchSideDataOpsReal<NDIM, double> patch_sc_ops;
+    double cfl_max = 0.0;
+    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            const Box<NDIM>& patch_box = patch->getBox();
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            const double* const dx = pgeom->getDx();
+            const double dx_min = *(std::min_element(dx, dx + NDIM));
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(d_un_sc_var, getNewContext());
+#ifndef NDEBUG
+            TBOX_ASSERT(un_data);
+#endif
+            double u_max = patch_sc_ops.maxNorm(un_data, patch_box);
+            const double dt = new_time - current_time;
+            cfl_max = std::max(cfl_max, u_max * dt / dx_min);
+        }
+    }
+    d_cfl_un_current = IBTK_MPI::maxReduction(cfl_max);
+    plog << d_object_name << "::postprocessIntegrateHierarchy(): Network CFL number = " << d_cfl_un_current << "\n";
+
     // Do anything that needs to be done after integrateHierarchy().
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
@@ -1568,6 +1608,26 @@ MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
         }
         double half_time = 0.5 * (current_time + new_time);
         d_thn_fcn->setDataOnPatchHierarchy(thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time, false);
+    }
+
+    // Set ghost cells and synchronize volume fraction
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    {
+        HierarchyGhostCellInterpolation hier_ghost_fill;
+        std::vector<ITC> ghost_cell_comps = { ITC(
+            thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
+        hier_ghost_fill.initializeOperatorState(ghost_cell_comps, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        hier_ghost_fill.fillData(current_time);
+
+        ghost_cell_comps = { ITC(
+            thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
+        hier_ghost_fill.resetTransactionComponents(ghost_cell_comps);
+        hier_ghost_fill.fillData(0.5 * (current_time + new_time));
+
+        ghost_cell_comps = { ITC(
+            thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
+        hier_ghost_fill.resetTransactionComponents(ghost_cell_comps);
+        hier_ghost_fill.fillData(new_time);
     }
     return;
 }

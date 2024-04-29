@@ -90,6 +90,31 @@ main(int argc, char* argv[])
             ins_integrator->setDragCoefficient(xi, nu, nu);
         }
 
+        // Setup boundary conditions if necessary
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
+        std::unique_ptr<RobinBcCoefStrategy<NDIM>> p_bc_coef, thn_bc_coef;
+        const bool periodic_domain = grid_geometry->getPeriodicShift().min() > 0;
+        if (!periodic_domain)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                std::string un_bc_coef_name = "un_bcs_" + std::to_string(d);
+                un_bc_coefs[d] =
+                    new muParserRobinBcCoefs(un_bc_coef_name, input_db->getDatabase(un_bc_coef_name), grid_geometry);
+                std::string us_bc_coef_name = "us_bcs_" + std::to_string(d);
+                us_bc_coefs[d] =
+                    new muParserRobinBcCoefs(us_bc_coef_name, input_db->getDatabase(us_bc_coef_name), grid_geometry);
+            }
+
+            // Create boundary condition objects for volume fraction
+            thn_bc_coef =
+                std::make_unique<muParserRobinBcCoefs>("thn_bc", input_db->getDatabase("thn_bc"), grid_geometry);
+            p_bc_coef = std::make_unique<muParserRobinBcCoefs>("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
+        }
+
+        ins_integrator->registerPhysicalBoundaryConditions(un_bc_coefs, us_bc_coefs, p_bc_coef.get());
+        ins_integrator->registerVolumeFractionBoundaryConditions(thn_bc_coef.get());
+
         // Setup velocity and pressures functions.
         Pointer<CartGridFunction> un_fcn =
             new muParserCartGridFunction("un", app_initializer->getComponentDatabase("un"), grid_geometry);
@@ -299,6 +324,15 @@ main(int argc, char* argv[])
             level->deallocatePatchData(un_exa_idx);
             level->deallocatePatchData(us_exa_idx);
             level->deallocatePatchData(p_exa_idx);
+        }
+
+        if (periodic_domain)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                delete un_bc_coefs[d];
+                delete us_bc_coefs[d];
+            }
         }
     } // cleanup dynamically allocated objects prior to shutdown
 } // main
