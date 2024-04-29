@@ -121,7 +121,8 @@ public:
      * \brief Set the physical boundary condition helper object.
      */
     virtual void
-    setPhysicalBoundaryHelper(SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> bc_helper);
+    setPhysicalBoundaryHelper(SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> bc_un_helper,
+                              SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> bc_us_helper);
 
     /*!
      * \name Linear operator functionality.
@@ -229,7 +230,7 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
 
     // Boundary condition helper object.
-    SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;
+    SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> d_bc_un_helper, d_bc_us_helper;
 
     // Cached communications operators.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,

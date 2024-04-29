@@ -217,6 +217,7 @@ public:
      * the volume fraction.
      */
     void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator,
+                                     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr,
                                      bool has_meaningful_mid_value = true);
 
     /*!
@@ -482,6 +483,9 @@ private:
 
     // Solvent advection velocity variable
     SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> d_us_adv_diff_var;
+
+    // Network CFL number
+    double d_cfl_un_current = std::numeric_limits<double>::quiet_NaN();
 };
 } // namespace multiphase
 

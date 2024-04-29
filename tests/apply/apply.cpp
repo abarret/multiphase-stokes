@@ -285,8 +285,9 @@ main(int argc, char* argv[])
         stokes_op.setCandDCoefficients(C, D);
         stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
 
-        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-        stokes_op.setPhysicalBoundaryHelper(bc_helper);
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op.setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
 
         stokes_op.setThnIdx(thn_cc_idx);
         stokes_op.initializeOperatorState(u_vec, f_vec);

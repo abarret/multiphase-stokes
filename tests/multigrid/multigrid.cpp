@@ -331,8 +331,9 @@ main(int argc, char* argv[])
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
 
-        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-        stokes_op->setPhysicalBoundaryHelper(bc_helper);
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op->setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
 
         stokes_op->setThnIdx(thn_cc_idx);
 

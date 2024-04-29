@@ -213,6 +213,8 @@ private:
     SAMRAI::tbox::Pointer<IBMultiphaseEulerianForceFunction> d_cross_links_un_fcn, d_cross_links_us_fcn;
     SAMRAI::tbox::Pointer<MultiphaseCrossLinksStrategy> d_cross_links_strategy;
 
+    IBTK::RobinPhysBdryPatchStrategy* d_un_phys_bdry_op = nullptr;
+
     // Network communication algorithms.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_un_ghostfill_alg;
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineOperator<NDIM>> d_un_ghostfill_op;
