@@ -73,6 +73,7 @@ main(int argc, char* argv[])
         // Grab the boundary condition objects
         std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
         RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
+        RobinBcCoefStrategy<NDIM>* p_bc_coef = nullptr;
         bool is_periodic = grid_geometry->getPeriodicShift().max() == 1;
         if (!is_periodic)
         {
@@ -87,6 +88,7 @@ main(int argc, char* argv[])
             }
             std::string thn_bc_name = "thn_bc";
             thn_bc_coef = new muParserRobinBcCoefs(thn_bc_name, input_db->getDatabase(thn_bc_name), grid_geometry);
+            p_bc_coef = new muParserRobinBcCoefs("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
         }
 
         // Create variables and register them with the variable database.
@@ -332,9 +334,10 @@ main(int argc, char* argv[])
         stokes_op->setCandDCoefficients(C, D);
         stokes_op->setThnIdx(thn_cc_idx);
 
-        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-        stokes_op->setPhysicalBoundaryHelper(bc_helper);
-        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op->setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
+        stokes_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);
 
         Pointer<PETScKrylovLinearSolver> krylov_solver =
             new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
@@ -343,7 +346,7 @@ main(int argc, char* argv[])
         // Now create a preconditioner
         Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
             new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
-        fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
+        fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);
         fac_precondition_strategy->setThnIdx(thn_cc_idx);
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
@@ -353,10 +356,10 @@ main(int argc, char* argv[])
                                       app_initializer->getComponentDatabase("KrylovPrecond"),
                                       "Krylov_precond_");
         bool use_precond = input_db->getBool("USE_PRECOND");
-        Krylov_precond->setNullspace(false, null_vecs);
+        //        Krylov_precond->setNullspace(false, null_vecs);
         if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
 
-        krylov_solver->setNullspace(false, null_vecs);
+        //        krylov_solver->setNullspace(false, null_vecs);
         krylov_solver->initializeSolverState(u_vec, f_vec);
         // We need to set thn_cc_idx on the dense hierarchy.
         // TODO: find a better way to do this
