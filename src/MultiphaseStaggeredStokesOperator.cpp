@@ -111,7 +111,8 @@ MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::
       d_nc_scr_var(new NodeVariable<NDIM, double>(d_object_name + "::ThnNode", 1, false)),
       d_cc_ndim_var(new CellVariable<NDIM, double>(d_object_name + "::ThnCell", NDIM)),
       d_sc_scr_var(new SideVariable<NDIM, double>(d_object_name + "::VelAvg", 1, false)),
-      d_params(params)
+      d_params(params),
+      d_thn_scr_var(new CellVariable<NDIM, double>(d_object_name + "::Thn"))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -151,6 +152,11 @@ MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::
     if (var_db->checkVariableExists(d_object_name + "::VelAvg"))
         d_sc_scr_var = var_db->getVariable(d_object_name + "::VelAvg");
     d_sc_scr_idx = var_db->registerVariableAndContext(d_sc_scr_var, var_db->getContext(d_object_name + "::CTX"));
+
+    if (var_db->checkVariableExists(d_object_name + "::Thn"))
+        d_thn_scr_var = var_db->getVariable(d_object_name + "::Thn");
+    d_thn_scr_idx = var_db->registerVariableAndContext(
+        d_thn_scr_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(1));
 
     // Initialize the boundary conditions objects.
     setPhysicalBcCoefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef),
@@ -331,6 +337,7 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     {
         // Note that thn ghost cells are always filled under inhomogeneous conditions.
         std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
+            d_thn_scr_idx,
             thn_idx,
             "CONSERVATIVE_LINEAR_REFINE",
             USE_CF_INTERPOLATION,
@@ -342,9 +349,28 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
         hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
         hier_bdry_fill.setHomogeneousBc(false);
         hier_bdry_fill.fillData(d_solution_time);
+
+        if (d_regularize_thn)
+        {
+            for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+                for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+                {
+                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                    Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(d_thn_scr_idx);
+                    for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
+                    {
+                        const CellIndex<NDIM>& idx = ci();
+                        (*thn_data)(idx) = std::max((*thn_data)(idx), d_min_thn);
+                        (*thn_data)(idx) = std::min((*thn_data)(idx), 1.0 - d_min_thn);
+                    }
+                }
+            }
+        }
     }
 
-    applySpecialized(A_P_idx, A_un_idx, A_us_idx, P_idx, un_scratch_idx, us_scratch_idx, thn_idx);
+    applySpecialized(A_P_idx, A_un_idx, A_us_idx, P_idx, un_scratch_idx, us_scratch_idx, d_thn_scr_idx);
 
     if (d_bc_un_helper)
     {
@@ -421,6 +447,7 @@ MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
         if (!level->checkAllocated(d_sc_scr_idx)) level->allocatePatchData(d_sc_scr_idx);
         if (!level->checkAllocated(d_nc_scr_idx)) level->allocatePatchData(d_nc_scr_idx);
         if (!level->checkAllocated(d_cc_ndim_idx)) level->allocatePatchData(d_cc_ndim_idx);
+        if (!level->checkAllocated(d_thn_scr_idx)) level->allocatePatchData(d_thn_scr_idx);
     }
 
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
@@ -535,6 +562,7 @@ MultiphaseStaggeredStokesOperator::deallocateOperatorState()
         if (level->checkAllocated(d_sc_scr_idx)) level->deallocatePatchData(d_sc_scr_idx);
         if (level->checkAllocated(d_nc_scr_idx)) level->deallocatePatchData(d_nc_scr_idx);
         if (level->checkAllocated(d_cc_ndim_idx)) level->deallocatePatchData(d_cc_ndim_idx);
+        if (level->checkAllocated(d_thn_scr_idx)) level->deallocatePatchData(d_thn_scr_idx);
     }
     d_os_coarsen_scheds.clear();
     d_os_coarsen_alg = nullptr;

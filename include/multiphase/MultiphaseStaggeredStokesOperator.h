@@ -55,6 +55,8 @@ namespace multiphase
  *
  * This class handles the case in which the drag coefficient is variable.
  *
+ * \note This class does not by default regularize the volume fraction.
+ *
  * \see INSStaggeredHierarchyIntegrator
  */
 class MultiphaseStaggeredStokesOperator : public IBTK::LinearOperator
@@ -215,6 +217,25 @@ public:
 
     //\}
 
+    /*!
+     * If `regularize_thn` is true, then the volume fraction will be regularized by the specified amount. Specifically,
+     * the volume fraction will be set to \f$thn = max(min_thn, min(thn, 1.0 - min_thn))\f$.
+     *
+     * This will regularize both interior cells and ghost cells.
+     * @{
+     */
+    inline void setRegularizeThn(bool regularize_thn, double min_thn)
+    {
+        d_regularize_thn = regularize_thn;
+        d_min_thn = min_thn;
+    }
+
+    inline void setRegularizeThn(bool regularize_thn)
+    {
+        setRegularizeThn(regularize_thn, d_min_thn);
+    }
+    /*@}*/
+
 protected:
     // Problem specification.
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_un_bc_coef;
@@ -291,6 +312,11 @@ private:
     // Volume averaged velocity
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_sc_scr_var;
     int d_sc_scr_idx = IBTK::invalid_index;
+
+    bool d_regularize_thn = false;
+    double d_min_thn = 1.0e-5;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_scr_var;
+    int d_thn_scr_idx = IBTK::invalid_index;
 };
 } // namespace multiphase
 

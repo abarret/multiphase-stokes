@@ -173,6 +173,25 @@ public:
      */
     void setCandDCoefficients(double C, double D);
 
+    /*!
+     * If `regularize_thn` is true, then the volume fraction will be regularized by the specified amount. Specifically,
+     * the volume fraction will be set to \f$thn = max(min_thn, min(thn, 1.0 - min_thn))\f$.
+     *
+     * This will regularize both interior cells and ghost cells.
+     * @{
+     */
+    inline void setRegularizeThn(bool regularize_thn, double min_thn)
+    {
+        d_regularize_thn = regularize_thn;
+        d_min_thn = min_thn;
+    }
+
+    inline void setRegularizeThn(bool regularize_thn)
+    {
+        setRegularizeThn(regularize_thn, d_min_thn);
+    }
+    /*@}*/
+
 private:
     /*!
      * \brief Default constructor.
@@ -277,6 +296,11 @@ private:
     SAMRAI::tbox::Pointer<IBTK::StaggeredPhysicalBoundaryHelper> d_bc_un_helper, d_bc_us_helper;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, int>> d_mask_var;
     int d_mask_idx = IBTK::invalid_index;
+
+    bool d_regularize_thn = false;
+    double d_min_thn = 1.0e-5;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_scr_var;
+    int d_thn_scr_idx = IBTK::invalid_index;
 };
 } // namespace multiphase
 
