@@ -39,9 +39,55 @@
 
 namespace multiphase
 {
+
+/*!
+ * \brief Class ThnCartGridFunction is an abstract class intended to help set the volume fraction. It is an extension of
+ * IBTK::CartGridFunction and improves the interface to inform implementations at which point in the time step the
+ * volume fraction should be set.
+ *
+ * The protected member d_time_pt will be set before setDataOnPatchHierarchy is called. This variable should be used to
+ * set the volume fraction at the correct time point.
+ */
+class ThnCartGridFunction : public IBTK::CartGridFunction
+{
+public:
+    ThnCartGridFunction(std::string object_name) : CartGridFunction(std::move(object_name))
+    {
+    }
+    using IBTK::CartGridFunction::setDataOnPatchHierarchy;
+    /*!
+     * \brief Calls setTimePoint() followed by setDataOnPatchHierarchy().
+     */
+    inline void setDataOnPatchHierarchy(int data_idx,
+                                        SAMRAI::tbox::Pointer<SAMRAI::hier::Variable<NDIM>> var,
+                                        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                                        double data_time,
+                                        IBTK::TimePoint time_pt,
+                                        bool initial_time = false,
+                                        int coarsest_ln = IBTK::invalid_level_number,
+                                        int finest_ln = IBTK::invalid_level_number)
+    {
+        setTimePoint(time_pt);
+        setDataOnPatchHierarchy(data_idx, var, hierarchy, data_time, initial_time, coarsest_ln, finest_ln);
+    }
+
+    /*!
+     * \brief Sets the time point at which the volume fraction should be set.
+     */
+    inline void setTimePoint(IBTK::TimePoint time_pt)
+    {
+        d_time_pt = time_pt;
+    }
+
+protected:
+    IBTK::TimePoint d_time_pt = IBTK::TimePoint::UNKNOWN_TIME;
+};
 /*!
  * \brief Class MultiphaseStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
+ *
+ * This class will regularize the volume fraction during the application of the Stokes operators. The regularization
+ * parameter can be set in the input database. Note that no regularization occurs in the momentum transport component.
  */
 class MultiphaseStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
 {
@@ -201,6 +247,9 @@ public:
     /*!
      * Register the volume fraction function. If a function is not registered, the volume fraction is advected with the
      * fluid.
+     *
+     * Note that the volume fraction function does not necessarily need to be of type `ThnCartGridFunction`. A dynamic
+     * cast will be performed before each call to determine the actual type of `thn_fcn`.
      *
      * An optional argument allows this function to be used as the initial condition for the volume fraction. If this is
      * set to false, users are expected to call setInitialNetworkVolumeFraction.
@@ -486,6 +535,8 @@ private:
 
     // Network CFL number
     double d_cfl_un_current = std::numeric_limits<double>::quiet_NaN();
+
+    double d_regularize_thn = 1.0e-5;
 };
 } // namespace multiphase
 

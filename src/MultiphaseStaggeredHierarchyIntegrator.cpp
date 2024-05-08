@@ -171,6 +171,7 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
         input_db->getStringWithDefault("convec_ts_type", "FORWARD_EULER"));
     d_use_accel_ts = input_db->getBoolWithDefault("use_accel_ts", d_use_accel_ts);
     d_accel_ts_safety_fac = input_db->getDoubleWithDefault("accel_ts_safety_factor", d_accel_ts_safety_fac);
+    d_regularize_thn = input_db->getDoubleWithDefault("regualarize_thn", d_regularize_thn);
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
@@ -317,9 +318,9 @@ MultiphaseStaggeredHierarchyIntegrator::registerAdvDiffHierarchyIntegrator(
     d_adv_diff_hier_integrators.push_back(adv_diff_hier_integrator);
     registerChildHierarchyIntegrator(adv_diff_hier_integrator);
     adv_diff_hier_integrator->registerAdvectionVelocity(d_U_adv_diff_var);
-    adv_diff_hier_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, true);
+    adv_diff_hier_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false);
     adv_diff_hier_integrator->registerAdvectionVelocity(d_us_adv_diff_var);
-    adv_diff_hier_integrator->setAdvectionVelocityIsDivergenceFree(d_us_adv_diff_var, true);
+    adv_diff_hier_integrator->setAdvectionVelocityIsDivergenceFree(d_us_adv_diff_var, false);
     return;
 } // registerAdvDiffHierarchyIntegrator
 
@@ -1068,6 +1069,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     {
         MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
         RHS_op.setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
+        RHS_op.setRegularizeThn(true, d_regularize_thn);
         RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
         RHS_op.setSolutionTime(current_time);
         RHS_op.setTimeInterval(current_time, new_time);
@@ -1083,6 +1085,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
 
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params);
+    d_stokes_op->setRegularizeThn(true, d_regularize_thn);
     d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
     d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
@@ -1098,6 +1101,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     {
         d_precond_op =
             new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
+        d_precond_op->setRegularizeThn(true, d_regularize_thn);
         d_precond_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
         d_precond_op->setUnderRelaxationParamater(d_w);
         d_precond_op->setCandDCoefficients(C, D2);
@@ -1601,13 +1605,24 @@ MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
 #ifndef NDEBUG
         TBOX_ASSERT(d_thn_fcn);
 #endif
-        if (start_of_ts)
+        Pointer<ThnCartGridFunction> thn_cart_fcn = d_thn_fcn;
+        if (thn_cart_fcn)
         {
-            d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, false);
-            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, false);
+            thn_cart_fcn->setDataOnPatchHierarchy(
+                thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, TimePoint::CURRENT_TIME);
+            thn_cart_fcn->setDataOnPatchHierarchy(
+                thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, TimePoint::NEW_TIME);
+            double half_time = 0.5 * (current_time + new_time);
+            thn_cart_fcn->setDataOnPatchHierarchy(
+                thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time, TimePoint::HALF_TIME);
         }
-        double half_time = 0.5 * (current_time + new_time);
-        d_thn_fcn->setDataOnPatchHierarchy(thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time, false);
+        else
+        {
+            d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time);
+            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time);
+            double half_time = 0.5 * (current_time + new_time);
+            d_thn_fcn->setDataOnPatchHierarchy(thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time);
+        }
     }
 
     // Set ghost cells and synchronize volume fraction
