@@ -88,7 +88,8 @@ main(int argc, char* argv[])
             }
             std::string thn_bc_name = "thn_bc";
             thn_bc_coef = new muParserRobinBcCoefs(thn_bc_name, input_db->getDatabase(thn_bc_name), grid_geometry);
-            p_bc_coef = new muParserRobinBcCoefs("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
+            if (input_db->isDatabase("p_bc"))
+                p_bc_coef = new muParserRobinBcCoefs("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
         }
 
         // Create variables and register them with the variable database.
@@ -356,10 +357,10 @@ main(int argc, char* argv[])
                                       app_initializer->getComponentDatabase("KrylovPrecond"),
                                       "Krylov_precond_");
         bool use_precond = input_db->getBool("USE_PRECOND");
-        //        Krylov_precond->setNullspace(false, null_vecs);
+        Krylov_precond->setNullspace(false, null_vecs);
         if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
 
-        //        krylov_solver->setNullspace(false, null_vecs);
+        krylov_solver->setNullspace(false, null_vecs);
         krylov_solver->initializeSolverState(u_vec, f_vec);
         // We need to set thn_cc_idx on the dense hierarchy.
         // TODO: find a better way to do this
