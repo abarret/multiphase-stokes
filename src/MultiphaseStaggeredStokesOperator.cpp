@@ -337,14 +337,7 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
     {
         // Note that thn ghost cells are always filled under inhomogeneous conditions.
         std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
-            d_thn_scr_idx,
-            thn_idx,
-            "CONSERVATIVE_LINEAR_REFINE",
-            USE_CF_INTERPOLATION,
-            DATA_COARSEN_TYPE,
-            BDRY_EXTRAP_TYPE,
-            CONSISTENT_TYPE_2_BDRY,
-            d_thn_bc_coef) };
+            d_thn_scr_idx, thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
         HierarchyGhostCellInterpolation hier_bdry_fill;
         hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
         hier_bdry_fill.setHomogeneousBc(false);

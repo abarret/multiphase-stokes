@@ -513,14 +513,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
     // Note that thn ghost cells are always filled under inhomogeneous conditions.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
-        d_thn_scr_idx,
-        d_thn_idx,
-        "CONSERVATIVE_LINEAR_REFINE",
-        USE_CF_INTERPOLATION,
-        DATA_COARSEN_TYPE,
-        BDRY_EXTRAP_TYPE,
-        CONSISTENT_TYPE_2_BDRY,
-        d_thn_bc_coef) };
+        d_thn_scr_idx, d_thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
     HierarchyGhostCellInterpolation hier_bdry_fill;
     hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
     hier_bdry_fill.setHomogeneousBc(false);
@@ -890,16 +883,9 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     // Note that thn ghost cells are always filled under inhomogeneous conditions.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
-        d_thn_scr_idx,
-        d_thn_idx,
-        "CONSERVATIVE_LINEAR_REFINE",
-        USE_CF_INTERPOLATION,
-        DATA_COARSEN_TYPE,
-        BDRY_EXTRAP_TYPE,
-        CONSISTENT_TYPE_2_BDRY,
-        d_thn_bc_coef) };
+        d_thn_scr_idx, d_thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
     HierarchyGhostCellInterpolation hier_bdry_fill;
-    hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
+    hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy, coarsest_level_num, finest_level_num);
     hier_bdry_fill.setHomogeneousBc(false);
     hier_bdry_fill.fillData(d_solution_time);
 
