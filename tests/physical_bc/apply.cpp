@@ -77,7 +77,8 @@ main(int argc, char* argv[])
             }
             std::string thn_bc_name = "thn_bc";
             thn_bc_coef = new muParserRobinBcCoefs(thn_bc_name, input_db->getDatabase(thn_bc_name), grid_geometry);
-            p_bc_coef = new muParserRobinBcCoefs("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
+            if (input_db->isDatabase("p_bc"))
+                p_bc_coef = new muParserRobinBcCoefs("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
         }
 
         // Create variables and register them with the variable database.
