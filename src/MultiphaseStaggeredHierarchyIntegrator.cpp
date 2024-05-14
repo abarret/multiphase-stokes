@@ -1178,7 +1178,7 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
 
     // Replace N_old data if necessary
-    if (is_multistep_time_stepping_type(d_convective_time_stepping_type))
+    if (!d_creeping_flow && is_multistep_time_stepping_type(d_convective_time_stepping_type))
     {
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         const int Nn_old_idx = var_db->mapVariableAndContextToIndex(d_Nn_old_var, getCurrentContext());
