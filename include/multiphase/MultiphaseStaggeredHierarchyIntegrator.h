@@ -9,6 +9,7 @@
 #include "multiphase/MultiphaseConvectiveManager.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
+#include "multiphase/utility_functions.h"
 
 #include "ibamr/INSHierarchyIntegrator.h"
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
@@ -392,6 +393,11 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_Nn_old_var, d_Ns_old_var;
 
+    /*!
+     * BDF2 patch data for velocity
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_old_var, d_us_old_var;
+
     // Scratch force index
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
 
@@ -403,6 +409,8 @@ private:
     // Variable drag coefficient.
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
+
+    TimeSteppingType d_viscous_ts_type = TimeSteppingType::TRAPEZOIDAL_RULE;
 };
 } // namespace multiphase
 
