@@ -485,6 +485,22 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
         registerVariable(Ns_idx, d_Ns_old_var, 0, getCurrentContext());
     }
 
+    // We only register old velocity variables if we are using BDF2
+    if (d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        d_un_old_var = new SideVariable<NDIM, double>(d_object_name + "::un_old");
+        d_us_old_var = new SideVariable<NDIM, double>(d_object_name + "::us_old");
+        d_thn_old_var = new CellVariable<NDIM, double>(d_object_name + "::thn_old");
+        d_fn_old_var = new SideVariable<NDIM, double>(d_object_name + "::fn_old");
+        d_fs_old_var = new SideVariable<NDIM, double>(d_object_name + "::fs_old");
+        int un_old_idx, us_old_idx, thn_old_idx, fn_old_idx, fs_old_idx;
+        registerVariable(un_old_idx, d_un_old_var, 0, getCurrentContext());
+        registerVariable(us_old_idx, d_us_old_var, 0, getCurrentContext());
+        registerVariable(thn_old_idx, d_thn_old_var, 1, getCurrentContext());
+        registerVariable(fn_old_idx, d_fn_old_var, 0, getCurrentContext());
+        registerVariable(fs_old_idx, d_fs_old_var, 0, getCurrentContext());
+    }
+
     // Register variables with the integrator. Those with states (Velocities) have associated current, new, and scratch
     // indices. NOTE: Pressure is NOT a state variable, but we keep track of current and new values for initial guesses
     // for the solver.
@@ -898,17 +914,32 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         // If the integrator step is 0 (so initial time step), we reduce to backward Euler, and this block is skipped.
         const int un_old_idx = var_db->mapVariableAndContextToIndex(d_un_old_var, getCurrentContext());
         const int us_old_idx = var_db->mapVariableAndContextToIndex(d_us_old_var, getCurrentContext());
+        const int thn_old_idx = var_db->mapVariableAndContextToIndex(d_thn_old_var, getCurrentContext());
+        // Fill ghost cells of thn old.
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp = { ITC(
+            thn_old_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, d_thn_bc_coef) };
+        HierarchyGhostCellInterpolation ghost_fill;
+        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        ghost_fill.fillData(current_time - d_dt_previous[0]);
 
         const int rhs_un_idx = d_rhs_vec->getComponentDescriptorIndex(0);
         const int rhs_us_idx = d_rhs_vec->getComponentDescriptorIndex(1);
 
         double alpha = d_dt_previous[0] / dt;
-        C = 2.0 + alpha / (dt * (1.0 + alpha));
+        C = d_params.rho * (2.0 + alpha) / (dt * (1.0 + alpha));
 
-        d_hier_sc_data_ops->linearSum(
-            rhs_un_idx, -(alpha + 1.0) / (dt * alpha), un_cur_idx, 1.0 / (dt * alpha * (alpha + 1.0)), un_old_idx);
-        d_hier_sc_data_ops->linearSum(
-            rhs_us_idx, -(alpha + 1.0) / (dt * alpha), us_cur_idx, 1.0 / (dt * alpha * (alpha + 1.0)), us_old_idx);
+        multiply_sc_and_thn(d_fn_scr_idx, un_old_idx, thn_old_idx, d_hierarchy);
+        multiply_sc_and_ths(d_fs_scr_idx, us_old_idx, thn_old_idx, d_hierarchy);
+
+        d_hier_sc_data_ops->scale(rhs_un_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), d_fn_scr_idx);
+        d_hier_sc_data_ops->scale(rhs_us_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), d_fs_scr_idx);
+
+        multiply_sc_and_thn(d_fn_scr_idx, un_cur_idx, thn_cur_idx, d_hierarchy);
+        multiply_sc_and_ths(d_fs_scr_idx, us_cur_idx, thn_cur_idx, d_hierarchy);
+
+        d_hier_sc_data_ops->axpy(rhs_un_idx, d_params.rho * (alpha + 1.0) / (dt * alpha), d_fn_scr_idx, rhs_un_idx);
+        d_hier_sc_data_ops->axpy(rhs_us_idx, d_params.rho * (alpha + 1.0) / (dt * alpha), d_fs_scr_idx, rhs_us_idx);
     }
     else
     {
@@ -1081,43 +1112,8 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_temp");
     f_vec->allocateVectorData(current_time);
     f_vec->setToScalar(0.0);
-    // Start with forces that do not need to be scaled.
-    if (d_f_un_fcn)
-    {
-        d_f_un_fcn->setDataOnPatchHierarchy(d_fn_scr_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_fcn)
-    {
-        d_f_us_fcn->setDataOnPatchHierarchy(d_fs_scr_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
-    }
 
-    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
-    {
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp = { ITC(
-            thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_fill.fillData(half_time);
-    }
-    if (d_f_un_thn_fcn)
-    {
-        d_f_un_thn_fcn->setDataOnPatchHierarchy(d_fn_scr_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_thn(d_fn_scr_idx, d_fn_scr_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_ths_fcn)
-    {
-        d_f_us_ths_fcn->setDataOnPatchHierarchy(d_fs_scr_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_ths(d_fs_scr_idx, d_fs_scr_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
-    }
+    addBodyForces(f_vec, current_time, new_time, thn_cur_idx, thn_scr_idx, thn_new_idx);
     if (!d_creeping_flow)
     {
         approxConvecOp(
@@ -1220,6 +1216,27 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
         const int Nn_old_idx = var_db->mapVariableAndContextToIndex(d_Nn_old_var, getCurrentContext());
         const int Ns_old_idx = var_db->mapVariableAndContextToIndex(d_Ns_old_var, getCurrentContext());
         d_convec_op->fillWithConvectiveOperator(Nn_old_idx, Ns_old_idx);
+    }
+
+    if (d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int un_old_idx = var_db->mapVariableAndContextToIndex(d_un_old_var, getCurrentContext());
+        const int us_old_idx = var_db->mapVariableAndContextToIndex(d_us_old_var, getCurrentContext());
+        const int thn_old_idx = var_db->mapVariableAndContextToIndex(d_thn_old_var, getCurrentContext());
+        const int fn_old_idx = var_db->mapVariableAndContextToIndex(d_fn_old_var, getCurrentContext());
+        const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getCurrentContext());
+        const int un_cur_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
+        const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
+        const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+        const int fn_cur_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+        const int fs_cur_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+
+        d_hier_sc_data_ops->copyData(un_old_idx, un_cur_idx);
+        d_hier_sc_data_ops->copyData(us_old_idx, us_cur_idx);
+        d_hier_cc_data_ops->copyData(thn_old_idx, thn_cur_idx);
+        d_hier_sc_data_ops->copyData(fn_old_idx, fn_cur_idx);
+        d_hier_sc_data_ops->copyData(fs_old_idx, fs_cur_idx);
     }
 
     // Calculate gradient of thn for grid cell tagging.
@@ -1501,6 +1518,96 @@ bool
 MultiphaseStaggeredHierarchyIntegrator::isVariableDrag() const
 {
     return d_params.isVariableDrag();
+}
+
+void
+MultiphaseStaggeredHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<NDIM, double>>& f_vec,
+                                                      const double current_time,
+                                                      const double new_time,
+                                                      const int thn_cur_idx,
+                                                      const int thn_half_idx,
+                                                      const int thn_new_idx)
+{
+    // If we are using BDF2, then we evaluate the forces using AB2
+    double eval_time = d_viscous_ts_type == TimeSteppingType::BDF2 ? current_time : 0.5 * (current_time + new_time);
+    double dt = new_time - current_time;
+    double alpha = d_viscous_ts_type == TimeSteppingType::BDF2 ? d_dt_previous[0] / dt : 1.0;
+    const int thn_idx = d_viscous_ts_type == TimeSteppingType::BDF2 ? thn_cur_idx : thn_half_idx;
+
+    // Create some scratch indices for accumulation
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int fn_cloned_idx = var_db->registerClonedPatchDataIndex(d_f_un_sc_var, d_fn_scr_idx);
+    const int fs_cloned_idx = var_db->registerClonedPatchDataIndex(d_f_us_sc_var, d_fs_scr_idx);
+    allocate_patch_data(
+        { fn_cloned_idx, fs_cloned_idx }, d_hierarchy, eval_time, 0, d_hierarchy->getFinestLevelNumber());
+    d_hier_sc_data_ops->setToScalar(d_fn_scr_idx, 0.0);
+    d_hier_sc_data_ops->setToScalar(d_fs_scr_idx, 0.0);
+
+    // Start with forces that do not need to be scaled.
+    if (d_f_un_fcn)
+    {
+        d_f_un_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, fn_cloned_idx, d_fn_scr_idx);
+    }
+    if (d_f_us_fcn)
+    {
+        d_f_us_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
+    }
+
+    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
+    {
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp = { ITC(
+            thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
+        HierarchyGhostCellInterpolation ghost_fill;
+        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        ghost_fill.fillData(eval_time);
+    }
+    if (d_f_un_thn_fcn)
+    {
+        d_f_un_thn_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn(fn_cloned_idx, fn_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, fn_cloned_idx, d_fn_scr_idx);
+    }
+    if (d_f_us_ths_fcn)
+    {
+        d_f_us_ths_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_ths(fs_cloned_idx, fs_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
+    }
+
+    if (getIntegratorStep() != 0 && d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int fn_old_idx = var_db->mapVariableAndContextToIndex(d_fn_old_var, getCurrentContext());
+        const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getCurrentContext());
+        d_hier_sc_data_ops->axpy(
+            f_vec->getComponentDescriptorIndex(0), -1.0 / alpha, fn_old_idx, f_vec->getComponentDescriptorIndex(0));
+        d_hier_sc_data_ops->axpy(
+            f_vec->getComponentDescriptorIndex(1), -1.0 / alpha, fs_old_idx, f_vec->getComponentDescriptorIndex(1));
+        d_hier_sc_data_ops->axpy(f_vec->getComponentDescriptorIndex(0),
+                                 (alpha + 1.0) / alpha,
+                                 d_fn_scr_idx,
+                                 f_vec->getComponentDescriptorIndex(0));
+        d_hier_sc_data_ops->axpy(f_vec->getComponentDescriptorIndex(1),
+                                 (alpha + 1.0) / alpha,
+                                 d_fs_scr_idx,
+                                 f_vec->getComponentDescriptorIndex(1));
+    }
+    else
+    {
+        d_hier_sc_data_ops->add(
+            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
+        d_hier_sc_data_ops->add(
+            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
+    }
+
+    // Copy our accumulated forces into a permanent location
+    const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+    const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+    d_hier_sc_data_ops->copyData(fn_idx, d_fn_scr_idx);
+    d_hier_sc_data_ops->copyData(fs_idx, d_fs_scr_idx);
 }
 
 //////////////////////////////////////////////////////////////////////////////
