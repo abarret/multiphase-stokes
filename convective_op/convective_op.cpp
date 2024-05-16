@@ -237,7 +237,7 @@ main(int argc, char* argv[])
 
         convec_op.approximateConvectiveOperator(N_un_idx,
                                                 N_us_idx,
-                                                TimeSteppingType::FORWARD_EULER,
+                                                IBAMR::TimeSteppingType::FORWARD_EULER,
                                                 0.0,
                                                 1.0,
                                                 un_idx,
