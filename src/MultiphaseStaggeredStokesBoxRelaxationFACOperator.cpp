@@ -91,8 +91,10 @@ extern "C"
                  const int&,    // f_us_gcw
                  double* const, // thn_data
                  const int&,    // thn_gcw
-                 const double&, // eta_n    // whatever will be passed in will be treated as a reference to a double
-                 const double&, // eta_s    // telling the compiler that the function is expecting a reference
+                 const double&, // eta_n
+                 const double&, // eta_s
+                 const double&, // lambda_n
+                 const double&, // lambda_s
                  const double&, // nu_n
                  const double&, // nu_s
                  const double&, // xi
@@ -124,9 +126,10 @@ extern "C"
                       const int&,    // f_us_gcw
                       double* const, // thn_data
                       const int&,    // thn_gcw
-                      const double&, // eta_n    // whatever will be passed in will be treated as a reference to a
-                                     // double
-                      const double&, // eta_s    // telling the compiler that the function is expecting a reference
+                      const double&, // eta_n
+                      const double&, // eta_s
+                      const double&, // lambda_n
+                      const double&, // lambda_s
                       const double&, // nu_n
                       const double&, // nu_s
                       const double&, // xi
@@ -163,6 +166,8 @@ extern "C"
                         const int&,    // thn_gcw
                         const double&, // eta_n
                         const double&, // eta_s
+                        const double&, // lambda_n
+                        const double&, // lambda_s
                         double* const, // xi_0
                         double* const, // xi_1
                         const int&,    // xi_gcw
@@ -196,6 +201,8 @@ extern "C"
                              const int&,    // thn_gcw
                              const double&, // eta_n
                              const double&, // eta_s
+                             const double&, // lambda_n
+                             const double&, // lambda_s
                              double* const, // xi_0
                              double* const, // xi_1
                              const int&,    // xi_gcw
@@ -727,6 +734,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                         thn_gcw.min(),
                                         d_params.eta_n,
                                         d_params.eta_s,
+                                        d_params.lambda_n,
+                                        d_params.lambda_s,
                                         xi_data->getPointer(0),
                                         xi_data->getPointer(1),
                                         xi_data->getGhostCellWidth().min(),
@@ -765,6 +774,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                  thn_gcw.min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
+                                 d_params.lambda_n,
+                                 d_params.lambda_s,
                                  d_params.nu_n,
                                  d_params.nu_s,
                                  d_params.xi,
@@ -807,6 +818,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                    thn_gcw.min(),
                                    d_params.eta_n,
                                    d_params.eta_s,
+                                   d_params.lambda_n,
+                                   d_params.lambda_s,
                                    xi_data->getPointer(0),
                                    xi_data->getPointer(1),
                                    xi_data->getGhostCellWidth().min(),
@@ -842,6 +855,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                             thn_gcw.min(),
                             d_params.eta_n,
                             d_params.eta_s,
+                            d_params.lambda_n,
+                            d_params.lambda_s,
                             d_params.nu_n,
                             d_params.nu_s,
                             d_params.xi,

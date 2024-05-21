@@ -327,8 +327,19 @@ MultiphaseStaggeredHierarchyIntegrator::registerAdvDiffHierarchyIntegrator(
 void
 MultiphaseStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
+    setViscosityCoefficient(eta_n, eta_s, -eta_n, -eta_s);
+}
+
+void
+MultiphaseStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n,
+                                                                const double eta_s,
+                                                                const double lambda_n,
+                                                                const double lambda_s)
+{
     d_params.eta_n = eta_n;
     d_params.eta_s = eta_s;
+    d_params.lambda_n = lambda_n;
+    d_params.lambda_s = lambda_s;
 }
 
 void

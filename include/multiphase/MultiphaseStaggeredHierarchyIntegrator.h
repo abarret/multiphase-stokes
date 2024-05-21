@@ -200,6 +200,7 @@ public:
      * \brief Set the viscosity coefficients for the viscous stresses.
      */
     void setViscosityCoefficient(double eta_n, double eta_s);
+    void setViscosityCoefficient(double eta_n, double eta_s, double lambda_n, double lambda_s);
 
     /*!
      * \brief Set the drag coefficients for each phase.

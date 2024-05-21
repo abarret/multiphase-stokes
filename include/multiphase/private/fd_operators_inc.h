@@ -34,6 +34,8 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     const double eta_n = params.eta_n;
     const double eta_s = params.eta_s;
+    const double lambda_n = params.lambda_n;
+    const double lambda_s = params.lambda_s;
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
@@ -66,42 +68,44 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
         double thn_imhalf_jmhalf = (*thn_nc_data)(idx_n_l);
 
         // components of first row (x-component of network vel) of network equation
-        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+        double ddx_Thn_dx_un = 1.0 / (dx[0] * dx[0]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+        double ddy_Thn_dy_un = 1.0 / (dx[1] * dx[1]) *
                                (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
-        double ddy_Thn_dx_vn = eta_n / (dx[1] * dx[0]) *
+        double ddy_Thn_dx_vn = 1.0 / (dx[1] * dx[0]) *
                                (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
-        double ddx_Thn_dy_vn = -eta_n / (dx[0] * dx[1]) *
+        double ddx_Thn_dy_vn = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
-
+        double visc_stress_n = (2.0 * eta_n + lambda_n) * ddx_Thn_dx_un + eta_n * ddy_Thn_dy_un +
+                               eta_n * ddy_Thn_dx_vn + lambda_n * ddx_Thn_dy_vn;
         double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) = D_u * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n) +
-                            D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
+        (*A_un_data)(idx) = D_u * (visc_stress_n + drag_n) + D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
 
         // solvent equation
-        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+        double ddx_Ths_dx_us = 1.0 / (dx[0] * dx[0]) *
                                (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                 convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+        double ddy_Ths_dy_us = 1.0 / (dx[1] * dx[1]) *
                                (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-        double ddy_Ths_dx_vs = eta_s / (dx[1] * dx[0]) *
+        double ddy_Ths_dx_vs = 1.0 / (dx[1] * dx[0]) *
                                (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
         double ddx_Ths_dy_vs =
-            -eta_s / (dx[0] * dx[1]) *
+            1.0 / (dx[0] * dx[1]) *
             (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
              convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
+        double visc_stress_s = (2.0 * eta_s + lambda_s) * ddx_Ths_dx_us + eta_s * ddy_Ths_dy_us +
+                               eta_s * ddy_Ths_dx_vs + lambda_s * ddx_Ths_dy_vs;
         double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
         double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_us_data)(idx) = D_u * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s) +
-                            D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) =
+            D_u * (visc_stress_s + drag_s) + D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
     }
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
@@ -122,42 +126,44 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
         double thn_imhalf_jmhalf = (*thn_nc_data)(idx_n_l);
 
         // components of second row (y-component of network vel) of network equation
-        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+        double ddy_Thn_dy_vn = 1.0 / (dx[1] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+        double ddx_Thn_dx_vn = 1.0 / (dx[0] * dx[0]) *
                                (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
-        double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
+        double ddx_Thn_dy_un = 1.0 / (dx[1] * dx[0]) *
                                (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
-        double ddy_Thn_dx_vn = -eta_n / (dx[0] * dx[1]) *
+        double ddy_Thn_dx_un = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
-
+        double visc_stress_n = (2.0 * eta_n + lambda_n) * ddy_Thn_dy_vn + eta_n * ddx_Thn_dy_un +
+                               eta_n * ddx_Thn_dx_vn + lambda_n * ddy_Thn_dx_un;
         double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) = D_u * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n) +
-                            D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
+        (*A_un_data)(idx) = D_u * (visc_stress_n + drag_n) + D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
 
         // Solvent equation
-        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+        double ddy_Ths_dy_vs = 1.0 / (dx[1] * dx[1]) *
                                (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                 convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+        double ddx_Ths_dx_vs = 1.0 / (dx[0] * dx[0]) *
                                (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-        double ddx_Ths_dy_vs = eta_s / (dx[1] * dx[0]) *
+        double ddx_Ths_dy_us = 1.0 / (dx[1] * dx[0]) *
                                (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
-        double ddy_Ths_dx_vs =
-            -eta_s / (dx[0] * dx[1]) *
+        double ddy_Ths_dx_us =
+            1.0 / (dx[0] * dx[1]) *
             (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
              convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
+        double visc_stress_s = (2.0 * eta_s + lambda_s) * ddy_Ths_dy_vs + eta_s * ddx_Ths_dy_us +
+                               eta_s * ddx_Ths_dx_vs + lambda_s * ddy_Ths_dx_us;
         double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
         double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_us_data)(idx) = D_u * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s) +
-                            D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) =
+            D_u * (visc_stress_s + drag_s) + D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
     }
 }
 
@@ -183,6 +189,8 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     const double eta_n = params.eta_n;
     const double eta_s = params.eta_s;
+    const double lambda_n = params.lambda_n;
+    const double lambda_s = params.lambda_s;
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
@@ -215,42 +223,44 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
                                            (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
 
         // components of first row (x-component of network vel) of network equation
-        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+        double ddx_Thn_dx_un = 1.0 / (dx[0] * dx[0]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+        double ddy_Thn_dy_un = 1.0 / (dx[1] * dx[1]) *
                                (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
-        double ddy_Thn_dx_vn = eta_n / (dx[1] * dx[0]) *
+        double ddy_Thn_dx_vn = 1.0 / (dx[1] * dx[0]) *
                                (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
-        double ddx_Thn_dy_vn = -eta_n / (dx[0] * dx[1]) *
+        double ddx_Thn_dy_vn = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
-
+        double visc_stress_n = (2.0 * eta_n - lambda_n) * ddx_Thn_dx_un + eta_n * ddy_Thn_dy_un +
+                               eta_n * ddy_Thn_dx_vn + lambda_n * ddx_Thn_dy_vn;
         double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) = D_u * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n) +
-                            D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
+        (*A_un_data)(idx) = D_u * (visc_stress_n + drag_n) + D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
 
         // solvent equation
-        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+        double ddx_Ths_dx_us = 1.0 / (dx[0] * dx[0]) *
                                (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                 convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+        double ddy_Ths_dy_us = 1.0 / (dx[1] * dx[1]) *
                                (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-        double ddy_Ths_dx_vs = eta_s / (dx[1] * dx[0]) *
+        double ddy_Ths_dx_vs = 1.0 / (dx[1] * dx[0]) *
                                (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
         double ddx_Ths_dy_vs =
-            -eta_s / (dx[0] * dx[1]) *
+            1.0 / (dx[0] * dx[1]) *
             (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
              convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
+        double visc_stress_s = (2.0 * eta_s + lambda_s) * ddx_Ths_dx_us + eta_s * ddy_Ths_dy_us +
+                               eta_s * ddy_Ths_dx_vs + lambda_s * ddx_Ths_dy_vs;
         double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
         double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_us_data)(idx) = D_u * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s) +
-                            D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) =
+            D_u * (visc_stress_s + drag_s) + D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
     }
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
@@ -274,42 +284,44 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
                                            (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
 
         // components of second row (y-component of network vel) of network equation
-        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+        double ddy_Thn_dy_vn = 1.0 / (dx[1] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+        double ddx_Thn_dx_vn = 1.0 / (dx[0] * dx[0]) *
                                (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
-        double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
+        double ddx_Thn_dy_un = 1.0 / (dx[1] * dx[0]) *
                                (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
-        double ddy_Thn_dx_vn = -eta_n / (dx[0] * dx[1]) *
+        double ddy_Thn_dx_un = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
-
+        double visc_stress_n = (2.0 * eta_n + lambda_n) * ddy_Thn_dy_vn + eta_n * ddx_Thn_dy_un +
+                               eta_n * ddx_Thn_dx_vn + lambda_n * ddy_Thn_dx_un;
         double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) = D_u * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n) +
-                            D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
+        (*A_un_data)(idx) = D_u * (visc_stress_n + drag_n) + D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
 
         // Solvent equation
-        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+        double ddy_Ths_dy_vs = 1.0 / (dx[1] * dx[1]) *
                                (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                 convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+        double ddx_Ths_dx_vs = 1.0 / (dx[0] * dx[0]) *
                                (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-        double ddx_Ths_dy_vs = eta_s / (dx[1] * dx[0]) *
+        double ddx_Ths_dy_us = 1.0 / (dx[1] * dx[0]) *
                                (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
-        double ddy_Ths_dx_vs =
-            -eta_s / (dx[0] * dx[1]) *
+        double ddy_Ths_dx_us =
+            1.0 / (dx[0] * dx[1]) *
             (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
              convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
+        double visc_stress_s = (2.0 * eta_s + lambda_s) * ddy_Ths_dy_vs + eta_s * ddx_Ths_dy_us +
+                               eta_s * ddx_Ths_dx_vs + lambda_s * ddy_Ths_dx_us;
         double drag_s = -xi / nu_s * thn_lower * convertToThs(thn_lower) * ((*us_data)(idx) - (*un_data)(idx));
         double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_us_data)(idx) = D_u * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s) +
-                            D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) =
+            D_u * (visc_stress_s + drag_s) + D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
     }
 }
 
@@ -333,6 +345,8 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
 
     const double eta_n = params.eta_n;
     const double eta_s = params.eta_s;
+    const double lambda_n = params.lambda_n;
+    const double lambda_s = params.lambda_s;
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
@@ -365,42 +379,45 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
                                            (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
 
         // components of first row (x-component of network vel) of network equation
-        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+        double ddx_Thn_dx_un = 1.0 / (dx[0] * dx[0]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
-        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+        double ddy_Thn_dy_un = 1.0 / (dx[1] * dx[1]) *
                                (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
-        double ddy_Thn_dx_vn = eta_n / (dx[1] * dx[0]) *
+        double ddy_Thn_dx_vn = 1.0 / (dx[1] * dx[0]) *
                                (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
-        double ddx_Thn_dy_vn = -eta_n / (dx[0] * dx[1]) *
+        double ddx_Thn_dy_vn = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
 
+        double visc_stress_n = (2.0 * eta_n + lambda_n) * ddx_Thn_dx_un + eta_n * ddy_Thn_dy_un +
+                               eta_n * ddy_Thn_dx_vn + lambda_n * ddx_Thn_dy_vn;
         double drag_n = -(*xi_data)(idx) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) = D_u * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn + drag_n) +
-                            D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
+        (*A_un_data)(idx) = D_u * (visc_stress_n + drag_n) + D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
 
         // solvent equation
-        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+        double ddx_Ths_dx_us = 1.0 / (dx[0] * dx[0]) *
                                (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                 convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+        double ddy_Ths_dy_us = 1.0 / (dx[1] * dx[1]) *
                                (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-        double ddy_Ths_dx_vs = eta_s / (dx[1] * dx[0]) *
+        double ddy_Ths_dx_vs = 1.0 / (dx[1] * dx[0]) *
                                (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
         double ddx_Ths_dy_vs =
-            -eta_s / (dx[0] * dx[1]) *
+            1.0 / (dx[0] * dx[1]) *
             (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
              convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
+        double visc_stress_s = (2.0 * eta_s + lambda_s) * ddx_Ths_dx_us + eta_s * ddy_Ths_dy_us +
+                               eta_s * ddy_Ths_dx_vs + lambda_s * ddx_Ths_dy_vs;
         double drag_s = -(*xi_data)(idx) * ((*us_data)(idx) - (*un_data)(idx));
         double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_us_data)(idx) = D_u * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s) +
-                            D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) =
+            D_u * (visc_stress_s + drag_s) + D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
     }
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
@@ -424,42 +441,44 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
                                            (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
 
         // components of second row (y-component of network vel) of network equation
-        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+        double ddy_Thn_dy_vn = 1.0 / (dx[1] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
-        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+        double ddx_Thn_dx_vn = 1.0 / (dx[0] * dx[0]) *
                                (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
-        double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
+        double ddx_Thn_dy_un = 1.0 / (dx[1] * dx[0]) *
                                (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
                                 thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
-        double ddy_Thn_dx_vn = -eta_n / (dx[0] * dx[1]) *
+        double ddy_Thn_dx_un = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
-
+        double visc_stress_n = (2.0 * eta_n + lambda_n) * ddy_Thn_dy_vn + eta_n * ddx_Thn_dy_un +
+                               eta_n * ddx_Thn_dx_vn + lambda_n * ddy_Thn_dx_un;
         double drag_n = -(*xi_data)(idx) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) = D_u * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n) +
-                            D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
+        (*A_un_data)(idx) = D_u * (visc_stress_n + drag_n) + D_p * (pressure_n) + C * thn_lower * (*un_data)(idx);
 
         // Solvent equation
-        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+        double ddy_Ths_dy_vs = 1.0 / (dx[1] * dx[1]) *
                                (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
                                 convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
-        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+        double ddx_Ths_dx_vs = 1.0 / (dx[0] * dx[0]) *
                                (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
-        double ddx_Ths_dy_vs = eta_s / (dx[1] * dx[0]) *
+        double ddx_Ths_dy_us = 1.0 / (dx[1] * dx[0]) *
                                (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
                                 convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
-        double ddy_Ths_dx_vs =
-            -eta_s / (dx[0] * dx[1]) *
+        double ddy_Ths_dx_us =
+            1.0 / (dx[0] * dx[1]) *
             (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
              convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
+        double visc_stress_s = (2.0 * eta_s + lambda_s) * ddy_Ths_dy_vs + eta_s * ddx_Ths_dy_us +
+                               eta_s * ddx_Ths_dx_vs + lambda_s * ddy_Ths_dx_us;
         double drag_s = -(*xi_data)(idx) * ((*us_data)(idx) - (*un_data)(idx));
         double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_us_data)(idx) = D_u * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs + drag_s) +
-                            D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) =
+            D_u * (visc_stress_s + drag_s) + D_p * (pressure_s) + C * convertToThs(thn_lower) * (*us_data)(idx);
     }
 }
 
