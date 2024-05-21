@@ -7,14 +7,16 @@ namespace multiphase
 {
 struct MultiphaseParameters
 {
-    double rho;
+    double rho = std::numeric_limits<double>::quiet_NaN();
 
-    double eta_n;
-    double eta_s;
+    double eta_n = std::numeric_limits<double>::quiet_NaN();
+    double eta_s = std::numeric_limits<double>::quiet_NaN();
+    double lambda_n = std::numeric_limits<double>::quiet_NaN();
+    double lambda_s = std::numeric_limits<double>::quiet_NaN();
 
-    double xi;
-    double nu_n;
-    double nu_s;
+    double xi = std::numeric_limits<double>::quiet_NaN();
+    double nu_n = std::numeric_limits<double>::quiet_NaN();
+    double nu_s = std::numeric_limits<double>::quiet_NaN();
 
     int xi_idx = IBTK::invalid_index;
 

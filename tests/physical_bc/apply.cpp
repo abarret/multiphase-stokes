@@ -299,6 +299,8 @@ main(int argc, char* argv[])
         }
         params.eta_n = input_db->getDouble("ETAN");
         params.eta_s = input_db->getDouble("ETAS");
+        params.lambda_n = -params.eta_n;
+        params.lambda_s = -params.eta_s;
         MultiphaseStaggeredStokesOperator stokes_op("stokes_op", false, params);
         stokes_op.setCandDCoefficients(C, D);
         stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);

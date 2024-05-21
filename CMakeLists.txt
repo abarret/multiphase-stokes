@@ -44,7 +44,7 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/cmake/MultiphaseConfig.cmake
 	${CMAKE_CURRENT_BINARY_DIR}/cmake/MultiphaseConfigVersion.cmake
 	DESTINATION ${INSTALL_CONFIGDIR})
 
-SET(DIRS smooth frm physical_bc convective_op ib_ex ib_peristalsis)
+SET(DIRS smooth frm physical_bc convective_op ib_ex ib_peristalsis swelling)
 FOREACH(_dir ${DIRS})
    ADD_SUBDIRECTORY(${_dir})
 ENDFOREACH()

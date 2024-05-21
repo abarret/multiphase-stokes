@@ -68,108 +68,113 @@
 
 extern "C"
 {
-    void R_B_G_S(const double*, // dx
-                 const int&,    // ilower0
-                 const int&,    // iupper0
-                 const int&,    // ilower1
-                 const int&,    // iupper1
-                 double* const, // un_data_0
-                 double* const, // un_data_1
-                 const int&,    // un_gcw
-                 double* const, // us_data_0
-                 double* const, // us_data_0
-                 const int&,    // us_gcw
-                 double* const, // p_data_
-                 const int&,    // p_gcw
-                 double* const, // f_p_data
-                 const int&,    // f_p_gcw
-                 double* const, // f_un_data_0
-                 double* const, // f_un_data_1
-                 const int&,    // f_un_gcw
-                 double* const, // f_us_data_0
-                 double* const, // f_us_data_1
-                 const int&,    // f_us_gcw
-                 double* const, // thn_data
-                 const int&,    // thn_gcw
-                 const double&, // eta_n    // whatever will be passed in will be treated as a reference to a double
-                 const double&, // eta_s    // telling the compiler that the function is expecting a reference
-                 const double&, // nu_n
-                 const double&, // nu_s
-                 const double&, // xi
-                 const double&, // w = under relaxation factor
-                 const double&, // C in C*u term
-                 const double&, // D
-                 const int&);   // red_or_black
+    void R_B_G_S(const double*,             // dx
+                 const int&,                // ilower0
+                 const int&,                // iupper0
+                 const int&,                // ilower1
+                 const int&,                // iupper1
+                 double* const,             // un_data_0
+                 double* const,             // un_data_1
+                 const int&,                // un_gcw
+                 double* const,             // us_data_0
+                 double* const,             // us_data_0
+                 const int&,                // us_gcw
+                 double* const,             // p_data_
+                 const int&,                // p_gcw
+                 double* const,             // f_p_data
+                 const int&,                // f_p_gcw
+                 double* const,             // f_un_data_0
+                 double* const,             // f_un_data_1
+                 const int&,                // f_un_gcw
+                 double* const,             // f_us_data_0
+                 double* const,             // f_us_data_1
+                 const int&,                // f_us_gcw
+                 double* const,             // thn_data
+                 const int&,                // thn_gcw
+                 const double&,             // eta_n
+                 const double&,             // eta_s
+                 const double&,             // lambda_n
+                 const double&,             // lambda_s
+                 const double&,             // nu_n
+                 const double&,             // nu_s
+                 const double&,             // xi
+                 const double&,             // w = under relaxation factor
+                 const double&,             // C in C*u term
+                 const double&,             // D
+                 const int&);               // red_or_black
 
-    void R_B_G_S_mask(const double*, // dx
-                      const int&,    // ilower0
-                      const int&,    // iupper0
-                      const int&,    // ilower1
-                      const int&,    // iupper1
-                      double* const, // un_data_0
-                      double* const, // un_data_1
-                      const int&,    // un_gcw
-                      double* const, // us_data_0
-                      double* const, // us_data_0
-                      const int&,    // us_gcw
-                      double* const, // p_data_
-                      const int&,    // p_gcw
-                      double* const, // f_p_data
-                      const int&,    // f_p_gcw
-                      double* const, // f_un_data_0
-                      double* const, // f_un_data_1
-                      const int&,    // f_un_gcw
-                      double* const, // f_us_data_0
-                      double* const, // f_us_data_1
-                      const int&,    // f_us_gcw
-                      double* const, // thn_data
-                      const int&,    // thn_gcw
-                      const double&, // eta_n    // whatever will be passed in will be treated as a reference to a
-                                     // double
-                      const double&, // eta_s    // telling the compiler that the function is expecting a reference
-                      const double&, // nu_n
-                      const double&, // nu_s
-                      const double&, // xi
-                      const double&, // w = under relaxation factor
-                      const double&, // C in C*u term
-                      const double&, // D
-                      const int&,    // red_or_black
-                      const int*,    // mask_0
-                      const int*,    // mask_1
-                      const int&);   // mask_gcw
+    void R_B_G_S_mask(const double*,        // dx
+                      const int&,           // ilower0
+                      const int&,           // iupper0
+                      const int&,           // ilower1
+                      const int&,           // iupper1
+                      double* const,        // un_data_0
+                      double* const,        // un_data_1
+                      const int&,           // un_gcw
+                      double* const,        // us_data_0
+                      double* const,        // us_data_0
+                      const int&,           // us_gcw
+                      double* const,        // p_data_
+                      const int&,           // p_gcw
+                      double* const,        // f_p_data
+                      const int&,           // f_p_gcw
+                      double* const,        // f_un_data_0
+                      double* const,        // f_un_data_1
+                      const int&,           // f_un_gcw
+                      double* const,        // f_us_data_0
+                      double* const,        // f_us_data_1
+                      const int&,           // f_us_gcw
+                      double* const,        // thn_data
+                      const int&,           // thn_gcw
+                      const double&,        // eta_n
+                      const double&,        // eta_s
+                      const double&,        // lambda_n
+                      const double&,        // lambda_s
+                      const double&,        // nu_n
+                      const double&,        // nu_s
+                      const double&,        // xi
+                      const double&,        // w = under relaxation factor
+                      const double&,        // C in C*u term
+                      const double&,        // D
+                      const int&,           // red_or_black
+                      const int*,           // mask_0
+                      const int*,           // mask_1
+                      const int&);          // mask_gcw
 
-    void R_B_G_S_var_xi(const double*, // dx
-                        const int&,    // ilower0
-                        const int&,    // iupper0
-                        const int&,    // ilower1
-                        const int&,    // iupper1
-                        double* const, // un_data_0
-                        double* const, // un_data_1
-                        const int&,    // un_gcw
-                        double* const, // us_data_0
-                        double* const, // us_data_0
-                        const int&,    // us_gcw
-                        double* const, // p_data_
-                        const int&,    // p_gcw
-                        double* const, // f_p_data
-                        const int&,    // f_p_gcw
-                        double* const, // f_un_data_0
-                        double* const, // f_un_data_1
-                        const int&,    // f_un_gcw
-                        double* const, // f_us_data_0
-                        double* const, // f_us_data_1
-                        const int&,    // f_us_gcw
-                        double* const, // thn_data
-                        const int&,    // thn_gcw
-                        const double&, // eta_n
-                        const double&, // eta_s
-                        double* const, // xi_0
-                        double* const, // xi_1
-                        const int&,    // xi_gcw
-                        const double&, // w = under relaxation factor
-                        const double&, // C in C*u term
-                        const double&, // D
-                        const int&);   // red_or_black
+    void R_B_G_S_var_xi(const double*,      // dx
+                        const int&,         // ilower0
+                        const int&,         // iupper0
+                        const int&,         // ilower1
+                        const int&,         // iupper1
+                        double* const,      // un_data_0
+                        double* const,      // un_data_1
+                        const int&,         // un_gcw
+                        double* const,      // us_data_0
+                        double* const,      // us_data_0
+                        const int&,         // us_gcw
+                        double* const,      // p_data_
+                        const int&,         // p_gcw
+                        double* const,      // f_p_data
+                        const int&,         // f_p_gcw
+                        double* const,      // f_un_data_0
+                        double* const,      // f_un_data_1
+                        const int&,         // f_un_gcw
+                        double* const,      // f_us_data_0
+                        double* const,      // f_us_data_1
+                        const int&,         // f_us_gcw
+                        double* const,      // thn_data
+                        const int&,         // thn_gcw
+                        const double&,      // eta_n
+                        const double&,      // eta_s
+                        const double&,      // lambda_n
+                        const double&,      // lambda_s
+                        double* const,      // xi_0
+                        double* const,      // xi_1
+                        const int&,         // xi_gcw
+                        const double&,      // w = under relaxation factor
+                        const double&,      // C in C*u term
+                        const double&,      // D
+                        const int&);        // red_or_black
 
     void R_B_G_S_var_xi_mask(const double*, // dx
                              const int&,    // ilower0
@@ -196,6 +201,8 @@ extern "C"
                              const int&,    // thn_gcw
                              const double&, // eta_n
                              const double&, // eta_s
+                             const double&, // lambda_n
+                             const double&, // lambda_s
                              double* const, // xi_0
                              double* const, // xi_1
                              const int&,    // xi_gcw
@@ -727,6 +734,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                         thn_gcw.min(),
                                         d_params.eta_n,
                                         d_params.eta_s,
+                                        d_params.lambda_n,
+                                        d_params.lambda_s,
                                         xi_data->getPointer(0),
                                         xi_data->getPointer(1),
                                         xi_data->getGhostCellWidth().min(),
@@ -765,6 +774,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                  thn_gcw.min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
+                                 d_params.lambda_n,
+                                 d_params.lambda_s,
                                  d_params.nu_n,
                                  d_params.nu_s,
                                  d_params.xi,
@@ -807,6 +818,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                    thn_gcw.min(),
                                    d_params.eta_n,
                                    d_params.eta_s,
+                                   d_params.lambda_n,
+                                   d_params.lambda_s,
                                    xi_data->getPointer(0),
                                    xi_data->getPointer(1),
                                    xi_data->getGhostCellWidth().min(),
@@ -842,6 +855,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                             thn_gcw.min(),
                             d_params.eta_n,
                             d_params.eta_s,
+                            d_params.lambda_n,
+                            d_params.lambda_s,
                             d_params.nu_n,
                             d_params.nu_s,
                             d_params.xi,
