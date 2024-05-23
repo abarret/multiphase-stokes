@@ -299,17 +299,6 @@ public:
                                         bool allocate_data) override;
 
     /*!
-     * Prepare to advance the data from current_time to new_time.
-     */
-    void preprocessIntegrateHierarchy(double current_time, double new_time, int num_cycles = 1) override;
-
-    /*!
-     * Synchronously advance each level in the hierarchy over the given time
-     * increment.
-     */
-    void integrateHierarchySpecialized(double current_time, double new_time, int cycle_num = 0) override;
-
-    /*!
      * Clean up data following call(s) to integrateHierarchy().
      */
     void postprocessIntegrateHierarchy(double current_time,
@@ -335,9 +324,6 @@ public:
                                           bool initial_time,
                                           bool uses_richardson_extrapolation_too);
 
-    void regridHierarchyBeginSpecialized() override;
-    void initializeCompositeHierarchyDataSpecialized(double init_data_time, bool initial_time) override;
-
 protected:
     void setupPlotDataSpecialized() override;
 
@@ -346,57 +332,7 @@ protected:
      */
     double getMaximumTimeStepSizeSpecialized() override;
 
-private:
     bool isVariableDrag() const;
-
-    void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
-                        double current_time,
-                        double new_time,
-                        int un_cur_idx,
-                        int us_cur_idx,
-                        int thn_cur_idx,
-                        int un_new_idx,
-                        int us_new_idx,
-                        int thn_new_idx);
-    /*!
-     * Adds all body forces to the provided SAMRAI vector. Assumes first component of f_vec is the network forces and
-     * the second ocmponent is the solvent forces.
-     *
-     * The volume fraction index thn_idx must have at least one layer of ghost cells to account for scaling the forces.
-     */
-    void addBodyForces(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
-                       double current_time,
-                       double new_time,
-                       int thn_cur_idx,
-                       int thn_half_idx,
-                       int thn_new_idx);
-
-    /*!
-     * \brief Default constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     */
-    MultiphaseStaggeredHierarchyIntegrator() = delete;
-
-    /*!
-     * \brief Copy constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     *
-     * \param from The value to copy to this object.
-     */
-    MultiphaseStaggeredHierarchyIntegrator(const MultiphaseStaggeredHierarchyIntegrator& from) = delete;
-
-    /*!
-     * \brief Assignment operator.
-     *
-     * \note This operator is not implemented and should not be used.
-     *
-     * \param that The value to assign to this object.
-     *
-     * \return A reference to this object.
-     */
-    MultiphaseStaggeredHierarchyIntegrator& operator=(const MultiphaseStaggeredHierarchyIntegrator& that) = delete;
 
     /*!
      * \brief A helper function to set the volume fractions. Sets thn_scr_idx = 0.5 * (thn_cur_idx + thn_new_idx).
@@ -443,29 +379,6 @@ private:
     SAMRAI::tbox::Array<double> d_abs_grad_thresh, d_rel_grad_thresh;
     double d_max_grad_thn = std::numeric_limits<double>::quiet_NaN();
 
-    /*!
-     * Vectors
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
-    std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
-    bool d_has_vel_nullspace = false, d_has_pressure_nullspace = true;
-
-    /*!
-     * Solver information
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_solver_db;
-    SAMRAI::tbox::Pointer<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesOperator> d_stokes_op;
-
-    /*!
-     * Preconditioner information
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
-    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
-    double d_w = std::numeric_limits<double>::quiet_NaN();
-    bool d_use_preconditioner = true;
 
     /*!
      * Drawing information.
@@ -492,25 +405,6 @@ private:
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
 
-    bool d_make_div_rhs_sum_to_zero = true;
-
-    /*!
-     * Convective operator
-     */
-    std::unique_ptr<MultiphaseConvectiveManager> d_convec_op;
-    IBAMR::LimiterType d_convec_limiter_type = IBAMR::LimiterType::UNKNOWN_LIMITER_TYPE;
-
-    /*!
-     * AB2 patch index for convective operator
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_Nn_old_var, d_Ns_old_var;
-
-    /*!
-     * BDF2 patch data. Note that for second order accuracy, we need
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_old_var, d_us_old_var;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_fn_old_var, d_fs_old_var;
-
     // Scratch force index
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
 
@@ -522,8 +416,6 @@ private:
     // Variable drag coefficient.
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
-
-    TimeSteppingType d_viscous_ts_type = TimeSteppingType::TRAPEZOIDAL_RULE;
 
     bool d_use_accel_ts = false;
     double d_accel_ts_safety_fac = 0.1;
