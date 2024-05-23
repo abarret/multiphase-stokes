@@ -1,4 +1,4 @@
-#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStandardHierarchyIntegrator.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
@@ -30,7 +30,7 @@ class DragCoefficient : public CartGridFunction
 {
 public:
     DragCoefficient(std::string object_name,
-                    Pointer<MultiphaseStaggeredHierarchyIntegrator> integrator,
+                    Pointer<MultiphaseStandardHierarchyIntegrator> integrator,
                     double xi,
                     double nu)
         : CartGridFunction(std::move(object_name)), d_integrator(integrator), d_xi(xi), d_nu(nu)
@@ -100,7 +100,7 @@ public:
     }
 
 private:
-    Pointer<MultiphaseStaggeredHierarchyIntegrator> d_integrator;
+    Pointer<MultiphaseStandardHierarchyIntegrator> d_integrator;
     double d_xi = std::numeric_limits<double>::quiet_NaN();
     double d_nu = std::numeric_limits<double>::quiet_NaN();
 };
@@ -131,10 +131,8 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
-            "FluidSolver",
-            app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
-            false);
+        Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator = new MultiphaseStandardHierarchyIntegrator(
+            "FluidSolver", app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"), false);
         grid_geometry->addSpatialRefineOperator(new CartCellDoubleQuadraticRefine()); // refine op for cell-centered
                                                                                       // variables
         grid_geometry->addSpatialRefineOperator(new CartSideDoubleRT0Refine()); // refine op for side-centered variables

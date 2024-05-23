@@ -1,5 +1,5 @@
 #include "multiphase/CFMultiphaseOldroydB.h"
-#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStandardHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/CFINSForcing.h>
@@ -30,7 +30,7 @@ using namespace multiphase;
 
 // Function prototypes
 void output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
-                 Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
+                 Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
                  Pointer<CFINSForcing> conformation_tensor_handler,
                  const int iteration_num,
@@ -63,7 +63,7 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+        Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator = new MultiphaseStandardHierarchyIntegrator(
             "FluidSolver",
             app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
             true /*register_for_restart*/);
@@ -298,7 +298,7 @@ main(int argc, char* argv[])
 
 void
 output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
-            Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
+            Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator,
             Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
             Pointer<CFINSForcing> conformation_tensor_handler,
             const int iteration_num,

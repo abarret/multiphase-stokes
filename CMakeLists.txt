@@ -15,6 +15,7 @@ SET(MULTIPHASE_SRC
     src/IBMultiphaseHierarchyIntegrator.cpp
     src/MultiphaseConvectiveManager.cpp
     src/MultiphaseStaggeredHierarchyIntegrator.cpp
+    src/MultiphaseStandardHierarchyIntegrator.cpp
     src/MultiphaseStaggeredStokesBoxRelaxationFACOperator.cpp
     src/MultiphaseStaggeredStokesOperator.cpp
     src/RBGS.f
