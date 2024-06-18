@@ -9,6 +9,7 @@
 #include "multiphase/MultiphaseConvectiveManager.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
+#include "multiphase/utility_functions.h"
 
 #include "ibamr/INSHierarchyIntegrator.h"
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
@@ -273,6 +274,13 @@ private:
                         int us_new_idx,
                         int thn_new_idx);
 
+    void addBodyForces(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
+                       double current_time,
+                       double new_time,
+                       int thn_cur_idx,
+                       int thn_half_idx,
+                       int thn_new_idx);
+
     /*!
      * \brief Default constructor.
      *
@@ -392,6 +400,12 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_Nn_old_var, d_Ns_old_var;
 
+    /*!
+     * BDF2 patch data. Note that for second order accuracy, we need
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_old_var, d_us_old_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_fn_old_var, d_fs_old_var;
+
     // Scratch force index
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
 
@@ -403,6 +417,8 @@ private:
     // Variable drag coefficient.
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
+
+    TimeSteppingType d_viscous_ts_type = TimeSteppingType::TRAPEZOIDAL_RULE;
 };
 } // namespace multiphase
 

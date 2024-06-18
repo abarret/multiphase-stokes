@@ -134,9 +134,10 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
                              "CONSTANT_REFINE",
                              register_for_restart)
 {
+    // We do not use d_viscous_time_stepping_type. Use d_viscous_ts_type instead (allows for BDF2).
+    d_viscous_time_stepping_type = UNKNOWN_TIME_STEPPING_TYPE;
     if (input_db->keyExists("viscous_time_stepping_type"))
-        d_viscous_time_stepping_type =
-            IBAMR::string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
+        d_viscous_ts_type = string_to_enum<TimeSteppingType>(input_db->getString("viscous_time_stepping_type"));
     if (input_db->keyExists("rho")) d_params.rho = input_db->getDouble("rho");
     if (input_db->keyExists("eta_n")) d_params.eta_n = input_db->getDouble("eta_n");
     if (input_db->keyExists("eta_s")) d_params.eta_s = input_db->getDouble("eta_s");
@@ -152,8 +153,9 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
     d_has_vel_nullspace = input_db->getBoolWithDefault("has_vel_nullspace", d_has_vel_nullspace);
     d_convec_limiter_type = IBAMR::string_to_enum<LimiterType>(
         input_db->getStringWithDefault("convec_limiter_type", IBAMR::enum_to_string(d_convec_limiter_type)));
-    d_convective_time_stepping_type =
-        IBAMR::string_to_enum<TimeSteppingType>(input_db->getStringWithDefault("convec_ts_type", "FORWARD_EULER"));
+    d_convective_time_stepping_type = IBAMR::string_to_enum<IBAMR::TimeSteppingType>(
+        input_db->getStringWithDefault("convec_ts_type", "FORWARD_EULER"));
+
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
@@ -167,11 +169,23 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
     d_us_bc_coefs.resize(NDIM, nullptr);
 
     // Make sure viscous time stepping type is valid for this class
-    if (d_viscous_time_stepping_type != TimeSteppingType::BACKWARD_EULER &&
-        d_viscous_time_stepping_type != TimeSteppingType::TRAPEZOIDAL_RULE)
+    if (d_viscous_ts_type != TimeSteppingType::BACKWARD_EULER &&
+        d_viscous_ts_type != TimeSteppingType::TRAPEZOIDAL_RULE && d_viscous_ts_type != TimeSteppingType::BDF2)
         TBOX_ERROR(d_object_name + ": Viscous time step type " +
-                   IBAMR::enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
-                   " not valid. Must use BACKWARD_EULER or TRAPEZOIDAL_RULE");
+                   IBAMR::enum_to_string<TimeSteppingType>(d_viscous_ts_type) +
+                   " not valid. Must use BACKWARD_EULER, TRAPEZOIDAL_RULE, or BDF2");
+
+    // Note we only support convective operating type of AB2 and forward Euler if we are using BDF for viscosity
+    if (d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        if (d_convective_time_stepping_type != ADAMS_BASHFORTH && d_convective_time_stepping_type != FORWARD_EULER)
+        {
+            TBOX_ERROR(d_object_name +
+                           ": Viscous operator is set as BDF2. We only support convective operators of Adams Bashforth "
+                           "or forward Euler. Choice of "
+                       << IBAMR::enum_to_string(d_convective_time_stepping_type) << " is invalid.\n");
+        }
+    }
 
     return;
 } // MultiphaseStaggeredHierarchyIntegrator
@@ -468,6 +482,20 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
         int Nn_idx, Ns_idx;
         registerVariable(Nn_idx, d_Nn_old_var, 0, getCurrentContext());
         registerVariable(Ns_idx, d_Ns_old_var, 0, getCurrentContext());
+    }
+
+    // We only register old velocity variables if we are using BDF2
+    if (d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        d_un_old_var = new SideVariable<NDIM, double>(d_object_name + "::un_old");
+        d_us_old_var = new SideVariable<NDIM, double>(d_object_name + "::us_old");
+        d_fn_old_var = new SideVariable<NDIM, double>(d_object_name + "::fn_old");
+        d_fs_old_var = new SideVariable<NDIM, double>(d_object_name + "::fs_old");
+        int un_old_idx, us_old_idx, fn_old_idx, fs_old_idx;
+        registerVariable(un_old_idx, d_un_old_var, 0, getCurrentContext());
+        registerVariable(us_old_idx, d_us_old_var, 0, getCurrentContext());
+        registerVariable(fn_old_idx, d_fn_old_var, 0, getCurrentContext());
+        registerVariable(fs_old_idx, d_fs_old_var, 0, getCurrentContext());
     }
 
     // Register variables with the integrator. Those with states (Velocities) have associated current, new, and scratch
@@ -848,24 +876,24 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     // RHS = f(n) + C*theta_i(n)*u_i(n) + D1*(viscous + drag) for  i = n, s
     double D1 = std::numeric_limits<double>::signaling_NaN();
     double D2 = std::numeric_limits<double>::signaling_NaN();
-    const double C = d_params.rho / dt;
+    double C = d_params.rho / dt;
 
-    switch (d_viscous_time_stepping_type)
+    switch (d_viscous_ts_type)
     {
-    case TRAPEZOIDAL_RULE:
+    case TimeSteppingType::TRAPEZOIDAL_RULE:
         D1 = 0.5;
         D2 = -0.5;
         break;
 
-    case BACKWARD_EULER:
+    case TimeSteppingType::BACKWARD_EULER:
+    case TimeSteppingType::BDF2:
         D1 = 0.0;
         D2 = -1.0;
         break;
 
     default:
-        TBOX_ERROR("Unknown time stepping type " +
-                   IBAMR::enum_to_string<TimeSteppingType>(d_viscous_time_stepping_type) +
-                   ". Valid options are BACKWARD_EULER and TRAPEZOIDAL_RULE.");
+        TBOX_ERROR("Unknown time stepping type " + IBAMR::enum_to_string<TimeSteppingType>(d_viscous_ts_type) +
+                   ". Valid options are BACKWARD_EULER, TRAPEZOIDAL_RULE, or BDF2.");
     }
 
     // Set drag coefficient if necessary
@@ -875,19 +903,55 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
         d_xi_fcn->setDataOnPatchHierarchy(xi_idx, d_xi_var, d_hierarchy, eval_time, false, coarsest_ln, finest_ln);
     }
-
-    MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
+    // Boundary Condition helper.
     Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-    RHS_op.setPhysicalBoundaryHelper(bc_helper);
-    RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
-    // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions in
-    // the RHS.
-    RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
-    RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
 
-    // Store results of applying stokes operator in rhs_vec
-    RHS_op.initializeOperatorState(*d_sol_vec, *d_rhs_vec);
-    RHS_op.apply(*d_sol_vec, *d_rhs_vec);
+    if (getIntegratorStep() != 0 && d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        // If the integrator step is 0 (so initial time step), we reduce to backward Euler, and this block is skipped.
+        // Note that the old velocities are already multiplied by volume fraction.
+        const int un_old_idx = var_db->mapVariableAndContextToIndex(d_un_old_var, getCurrentContext());
+        const int us_old_idx = var_db->mapVariableAndContextToIndex(d_us_old_var, getCurrentContext());
+
+        const int rhs_un_idx = d_rhs_vec->getComponentDescriptorIndex(0);
+        const int rhs_us_idx = d_rhs_vec->getComponentDescriptorIndex(1);
+
+        double alpha = d_dt_previous[0] / dt;
+        C = d_params.rho * (2.0 + alpha) / (dt * (1.0 + alpha));
+
+        d_hier_sc_data_ops->scale(rhs_un_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), un_old_idx);
+        d_hier_sc_data_ops->scale(rhs_us_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), us_old_idx);
+
+        // Set Thn boundary conditions
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(1);
+        ghost_cell_comp[0] =
+            ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
+        HierarchyGhostCellInterpolation hier_ghost_fill;
+        hier_ghost_fill.initializeOperatorState(
+            ghost_cell_comp, d_hierarchy, 0 /*coarsest_ln*/, d_hierarchy->getFinestLevelNumber());
+        hier_ghost_fill.fillData(current_time);
+
+        multiply_sc_and_thn(d_fn_scr_idx, un_cur_idx, thn_cur_idx, d_hierarchy);
+        multiply_sc_and_ths(d_fs_scr_idx, us_cur_idx, thn_cur_idx, d_hierarchy);
+
+        d_hier_sc_data_ops->axpy(rhs_un_idx, d_params.rho * (alpha + 1.0) / (dt * alpha), d_fn_scr_idx, rhs_un_idx);
+        d_hier_sc_data_ops->axpy(rhs_us_idx, d_params.rho * (alpha + 1.0) / (dt * alpha), d_fs_scr_idx, rhs_us_idx);
+    }
+    else
+    {
+        MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
+        RHS_op.setPhysicalBoundaryHelper(bc_helper);
+        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, nullptr, d_thn_bc_coef);
+        // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions
+        // in the RHS.
+        RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
+        RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
+
+        // Store results of applying stokes operator in rhs_vec
+        RHS_op.initializeOperatorState(*d_sol_vec, *d_rhs_vec);
+        RHS_op.apply(*d_sol_vec, *d_rhs_vec);
+    }
 
     // Set up the operators and solvers needed to solve the linear system.
     d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params);
@@ -1045,43 +1109,8 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_temp");
     f_vec->allocateVectorData(current_time);
     f_vec->setToScalar(0.0);
-    // Start with forces that do not need to be scaled.
-    if (d_f_un_fcn)
-    {
-        d_f_un_fcn->setDataOnPatchHierarchy(d_fn_scr_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_fcn)
-    {
-        d_f_us_fcn->setDataOnPatchHierarchy(d_fs_scr_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
-    }
 
-    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
-    {
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp = { ITC(
-            thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_fill.fillData(half_time);
-    }
-    if (d_f_un_thn_fcn)
-    {
-        d_f_un_thn_fcn->setDataOnPatchHierarchy(d_fn_scr_idx, d_f_un_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_thn(d_fn_scr_idx, d_fn_scr_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
-    }
-    if (d_f_us_ths_fcn)
-    {
-        d_f_us_ths_fcn->setDataOnPatchHierarchy(d_fs_scr_idx, d_f_us_sc_var, d_hierarchy, half_time);
-        multiply_sc_and_ths(d_fs_scr_idx, d_fs_scr_idx, thn_scr_idx, d_hierarchy);
-        d_hier_sc_data_ops->add(
-            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
-    }
+    addBodyForces(f_vec, current_time, new_time, thn_cur_idx, thn_scr_idx, thn_new_idx);
     if (!d_creeping_flow)
     {
         approxConvecOp(
@@ -1178,12 +1207,31 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
 
     // Replace N_old data if necessary
-    if (is_multistep_time_stepping_type(d_convective_time_stepping_type))
+    if (!d_creeping_flow && is_multistep_time_stepping_type(d_convective_time_stepping_type))
     {
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         const int Nn_old_idx = var_db->mapVariableAndContextToIndex(d_Nn_old_var, getCurrentContext());
         const int Ns_old_idx = var_db->mapVariableAndContextToIndex(d_Ns_old_var, getCurrentContext());
         d_convec_op->fillWithConvectiveOperator(Nn_old_idx, Ns_old_idx);
+    }
+
+    if (d_viscous_ts_type == TimeSteppingType::BDF2)
+    {
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int un_old_idx = var_db->mapVariableAndContextToIndex(d_un_old_var, getCurrentContext());
+        const int us_old_idx = var_db->mapVariableAndContextToIndex(d_us_old_var, getCurrentContext());
+        const int fn_old_idx = var_db->mapVariableAndContextToIndex(d_fn_old_var, getCurrentContext());
+        const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getCurrentContext());
+        const int un_cur_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
+        const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
+        const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+        const int fn_cur_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+        const int fs_cur_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+
+        multiply_sc_and_thn(un_old_idx, un_cur_idx, thn_cur_idx, d_hierarchy);
+        multiply_sc_and_ths(us_old_idx, us_cur_idx, thn_cur_idx, d_hierarchy);
+        d_hier_sc_data_ops->copyData(fn_old_idx, fn_cur_idx);
+        d_hier_sc_data_ops->copyData(fs_old_idx, fs_cur_idx);
     }
 
     // Calculate gradient of thn for grid cell tagging.
@@ -1408,7 +1456,7 @@ MultiphaseStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorReal<
 {
     // Note that MultiphaseConvectiveOperator is not smart enough to handle multistep time steppers. Therefore, we
     // have to do something special if we are using a multistep algorithm.
-    TimeSteppingType ts_type = d_convective_time_stepping_type;
+    IBAMR::TimeSteppingType ts_type = d_convective_time_stepping_type;
     if (getIntegratorStep() == 0 && is_multistep_time_stepping_type(ts_type))
         ts_type = d_init_convective_time_stepping_type;
     if (ts_type != ADAMS_BASHFORTH)
@@ -1438,14 +1486,22 @@ MultiphaseStaggeredHierarchyIntegrator::approxConvecOp(Pointer<SAMRAIVectorReal<
                                                    un_new_idx,
                                                    us_new_idx,
                                                    thn_new_idx);
-        // Now add previous time step.
+        // Now add previous time step. Note if we are using BDF2 for viscosity, we require different coefficients.
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         const int Nn_old_idx = var_db->mapVariableAndContextToIndex(d_Nn_old_var, getCurrentContext());
         const int Ns_old_idx = var_db->mapVariableAndContextToIndex(d_Ns_old_var, getCurrentContext());
         const double dt = new_time - current_time;
-        const double omega = dt / d_dt_previous[0];
-        d_hier_sc_data_ops->linearSum(d_fn_scr_idx, 1.0 + 0.5 * omega, d_fn_scr_idx, -0.5 * omega, Nn_old_idx);
-        d_hier_sc_data_ops->linearSum(d_fs_scr_idx, 1.0 + 0.5 * omega, d_fs_scr_idx, -0.5 * omega, Ns_old_idx);
+        const double alpha = d_dt_previous[0] / dt;
+        if (d_viscous_ts_type == TimeSteppingType::BDF2)
+        {
+            d_hier_sc_data_ops->linearSum(d_fn_scr_idx, 1.0 + 1.0 / alpha, d_fn_scr_idx, -1.0 / alpha, Nn_old_idx);
+            d_hier_sc_data_ops->linearSum(d_fs_scr_idx, 1.0 + 1.0 / alpha, d_fs_scr_idx, -1.0 / alpha, Ns_old_idx);
+        }
+        else
+        {
+            d_hier_sc_data_ops->linearSum(d_fn_scr_idx, 1.0 + 0.5 / alpha, d_fn_scr_idx, -0.5 / alpha, Nn_old_idx);
+            d_hier_sc_data_ops->linearSum(d_fs_scr_idx, 1.0 + 0.5 / alpha, d_fs_scr_idx, -0.5 / alpha, Ns_old_idx);
+        }
     }
     d_hier_sc_data_ops->linearSum(
         f_vec->getComponentDescriptorIndex(0), 1.0, f_vec->getComponentDescriptorIndex(0), -d_params.rho, d_fn_scr_idx);
@@ -1457,6 +1513,103 @@ bool
 MultiphaseStaggeredHierarchyIntegrator::isVariableDrag() const
 {
     return d_params.isVariableDrag();
+}
+
+void
+MultiphaseStaggeredHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<NDIM, double>>& f_vec,
+                                                      const double current_time,
+                                                      const double new_time,
+                                                      const int thn_cur_idx,
+                                                      const int thn_half_idx,
+                                                      const int thn_new_idx)
+{
+    // If we are using BDF2, then we evaluate the forces using AB2
+    TimeSteppingType ts_type = d_viscous_ts_type;
+    if (getIntegratorStep() == 0) ts_type = TimeSteppingType::BACKWARD_EULER;
+    double eval_time = ts_type == TimeSteppingType::BDF2 ? current_time : 0.5 * (current_time + new_time);
+    double dt = new_time - current_time;
+    double alpha = ts_type == TimeSteppingType::BDF2 ? d_dt_previous[0] / dt : 1.0;
+    const int thn_idx = ts_type == TimeSteppingType::BDF2 ? thn_cur_idx : thn_half_idx;
+
+    // Create some scratch indices for accumulation
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int fn_cloned_idx = var_db->registerClonedPatchDataIndex(d_f_un_sc_var, d_fn_scr_idx);
+    const int fs_cloned_idx = var_db->registerClonedPatchDataIndex(d_f_us_sc_var, d_fs_scr_idx);
+    allocate_patch_data(
+        { fn_cloned_idx, fs_cloned_idx }, d_hierarchy, eval_time, 0, d_hierarchy->getFinestLevelNumber());
+    d_hier_sc_data_ops->setToScalar(d_fn_scr_idx, 0.0);
+    d_hier_sc_data_ops->setToScalar(d_fs_scr_idx, 0.0);
+
+    // Start with forces that do not need to be scaled.
+    if (d_f_un_fcn)
+    {
+        d_f_un_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, fn_cloned_idx, d_fn_scr_idx);
+    }
+    if (d_f_us_fcn)
+    {
+        d_f_us_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
+    }
+
+    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
+    {
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp = { ITC(
+            thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
+        HierarchyGhostCellInterpolation ghost_fill;
+        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        ghost_fill.fillData(eval_time);
+    }
+    if (d_f_un_thn_fcn)
+    {
+        d_f_un_thn_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn(fn_cloned_idx, fn_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, fn_cloned_idx, d_fn_scr_idx);
+    }
+    if (d_f_us_ths_fcn)
+    {
+        d_f_us_ths_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_ths(fs_cloned_idx, fs_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
+    }
+
+    // Copy our accumulated forces into a permanent location
+    const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
+    const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
+    d_hier_sc_data_ops->copyData(fn_idx, d_fn_scr_idx);
+    d_hier_sc_data_ops->copyData(fs_idx, d_fs_scr_idx);
+
+    if (ts_type == TimeSteppingType::BDF2)
+    {
+        auto var_db = VariableDatabase<NDIM>::getDatabase();
+        const int fn_old_idx = var_db->mapVariableAndContextToIndex(d_fn_old_var, getCurrentContext());
+        const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getCurrentContext());
+        // Note old forces should already by scaled by volume fraction.
+        d_hier_sc_data_ops->axpy(
+            f_vec->getComponentDescriptorIndex(0), -1.0 / alpha, fn_old_idx, f_vec->getComponentDescriptorIndex(0));
+        d_hier_sc_data_ops->axpy(
+            f_vec->getComponentDescriptorIndex(1), -1.0 / alpha, fs_old_idx, f_vec->getComponentDescriptorIndex(1));
+        d_hier_sc_data_ops->axpy(f_vec->getComponentDescriptorIndex(0),
+                                 1.0 + 1.0 / alpha,
+                                 d_fn_scr_idx,
+                                 f_vec->getComponentDescriptorIndex(0));
+        d_hier_sc_data_ops->axpy(f_vec->getComponentDescriptorIndex(1),
+                                 1.0 + 1.0 / alpha,
+                                 d_fs_scr_idx,
+                                 f_vec->getComponentDescriptorIndex(1));
+    }
+    else
+    {
+        d_hier_sc_data_ops->add(
+            f_vec->getComponentDescriptorIndex(0), d_fn_scr_idx, f_vec->getComponentDescriptorIndex(0));
+        d_hier_sc_data_ops->add(
+            f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
+    }
+
+    deallocate_patch_data({ fn_cloned_idx, fs_cloned_idx }, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+    var_db->removePatchDataIndex(fn_cloned_idx);
+    var_db->removePatchDataIndex(fs_cloned_idx);
 }
 
 //////////////////////////////////////////////////////////////////////////////

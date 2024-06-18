@@ -185,6 +185,60 @@ void deallocate_patch_data(const int idx,
                            int finest_ln);
 //\}
 
+template <typename T>
+inline T
+string_to_enum(const std::string& /*val*/)
+{
+    TBOX_ERROR("UNSUPPORTED ENUM TYPE\n");
+    return -1;
+} // string_to_enum
+
+template <typename T>
+inline std::string
+enum_to_string(T /*val*/)
+{
+    TBOX_ERROR("UNSUPPORTED ENUM TYPE\n");
+    return "UNKNOWN";
+} // enum_to_string
+
+enum class TimeSteppingType
+{
+    ADAMS_BASHFORTH,
+    BACKWARD_EULER,
+    FORWARD_EULER,
+    MIDPOINT_RULE,
+    TRAPEZOIDAL_RULE,
+    BDF2,
+    UNKNOWN_TIME_STEPPING_TYPE = -1
+};
+
+template <>
+inline TimeSteppingType
+string_to_enum<TimeSteppingType>(const std::string& val)
+{
+    if (strcasecmp(val.c_str(), "ADAMS_BASHFORTH") == 0) return TimeSteppingType::ADAMS_BASHFORTH;
+    if (strcasecmp(val.c_str(), "BACKWARD_EULER") == 0) return TimeSteppingType::BACKWARD_EULER;
+    if (strcasecmp(val.c_str(), "FORWARD_EULER") == 0) return TimeSteppingType::FORWARD_EULER;
+    if (strcasecmp(val.c_str(), "MIDPOINT_RULE") == 0) return TimeSteppingType::MIDPOINT_RULE;
+    if (strcasecmp(val.c_str(), "TRAPEZOIDAL_RULE") == 0) return TimeSteppingType::TRAPEZOIDAL_RULE;
+    if (strcasecmp(val.c_str(), "CRANK_NICOLSON") == 0) return TimeSteppingType::TRAPEZOIDAL_RULE;
+    if (strcasecmp(val.c_str(), "BDF2") == 0) return TimeSteppingType::BDF2;
+    return TimeSteppingType::UNKNOWN_TIME_STEPPING_TYPE;
+} // string_to_enum
+
+template <>
+inline std::string
+enum_to_string<TimeSteppingType>(TimeSteppingType val)
+{
+    if (val == TimeSteppingType::ADAMS_BASHFORTH) return "ADAMS_BASHFORTH";
+    if (val == TimeSteppingType::BACKWARD_EULER) return "BACKWARD_EULER";
+    if (val == TimeSteppingType::FORWARD_EULER) return "FORWARD_EULER";
+    if (val == TimeSteppingType::MIDPOINT_RULE) return "MIDPOINT_RULE";
+    if (val == TimeSteppingType::TRAPEZOIDAL_RULE) return "TRAPEZOIDAL_RULE";
+    if (val == TimeSteppingType::BDF2) return "BDF2";
+    return "UNKNOWN_TIME_STEPPING_TYPE";
+} // enum_to_string
+
 } // namespace multiphase
 
 #include "multiphase/private/utility_functions_inc.h"
