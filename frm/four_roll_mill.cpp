@@ -98,6 +98,21 @@ main(int argc, char* argv[])
         ins_integrator->setViscosityCoefficient(eta_n, eta_s, l_n, l_s);
         ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
 
+        // If necessary, grab boundary conditions. Note we only use dirichlet conditions on the flow.
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs, us_bc_coefs;
+        if (grid_geometry->getPeriodicShift().min() == 0)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                std::string u_bc_coefs_name = "u_bc_coefs_" + std::to_string(d);
+                un_bc_coefs.push_back(new muParserRobinBcCoefs(
+                    "un_bc_coefs_" + std::to_string(d), input_db->getDatabase(u_bc_coefs_name), grid_geometry));
+                us_bc_coefs.push_back(new muParserRobinBcCoefs(
+                    "us_bc_coefs_" + std::to_string(d), input_db->getDatabase(u_bc_coefs_name), grid_geometry));
+            }
+        }
+        ins_integrator->registerPhysicalBoundaryConditions(un_bc_coefs, us_bc_coefs);
+
         // Set up visualizations
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
 
