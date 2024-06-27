@@ -44,7 +44,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_var;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
     double d_relaxation_time = std::numeric_limits<double>::quiet_NaN();
-    double d_viscosity = std::numeric_limits<double>::quiet_NaN();
+    double d_z = std::numeric_limits<double>::quiet_NaN();
 };
 } // namespace multiphase
 #endif // #ifndef included_CFMultiphaseOldroydB

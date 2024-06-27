@@ -18,7 +18,7 @@ CFMultiphaseOldroydB::CFMultiphaseOldroydB(std::string object_name,
     : CFStrategy(std::move(object_name)), d_thn_var(thn_var), d_thn_integrator(thn_integrator)
 {
     d_relaxation_time = input_db->getDouble("relaxation_time");
-    d_viscosity = input_db->getDouble("viscosity");
+    d_z = input_db->getDouble("z");
 } // CFMultiphaseOldroydB
 
 void
@@ -33,6 +33,21 @@ CFMultiphaseOldroydB::computeRelaxation(const int R_idx,
     const int coarsest_ln = 0;
     const int finest_ln = hierarchy->getFinestLevelNumber();
     const double l_inv = 1.0 / d_relaxation_time;
+
+    // Find thn_scr_idx.
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_var, d_thn_integrator->getCurrentContext());
+    const int thn_scr_idx = var_db->mapVariableAndContextToIndex(d_thn_var, d_thn_integrator->getScratchContext());
+    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_var, d_thn_integrator->getNewContext());
+    bool deallocate_after = !d_thn_integrator->isAllocatedPatchData(thn_scr_idx, coarsest_ln, finest_ln);
+    if (deallocate_after) d_thn_integrator->allocatePatchData(thn_scr_idx, data_time, coarsest_ln, finest_ln);
+
+    HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(hierarchy, coarsest_ln, finest_ln);
+    if (d_thn_integrator->isAllocatedPatchData(thn_new_idx, coarsest_ln, finest_ln))
+        hier_cc_data_ops.linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
+    else
+        hier_cc_data_ops.copyData(thn_scr_idx, thn_cur_idx);
+
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
@@ -42,18 +57,22 @@ CFMultiphaseOldroydB::computeRelaxation(const int R_idx,
 
             Pointer<CellData<NDIM, double>> R_data = patch->getPatchData(R_idx);
             Pointer<CellData<NDIM, double>> C_data = patch->getPatchData(C_idx);
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_scr_idx);
 
             for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
             {
                 const CellIndex<NDIM>& idx = ci();
+                const double z = d_z * (*thn_data)(idx);
                 // We could be using a different evolution type.
                 MatrixNd mat = convert_to_conformation_tensor(*C_data, idx, evolve_type);
-                (*R_data)(idx, 0) = l_inv * (1.0 - mat(0, 0));
-                (*R_data)(idx, 1) = l_inv * (1.0 - mat(1, 1));
+                (*R_data)(idx, 0) = l_inv * (0.5 * z - mat(0, 0));
+                (*R_data)(idx, 1) = l_inv * (0.5 * z - mat(1, 1));
                 (*R_data)(idx, 2) = l_inv * (-mat(0, 1));
             }
         }
     }
+
+    if (deallocate_after) d_thn_integrator->deallocatePatchData(thn_scr_idx, coarsest_ln, finest_ln);
 }
 
 void
@@ -110,11 +129,12 @@ CFMultiphaseOldroydB::computeStress(const int sig_idx,
             for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
             {
                 const CellIndex<NDIM>& idx = ci();
+                const double thn = (*thn_data)(idx);
                 // Convert conformation to stress in place.
                 // Note this acts on C, not a decomposition of C.
-                (*C_data)(idx, 0) = (*thn_data)(idx)*d_viscosity / d_relaxation_time * ((*C_data)(idx, 0) - 1.0);
-                (*C_data)(idx, 1) = (*thn_data)(idx)*d_viscosity / d_relaxation_time * ((*C_data)(idx, 1) - 1.0);
-                (*C_data)(idx, 2) = (*thn_data)(idx)*d_viscosity / d_relaxation_time * (*C_data)(idx, 2);
+                (*C_data)(idx, 0) = thn * ((*C_data)(idx, 0) - d_z * thn);
+                (*C_data)(idx, 1) = thn * ((*C_data)(idx, 1) - d_z * thn);
+                (*C_data)(idx, 2) = thn * ((*C_data)(idx, 2));
             }
         }
     }
