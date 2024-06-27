@@ -26,8 +26,8 @@ CONVECTIVE_OPERATOR_TYPE     = "CUI"
 OUTPUT_CONFORMATION_TENSOR = TRUE
 OUTPUT_STRESS_TENSOR = TRUE
 OUTPUT_DIVERGENCE = TRUE
-RELAXATION_TIME = 0.5
-VISCOSITY = 10.0
+RELAXATION_TIME = 2.0
+VISCOSITY = 5.0
 USING_EXACT_U = FALSE
 BDRY_INTERP_TYPE = "LINEAR"
 PROJECT_CONFORM_TENS = FALSE
@@ -37,11 +37,15 @@ HAS_VEL_NULLSPACE = FALSE
 
 ETA_S = 0.04
 L_S = -ETA_S
-ETA_N = 4.0
+ETA_N = 2.0
 L_N = -ETA_N
 NU_N = 1.0
 NU_S = 1.0
 XI = 250.0*ETA_S
+
+z_init {
+   function_0 = "1.0"
+}
 
 un {
    function_0 = "0.0"
@@ -80,7 +84,7 @@ InitialConditions{
  function_2 = "0.0"
 }
 relaxation_time = RELAXATION_TIME
-z = VISCOSITY
+alpha = VISCOSITY
 fluid_model         = FLUID_MODEL
 evolution_type = EVOLVE_TYPE
 log_determinant     = LOG_DETERMINANT
