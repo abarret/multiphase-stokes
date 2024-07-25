@@ -7,6 +7,7 @@
 #include <PatchHierarchy.h>
 #include <PatchLevel.h>
 #include <SideData.h>
+#include <string.h>
 
 #include <set>
 
