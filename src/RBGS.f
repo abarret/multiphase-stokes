@@ -412,25 +412,9 @@ c
 c
           ! pressure at cell center
           b(9) = f_p(i0,i1)
-
 c
-          ! CALL dgetrf( 9, 9, A_box, 9, ipiv, info)
-
-          !IF( info.EQ.0 ) THEN
-          !     print *, 'info is:'
-               ! Solve the system A*X = B, overwriting B with X.
-          !     CALL dgetrs( 'No transpose', 9, 1, A_box, 9, ipiv, b, 
-c    &               9, info )
-          !END IF
-
           ! solve the system Ax = b, overwriting b with x
-          call dgesv(9, 1, A_box, 9, ipiv, b, 9, info)
-c
-          if (info /= 0) then
-            ! print *, A_box
-            print *, 'ERROR IN DGESV'
-            print *, info
-          endif
+          call lu_solve(A_box, b)
 c 
           un_0(i0,i1) = (1.d0-w)*un_0(i0,i1) + w*b(1);
           un_0(i0+1,i1) = (1.d0-w)*un_0(i0+1,i1) + w*b(2);
@@ -943,24 +927,8 @@ c
           ! pressure at cell center
           b(9) = f_p(i0,i1)
 c
-          ! CALL dgetrf( 9, 9, A_box, 9, ipiv, info)
-
-          !IF( info.EQ.0 ) THEN
-          !     print *, 'info is:'
-               ! Solve the system A*X = B, overwriting B with X.
-          !     CALL dgetrs( 'No transpose', 9, 1, A_box, 9, ipiv, b,
-c    &               9, info )
-          !END IF
-
           ! solve the system Ax = b, overwriting b with x
-          call dgesv(9, 1, A_box, 9, ipiv, b, 9, info)
-c
-          if (info /= 0) then
-            ! print *, A_box
-            print *, 'ERROR IN DGESV'
-            print *, info
-          endif
-
+          call lu_solve(A_box, b)
 c
           if (mask_0(i0,i1) .eq. 0) then
             un_0(i0,i1) = (1.d0-w)*un_0(i0,i1) + w*b(1);
@@ -1062,7 +1030,7 @@ c
       double precision ths_iphalf_jphalf, ths_iphalf_jmhalf
 c
       double precision A_box(9,9)
-      double precision b(9)
+      double precision b(9), x(9)
       integer ipiv(9), info
 c
       integer i0, i1
@@ -1389,24 +1357,8 @@ c
           ! pressure at cell center
           b(9) = f_p(i0,i1)
 c
-
-          ! CALL dgetrf( 9, 9, A_box, 9, ipiv, info)
-
-          !IF( info.EQ.0 ) THEN
-          !     print *, 'info is:'
-               ! Solve the system A*X = B, overwriting B with X.
-          !     CALL dgetrs( 'No transpose', 9, 1, A_box, 9, ipiv, b,
-c    &               9, info )
-          !END IF
-
           ! solve the system Ax = b, overwriting b with x
-          call dgesv(9, 1, A_box, 9, ipiv, b, 9, info)
-c
-          if (info /= 0) then
-            ! print *, A_box
-            print *, 'ERROR IN DGESV'
-            print *, info
-          endif
+          call lu_solve(A_box, b)
 c
           un_0(i0,i1) = (1.d0-w)*un_0(i0,i1) + w*b(1);
           un_0(i0+1,i1) = (1.d0-w)*un_0(i0+1,i1) + w*b(2);
@@ -1504,7 +1456,7 @@ c
       double precision ths_iphalf_jphalf, ths_iphalf_jmhalf
 c
       double precision A_box(9,9)
-      double precision b(9)
+      double precision b(9), x(9)
       integer ipiv(9), info
 c
       integer i0, i1
@@ -1927,24 +1879,8 @@ c
           ! pressure at cell center
           b(9) = f_p(i0,i1)
 c
-          ! CALL dgetrf( 9, 9, A_box, 9, ipiv, info)
-
-          !IF( info.EQ.0 ) THEN
-          !     print *, 'info is:'
-               ! Solve the system A*X = B, overwriting B with X.
-          !     CALL dgetrs( 'No transpose', 9, 1, A_box, 9, ipiv, b,
-c    &               9, info )
-          !END IF
-
           ! solve the system Ax = b, overwriting b with x
-          call dgesv(9, 1, A_box, 9, ipiv, b, 9, info)
-c
-          if (info /= 0) then
-            ! print *, A_box
-            print *, 'ERROR IN DGESV'
-            print *, info
-          endif
-
+          call lu_solve(A_box, b)
 c
           if (mask_0(i0,i1) .eq. 0) then
             un_0(i0,i1) = (1.d0-w)*un_0(i0,i1) + w*b(1);
@@ -1969,3 +1905,59 @@ c
       enddo
 c
       end subroutine
+
+c     Solve the system Ax = b.
+c     Inputs: the matrix A and vector b.
+c     Outputs: LU decomposition of A and solution in b
+c     Does not pivot nor checks for zero diagonals. This should be
+c     sufficient for our system, which is diagonally dominant
+c     (except for the last row).
+      subroutine lu_solve(A, b)
+      integer N
+      parameter (N=9)
+      double precision A(0:(N-1),0:(N-1))
+      double precision b(0:(N-1))
+
+      integer i, j, k
+
+      do i = 0,(N-1)
+        do j = (i+1),(N-1)
+          A(j,i) = A(j,i) / A(i,i)
+
+          do k = (i+1),(N-1)
+            A(j,k) = A(j,k) - A(j,i) * A(i,k)
+          enddo
+        enddo
+      enddo
+
+      ! Now solve
+      do i = 0,(N-1)
+
+        do k = 0, (i-1)
+          b(i) = b(i) - A(i,k) * b(k)
+        enddo
+      enddo
+
+      do i = (N-1),0,-1
+        do k = (i+1),(N-1)
+          b(i) = b(i) - A(i,k) * b(k)
+        enddo
+
+        b(i) = b(i) / A(i,i)
+      enddo
+
+!      print *, b
+!      print *, x
+!      print *, A(0,:)
+!      print *, A(1,:)
+!      print *, A(2,:)
+!      print *, A(3,:)
+!      print *, A(4,:)
+!      print *, A(5,:)
+!      print *, A(6,:)
+!      print *, A(7,:)
+!      print *, A(8,:)
+!      print *, P
+
+
+      end
