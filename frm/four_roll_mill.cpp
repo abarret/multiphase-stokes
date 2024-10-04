@@ -129,19 +129,19 @@ main(int argc, char* argv[])
             new muParserCartGridFunction("FS_FCN", app_initializer->getComponentDatabase("FS_FCN"), grid_geometry);
         ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
 
-        // Concentration variable
-        Pointer<CellVariable<NDIM, double>> z_var = new CellVariable<NDIM, double>("Z");
-        Pointer<CartGridFunction> z_init_conds =
-            new muParserCartGridFunction("z_init", input_db->getDatabase("z_init"), grid_geometry);
-        adv_diff_integrator->registerTransportedQuantity(z_var);
-        adv_diff_integrator->setAdvectionVelocity(z_var, ins_integrator->getAdvectionVelocityVariable());
-        adv_diff_integrator->setInitialConditions(z_var, z_init_conds);
-
         bool use_cf = input_db->getBool("USE_CF");
         Pointer<CFINSForcing> cf_un_forcing;
         Pointer<CFStrategy> cf_strategy;
         if (use_cf)
         {
+            // Concentration variable
+            Pointer<CellVariable<NDIM, double>> z_var = new CellVariable<NDIM, double>("Z");
+            Pointer<CartGridFunction> z_init_conds =
+                new muParserCartGridFunction("z_init", input_db->getDatabase("z_init"), grid_geometry);
+            adv_diff_integrator->registerTransportedQuantity(z_var);
+            adv_diff_integrator->setAdvectionVelocity(z_var, ins_integrator->getAdvectionVelocityVariable());
+            adv_diff_integrator->setInitialConditions(z_var, z_init_conds);
+
             Pointer<INSHierarchyIntegrator> ins_cf_integrator = ins_integrator;
             cf_un_forcing = new CFINSForcing("CFINSForcing",
                                              app_initializer->getComponentDatabase("CFINSForcing"),
