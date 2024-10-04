@@ -10,7 +10,7 @@ You will need to [build and install IBAMR](https://ibamr.github.io/building) and
 
 Note that IBAMR and its dependencies can be built automatically with `autoibamr`, and we are compatible with this method of building: https://github.com/ibamr/autoibamr.
 
-The simulations generated can be viewed by installing [VISit](https://visit-dav.github.io/visit-website/) on your machine.
+The simulations generated can be viewed by installing [VisIt](https://visit-dav.github.io/visit-website/) on your machine.
 
 # Compiling the code
 
