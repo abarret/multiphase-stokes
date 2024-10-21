@@ -18,6 +18,8 @@ SET(MULTIPHASE_SRC
     src/MultiphaseStandardHierarchyIntegrator.cpp
     src/MultiphaseStaggeredStokesBoxRelaxationFACOperator.cpp
     src/MultiphaseStaggeredStokesOperator.cpp
+    src/MultiphaseStaggeredStokesBlockFACOperator.cpp
+    src/MultiphaseStaggeredStokesBlockOperator.cpp
     src/RBGS.f
     )
 
