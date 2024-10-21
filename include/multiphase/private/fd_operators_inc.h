@@ -509,6 +509,58 @@ applyCoincompressibility(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
         (*A_data)(idx) = D * (div_un_thn + div_us_ths);
     }
 }
+
+inline void
+preconditonerBlockGTGOperatorConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                                 const int GtG_idx,
+                                                 const int u_idx, // size of pressure vector
+                                                 const int thn_idx,
+                                                 const MultiphaseParameters& params,
+                                                 const double C,
+                                                 const double D_u,
+                                                 const double D_p)
+{
+    // This sets up the G^T*G operator which acts on a vector u.
+    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> GtG_data = patch->getPatchData(GtG_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> u_data = patch->getPatchData(un_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+    const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
+    SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
+
+    for (SAMRAI::pdat::CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
+    {
+        const SAMRAI::pdat::CellIndex<NDIM>& idx = ci();
+
+        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
+
+        // thn at sides
+        double thn_lower_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - xp)); // thn(i-1/2,j)
+        double thn_upper_x = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + xp)); // thn(i+1/2,j)
+        double thn_lower_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx - yp)); // thn(i,j-1/2)
+        double thn_upper_y = 0.5 * ((*thn_data)(idx) + (*thn_data)(idx + yp)); // thn(i,j+1/2)
+
+        double uxx = ((*u_data)(idx-xp) - 2*(*u_data)(idx) + (*u_data)(idx+xp))/(dx[0]*dx[0]);
+        double uyy = ((*u_data)(idx-yp) - 2*(*u_data)(idx) + (*u_data)(idx+yp))/(dx[0]*dy[0]);
+
+        double ux = ((*u_data)(idx+xp) -(*u_data)(idx-xp))/dx[0];
+        double uy = ((*u_data)(idx+yp) -(*u_data)(idx-yp))/dx[1];
+
+        double thn_sq_ths_sq = (*thn_data)(idx)*(*thn_data)(idx) + convertToThs((*thn_data)(idx))*convertToThs((*thn_data)(idx));
+        double th_sq_uxx = thn_sq_ths_sq * uxx;
+        double th_sq_uyy = thn_sq_ths_sq * uyy;
+
+        double ddx_th_sq = (((*thn_data)(idx+xp)*(*thn_data)(idx+xp) + convertToThs((*thn_data)(idx+xp))*convertToThs((*thn_data)(idx+xp)))
+                            - ((*thn_data)(idx-xp)*(*thn_data)(idx-xp) + convertToThs((*thn_data)(idx-xp))*convertToThs((*thn_data)(idx-xp))))/dx[0];
+
+        double ddy_th_sq = (((*thn_data)(idx+yp)*(*thn_data)(idx+yp) + convertToThs((*thn_data)(idx+yp))*convertToThs((*thn_data)(idx+yp)))
+                            - ((*thn_data)(idx-yp)*(*thn_data)(idx-yp) + convertToThs((*thn_data)(idx-yp))*convertToThs((*thn_data)(idx-yp))))/dx[1];
+
+        (*GtG_data)(idx) = th_sq_uxx + th_sq_uyy + ddx_th_sq*ux + ddy_th_sq*uy;
+    }
 } // namespace multiphase
 
 #endif
