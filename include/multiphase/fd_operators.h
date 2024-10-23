@@ -48,17 +48,17 @@ void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SA
  *
  * Note that no synchronization is provided on the volume fraction when linear interpolation is done.
  */
-void accumulateMomentumOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                                  int A_un_idx,
-                                                  int A_us_idx,
-                                                  int p_idx,
-                                                  int un_idx,
-                                                  int us_idx,
-                                                  int thn_idx,
-                                                  const MultiphaseParameters& params,
-                                                  double C,
-                                                  double D_u,
-                                                  double D_p);
+void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                                        int A_un_idx,
+                                                        int A_us_idx,
+                                                        int p_idx,
+                                                        int un_idx,
+                                                        int us_idx,
+                                                        int thn_idx,
+                                                        const MultiphaseParameters& params,
+                                                        double C,
+                                                        double D_u,
+                                                        double D_p);
 ///\}
 
 /*!
@@ -90,6 +90,34 @@ void accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::h
                                                  double C,
                                                  double D_u,
                                                  double D_p);
+                                                 
+/*!
+* Accumulate the momentum forces for constant coefficient problems when the network volume fraction is only provided at
+ * cell centers. In this case, the volume fraction is linearly interpolated to respective sides and nodes when
+ * necessary.
+ * 
+ * Specifically, computes
+ *
+ * [ C*thn + A_n + D_u*xi   -D_u*xi               ][un]
+ * [ -D_u*xi                C*ths + A_s + D_u*xi  ][us]
+ * in which
+ * A_i = D_u*eta_i*div(thn*((grad+grad^T)-div*I))
+ *
+ * Note that the drag coefficient in this case is not explicitly scaled by the volume fractions.
+ *
+ * This function results in a runtime error if params.isVariableDrag() returns false.
+ *
+ * Note that no synchronization is provided on the volume fraction when linear interpolation is done.
+ */
+void accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                                                 const int F_un_idx,
+                                                                 const int F_us_idx,
+                                                                 const int un_idx,
+                                                                 const int us_idx,
+                                                                 const int thn_idx,
+                                                                 const MultiphaseParameters& params,
+                                                                 const double C,
+                                                                 const double D_u);
 
 /*!
  * Computes the divergence of the volume averaged velocity field on a given patch.
@@ -106,6 +134,24 @@ void applyCoincompressibility(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> p
                               int us_idx,
                               int thn_idx,
                               double D);
+
+/*!
+ * Computes the G^T*G operator on a given patch. G^T*G is used by the block preconditioner.
+ *
+ * Specifically, computes
+ *
+ * D_div * Div{ (D_p(thn^2+ths^2))*Grad }
+ *
+ * This function acts on cell-centered quantities to produce cell-centered results.
+ */
+void preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
+                                   const int GtG_idx,
+                                   const int u_idx, // size of pressure vector
+                                   const int thn_idx,
+                                   const MultiphaseParameters& params,
+                                   const double C,
+                                   const double D_div,
+                                   const double D_p);                              
 } // namespace multiphase
 
 #include "multiphase/private/fd_operators_inc.h"
