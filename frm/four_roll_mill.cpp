@@ -134,6 +134,14 @@ main(int argc, char* argv[])
         Pointer<CFStrategy> cf_strategy;
         if (use_cf)
         {
+            // Concentration variable
+            Pointer<CellVariable<NDIM, double>> z_var = new CellVariable<NDIM, double>("Z");
+            Pointer<CartGridFunction> z_init_conds =
+                new muParserCartGridFunction("z_init", input_db->getDatabase("z_init"), grid_geometry);
+            adv_diff_integrator->registerTransportedQuantity(z_var);
+            adv_diff_integrator->setAdvectionVelocity(z_var, ins_integrator->getAdvectionVelocityVariable());
+            adv_diff_integrator->setInitialConditions(z_var, z_init_conds);
+
             Pointer<INSHierarchyIntegrator> ins_cf_integrator = ins_integrator;
             cf_un_forcing = new CFINSForcing("CFINSForcing",
                                              app_initializer->getComponentDatabase("CFINSForcing"),
@@ -143,6 +151,7 @@ main(int argc, char* argv[])
                                              visit_data_writer);
             cf_strategy = new CFMultiphaseOldroydB("CFOldroydB",
                                                    ins_integrator->getNetworkVolumeFractionVariable(),
+                                                   z_var,
                                                    adv_diff_integrator,
                                                    input_db->getDatabase("CFINSForcing"));
             cf_un_forcing->registerCFStrategy(cf_strategy);

@@ -24,14 +24,14 @@ ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
 // Complex Fluid parameters
 USE_CF = TRUE
-FLUID_MODEL = "OLDROYDB"
+FLUID_MODEL = "USER_DEFINED"
 EVOLVE_TYPE = "STANDARD"
 LOG_DETERMINANT     = TRUE
 CONVECTIVE_OPERATOR_TYPE     = "CUI"
-OUTPUT_CONFORMATION_TENSOR = FALSE
-OUTPUT_STRESS_TENSOR = FALSE
+OUTPUT_CONFORMATION_TENSOR = TRUE
+OUTPUT_STRESS_TENSOR = TRUE
 OUTPUT_DIVERGENCE = TRUE
-RELAXATION_TIME = 0.3
+RELAXATION_TIME = 4.0
 VISCOSITY = 2.0
 USING_EXACT_U = FALSE
 BDRY_INTERP_TYPE = "LINEAR"
@@ -41,10 +41,16 @@ VISCOUS_TS_TYPE = "TRAPEZOIDAL_RULE"
 HAS_VEL_NULLSPACE = FALSE
 
 ETA_S = 0.04
-ETA_N = 4.0
+L_S = -ETA_S
+ETA_N = 2.0
+L_N = -ETA_N
 NU_N = 1.0
 NU_S = 1.0
 XI = 250.0*ETA_S
+
+z_init {
+   function_0 = "1.0"
+}
 
 un {
    function_0 = "0.0"
@@ -66,13 +72,13 @@ thn {
 }
 
 FN_FCN {
-   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+   function_0 = "(t < 0.2) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_0) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
+   function_1 = "(t < 0.2) ? (2*PI*cos(2*PI*X_1)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
 }
 
 FS_FCN {
-   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
-   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
+   function_0 = "(t < 0.2) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_0) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
+   function_1 = "(t < 0.2) ? (2*PI*cos(2*PI*X_1)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
 }
 
 CFINSForcing {
@@ -82,7 +88,7 @@ InitialConditions{
  function_2 = "0.0"
 }
 relaxation_time = RELAXATION_TIME
-viscosity = VISCOSITY
+alpha = VISCOSITY
 fluid_model         = FLUID_MODEL
 evolution_type = EVOLVE_TYPE
 log_determinant     = LOG_DETERMINANT
@@ -95,6 +101,8 @@ project_conformation_tensor = PROJECT_CONFORM_TENS
 }
 
 INSVCTwoFluidStaggeredHierarchyIntegrator {
+   creeping_flow = TRUE
+   convec_limiter_type = "CUI"
    rho                           = RHO
    start_time                    = START_TIME
    end_time                      = END_TIME
@@ -103,10 +111,12 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    enable_logging                = ENABLE_LOGGING
    w = W
    use_preconditioner = USE_PRECONDITIONER
-   grad_abs_thresh = 0.75
+   grad_abs_thresh = 0.20, 0.80, 1.75
    use_grad_tagging = TRUE
    tag_buffer = TAG_BUFFER
    regrid_interval = REGRID_INTERVAL
+   viscous_time_stepping_type = VISCOUS_TS_TYPE
+   has_vel_nullspace = HAS_VEL_NULLSPACE
 
    solver_db {
       ksp_type = "fgmres"
@@ -184,6 +194,9 @@ GriddingAlgorithm {
    efficiency_tolerance = 0.70e0  // min % of tag cells in new patch level
    combine_efficiency   = 0.85e0  // chop box if sum of volumes of smaller
                                   // boxes < efficiency * vol of large box
+
+   proper_nesting_buffer = 1
+   allow_patches_smaller_than_minimum_size_to_prevent_overlaps = FALSE
 }
 
 StandardTagAndInitialize {
