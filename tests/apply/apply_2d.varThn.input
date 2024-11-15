@@ -51,7 +51,7 @@ f_us {
 }
 
 f_p {
-   function = "0.5"//-PI*sin(4*PI*X_0)*sin(4*PI*X_1)"
+   function = "-PI*sin(4*PI*X_0)*sin(4*PI*X_1)"
 }
 
 Main {

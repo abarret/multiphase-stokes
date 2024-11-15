@@ -184,8 +184,7 @@ MultiphaseStaggeredStokesBlockOperator::setVelocityPoissonSpecifications(const P
 
 void
 MultiphaseStaggeredStokesBlockOperator::setCandDCoefficients(const double C,
-                                                             const double D_u,
-)
+                                                             const double D_u)
 {
     d_C = C;
     d_D_u = D_u;
@@ -569,21 +568,21 @@ MultiphaseStaggeredStokesBlockOperator::applySpecialized(const int A_un_idx,
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            if (d_params.isVariableDrag())
-                accumulateMomentumWithoutPressureOnPatchVariableDrag(
-                    patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D_u);
-            else
-                accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch,
-                                                                            A_un_idx,
-                                                                            A_us_idx,
-                                                                            un_idx,
-                                                                            us_idx,
-                                                                            thn_idx,
-                                                                            d_nc_scr_idx,
-                                                                            d_sc_scr_idx,
-                                                                            d_params,
-                                                                            d_C,
-                                                                            d_D_u);
+            // if (d_params.isVariableDrag())
+            //     //accumulateMomentumWithoutPressureOnPatchVariableDrag(
+            //     //    patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D_u);
+            // else
+            accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch,
+                                                                        A_un_idx,
+                                                                        A_us_idx,
+                                                                        un_idx,
+                                                                        us_idx,
+                                                                        thn_idx,
+                                                                        d_nc_scr_idx,
+                                                                        d_sc_scr_idx,
+                                                                        d_params,
+                                                                        d_C,
+                                                                        d_D_u);
         }
     }
 }

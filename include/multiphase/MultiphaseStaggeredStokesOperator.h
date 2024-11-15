@@ -50,7 +50,7 @@ namespace multiphase
  * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   D_p*ths*grad ][us]
  * [ D_div*div(thn)                    D_div*div(ths)                    0            ][p ]
  * in which
- * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
+ * A_i = D_u*eta_i*div(thn*((grad+grad^T)-div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
  *   -- C: Constant, set via setCandDCoefficients().
