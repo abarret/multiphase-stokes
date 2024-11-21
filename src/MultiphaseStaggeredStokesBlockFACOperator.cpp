@@ -318,7 +318,10 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
     if (num_sweeps == 0) return;
 
     IBTK_TIMER_START(t_smooth_error);
-    
+
+    d_hierarchy = error.getPatchHierarchy();
+    Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
+
     // Get the vector components. These pull out patch data indices
     const int un_idx = error.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = error.getComponentDescriptorIndex(1); // solvent velocity, Us
@@ -326,8 +329,32 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
     const int f_un_idx = residual.getComponentDescriptorIndex(0); // RHS_Un
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
 
-    d_hierarchy = error.getPatchHierarchy();
-    Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
+    // Cache coarse-fine interface ghost cell values in the "scratch" data.
+    if (level_num > 0 && num_sweeps > 1)
+    {
+        int patch_counter = 0;
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++patch_counter)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+
+            Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
+            Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
+
+            Pointer<SideData<NDIM, double>> un_scr_data = patch->getPatchData(d_un_scr_idx);
+            Pointer<SideData<NDIM, double>> us_scr_data = patch->getPatchData(d_us_scr_idx);
+
+            for (unsigned int axis = 0; axis < NDIM; ++axis)
+            {
+                un_scr_data->getArrayData(axis).copy(un_data->getArrayData(axis),
+                                                     d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                     IntVector<NDIM>(0));
+                us_scr_data->getArrayData(axis).copy(us_data->getArrayData(axis),
+                                                     d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                     IntVector<NDIM>(0));
+            }
+        }
+    }
+
     IntVector<NDIM> xp(1, 0), yp(0, 1);
 
     // outer for loop for number of sweeps
@@ -336,7 +363,7 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
         if (level_num > 0)
         {
             // TODO: try to understand this
-            if (sweep > 1)
+            if (sweep > 0)
             {
                 // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
                 int patch_counter = 0;
@@ -376,7 +403,6 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                 // TODO: 1 here is the ghost width to fill, this should be variable.
                 const IntVector<NDIM>& gcw_to_fill = 1;
                 d_sc_bdry_op->computeNormalExtension(*patch, ratio, gcw_to_fill);
-                d_cc_bdry_op->computeNormalExtension(*patch, ratio, gcw_to_fill);
             }
         }
         else if (sweep > 0)
@@ -455,10 +481,11 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                     + ((*thn_data)(idx - xp) - thn_imh_jph)/(dx_dy) * (*un_data)(upper_y_idx - xp)
                                     + (thn_imh_jmh - (*thn_data)(idx - xp))/(dx_dy) * (*un_data)(lower_y_idx - xp)
                                     + ((*thn_data)(idx)-thn_imh_jmh)/(dx_dy) * (*un_data)(lower_y_idx)) - d_D * d_params.xi * (*us_data)(lower_x_idx);
-                    un_imhalf_j /= d_D * d_params.eta_n * (-((*thn_data)(idx) + (*thn_data)(idx - xp))/(dx_dx) - (thn_imh_jph + thn_imh_jmh)/(dy_dy)) 
-                                    + d_params.xi * thn_lower_x * convertToThs(thn_lower_x) 
-                                    + d_C * thn_lower_x;
-                    (*un_data)(lower_x_idx) = (1 - d_w) * (*un_data)(lower_x_idx) + d_w * un_imhalf_j;
+                    un_imhalf_j /= d_D * d_params.eta_n *
+                                       (-((*thn_data)(idx) + (*thn_data)(idx - xp)) / (dx_dx) -
+                                        (thn_imh_jph + thn_imh_jmh) / (dy_dy)) +
+                                   d_D * d_params.xi * thn_lower_x * convertToThs(thn_lower_x) + d_C * thn_lower_x;
+                    (*un_data)(lower_x_idx) = (1.0 - d_w) * (*un_data)(lower_x_idx) + d_w * un_imhalf_j;
 
                     double un_i_jmhalf = (*f_un_data)(lower_y_idx);
                     un_i_jmhalf -= d_D * d_params.eta_n * ((thn_imh_jmh/dx_dx) * (*un_data)(lower_y_idx - xp)
@@ -469,10 +496,11 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                     + ((*thn_data)(idx - yp) - thn_iph_jmh)/(dx_dy) * (*un_data)(upper_x_idx - yp)
                                     + ((*thn_data)(idx) - thn_imh_jmh)/(dx_dy) * (*un_data)(lower_x_idx)
                                     + (thn_iph_jmh - (*thn_data)(idx))/(dx_dy) * (*un_data)(upper_x_idx)) - d_D * d_params.xi * (*us_data)(lower_y_idx);
-                    un_i_jmhalf /= d_D * d_params.eta_n * (-((*thn_data)(idx) + (*thn_data)(idx - yp))/(dy_dy) - (thn_iph_jmh + thn_imh_jmh)/(dx_dx)) 
-                                    + d_params.xi * thn_lower_y * convertToThs(thn_lower_y) 
-                                    + d_C * thn_lower_y;
-                    (*un_data)(lower_y_idx) = (1 - d_w) * (*un_data)(lower_y_idx) + d_w * un_i_jmhalf;
+                    un_i_jmhalf /= d_D * d_params.eta_n *
+                                       (-((*thn_data)(idx) + (*thn_data)(idx - yp)) / (dy_dy) -
+                                        (thn_iph_jmh + thn_imh_jmh) / (dx_dx)) +
+                                   d_D * d_params.xi * thn_lower_y * convertToThs(thn_lower_y) + d_C * thn_lower_y;
+                    (*un_data)(lower_y_idx) = (1.0 - d_w) * (*un_data)(lower_y_idx) + d_w * un_i_jmhalf;
 
                     // Solve for solvent velocities
                     double us_imhalf_j = (*f_us_data)(lower_x_idx);   
@@ -484,10 +512,12 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                 + (convertToThs((*thn_data)(idx - xp)) - convertToThs(thn_imh_jph))/(dx_dy) * (*us_data)(upper_y_idx - xp)
                                 + (convertToThs(thn_imh_jmh) - convertToThs((*thn_data)(idx - xp)))/(dx_dy) * (*us_data)(lower_y_idx - xp)
                                 + (convertToThs((*thn_data)(idx))-convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_y_idx)) - d_D * d_params.xi * (*un_data)(lower_x_idx);
-                    us_imhalf_j /= d_D * d_params.eta_s * (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - xp)))/(dx_dx) - (convertToThs(thn_imh_jph) + convertToThs(thn_imh_jmh))/(dy_dy)) 
-                                    + d_params.xi * thn_lower_x * convertToThs(thn_lower_x) 
-                                    + d_C * convertToThs(thn_lower_x);
-                    (*us_data)(lower_x_idx) = (1 - d_w) * (*us_data)(lower_x_idx) + d_w * us_imhalf_j;
+                    us_imhalf_j /=
+                        d_D * d_params.eta_s *
+                            (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - xp))) / (dx_dx) -
+                             (convertToThs(thn_imh_jph) + convertToThs(thn_imh_jmh)) / (dy_dy)) +
+                        d_D * d_params.xi * thn_lower_x * convertToThs(thn_lower_x) + d_C * convertToThs(thn_lower_x);
+                    (*us_data)(lower_x_idx) = (1.0 - d_w) * (*us_data)(lower_x_idx) + d_w * us_imhalf_j;
 
                     double us_i_jmhalf = (*f_us_data)(lower_y_idx);
                     us_i_jmhalf -= d_D * d_params.eta_s * ((convertToThs(thn_imh_jmh)/dx_dx) * (*us_data)(lower_y_idx - xp)
@@ -498,10 +528,12 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                 + (convertToThs((*thn_data)(idx - yp)) - convertToThs(thn_iph_jmh))/(dx_dy) * (*us_data)(upper_x_idx - yp)
                                 + (convertToThs((*thn_data)(idx)) - convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_x_idx)
                                 + (convertToThs(thn_iph_jmh) - convertToThs((*thn_data)(idx)))/(dx_dy) * (*us_data)(upper_x_idx)) - d_D * d_params.xi * (*un_data)(lower_y_idx);
-                    us_i_jmhalf /= d_D * d_params.eta_s * (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - yp)))/(dy_dy) - (convertToThs(thn_iph_jmh) + convertToThs(thn_imh_jmh))/(dx_dx))
-                                    + d_params.xi * thn_lower_y * convertToThs(thn_lower_y) 
-                                    + d_C * convertToThs(thn_lower_y);
-                    (*us_data)(lower_y_idx) = (1 - d_w) * (*us_data)(lower_y_idx) + d_w * us_i_jmhalf;
+                    us_i_jmhalf /=
+                        d_D * d_params.eta_s *
+                            (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - yp))) / (dy_dy) -
+                             (convertToThs(thn_iph_jmh) + convertToThs(thn_imh_jmh)) / (dx_dx)) +
+                        d_D * d_params.xi * thn_lower_y * convertToThs(thn_lower_y) + d_C * convertToThs(thn_lower_y);
+                    (*us_data)(lower_y_idx) = (1.0 - d_w) * (*us_data)(lower_y_idx) + d_w * us_i_jmhalf;
                 } // cell-centers
             } // end constant xi coefficient
         } // patches
@@ -769,9 +801,6 @@ MultiphaseStaggeredStokesBlockFACOperator::initializeOperatorState(const SAMRAIV
     d_sc_bdry_op = new CartSideDoubleQuadraticCFInterpolation();
     d_sc_bdry_op->setConsistentInterpolationScheme(false);
     d_sc_bdry_op->setPatchHierarchy(d_hierarchy);
-    d_cc_bdry_op = new CartCellDoubleQuadraticCFInterpolation();
-    d_cc_bdry_op->setConsistentInterpolationScheme(false);
-    d_cc_bdry_op->setPatchHierarchy(d_hierarchy);
 
     // Get overlap information for setting patch boundary conditions.
     d_patch_side_bc_box_overlap.resize(finest_ln + 1);

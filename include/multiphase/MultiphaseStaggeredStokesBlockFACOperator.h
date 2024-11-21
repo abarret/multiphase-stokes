@@ -237,7 +237,7 @@ private:
     /*
      * Coarse-fine interface interpolation objects.
      */
-    SAMRAI::tbox::Pointer<IBTK::CoarseFineBoundaryRefinePatchStrategy> d_sc_bdry_op, d_cc_bdry_op;
+    SAMRAI::tbox::Pointer<IBTK::CoarseFineBoundaryRefinePatchStrategy> d_sc_bdry_op;
 
     // Cache the prolongation and restriction schedules. Note we also cache the algorithms so that we can reset the
     // schedules to their previous state.

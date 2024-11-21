@@ -508,11 +508,10 @@ MultiphaseStaggeredStokesBlockOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, d
         {
             const int un_idx = x->getComponentDescriptorIndex(0);
             const int us_idx = x->getComponentDescriptorIndex(1);
-            const int P_idx = x->getComponentDescriptorIndex(2);
             d_bc_helper->enforceNormalVelocityBoundaryConditions(
-                un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
+                un_idx, IBTK::invalid_index, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
             d_bc_helper->enforceNormalVelocityBoundaryConditions(
-                us_idx, P_idx, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
+                us_idx, IBTK::invalid_index, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
         }
         apply(*x, *b);
         y.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&y, false), b);
@@ -524,9 +523,10 @@ MultiphaseStaggeredStokesBlockOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, d
     {
         const int un_idx = y.getComponentDescriptorIndex(0);
         const int us_idx = y.getComponentDescriptorIndex(1);
-        const int P_idx = y.getComponentDescriptorIndex(2);
-        d_bc_helper->enforceNormalVelocityBoundaryConditions(un_idx, P_idx, d_un_bc_coefs, d_new_time, homogeneous_bc);
-        d_bc_helper->enforceNormalVelocityBoundaryConditions(us_idx, P_idx, d_us_bc_coefs, d_new_time, homogeneous_bc);
+        d_bc_helper->enforceNormalVelocityBoundaryConditions(
+            un_idx, IBTK::invalid_index, d_un_bc_coefs, d_new_time, homogeneous_bc);
+        d_bc_helper->enforceNormalVelocityBoundaryConditions(
+            us_idx, IBTK::invalid_index, d_us_bc_coefs, d_new_time, homogeneous_bc);
     }
     return;
 } // modifyRhsForBcs
@@ -538,11 +538,10 @@ MultiphaseStaggeredStokesBlockOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, doub
     {
         const int un_idx = u.getComponentDescriptorIndex(0);
         const int us_idx = u.getComponentDescriptorIndex(1);
-        const int P_idx = u.getComponentDescriptorIndex(2);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(
-            un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
+            un_idx, IBTK::invalid_index, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
         d_bc_helper->enforceNormalVelocityBoundaryConditions(
-            us_idx, P_idx, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
+            us_idx, IBTK::invalid_index, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
     }
     return;
 } // imposeSolBcs
