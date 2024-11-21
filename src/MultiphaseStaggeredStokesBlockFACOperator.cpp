@@ -480,7 +480,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                     + (thn_imh_jmh/dy_dy * (*un_data)(lower_x_idx - yp))
                                     + ((*thn_data)(idx - xp) - thn_imh_jph)/(dx_dy) * (*un_data)(upper_y_idx - xp)
                                     + (thn_imh_jmh - (*thn_data)(idx - xp))/(dx_dy) * (*un_data)(lower_y_idx - xp)
-                                    + ((*thn_data)(idx)-thn_imh_jmh)/(dx_dy) * (*un_data)(lower_y_idx)) - d_D * d_params.xi * (*us_data)(lower_x_idx);
+                                    + ((*thn_data)(idx)-thn_imh_jmh)/(dx_dy) * (*un_data)(lower_y_idx)) 
+                                    - d_D * d_params.xi * (*us_data)(lower_x_idx) * thn_lower_x * convertToThs(thn_lower_x);
                     un_imhalf_j /= d_D * d_params.eta_n *
                                        (-((*thn_data)(idx) + (*thn_data)(idx - xp)) / (dx_dx) -
                                         (thn_imh_jph + thn_imh_jmh) / (dy_dy)) +
@@ -495,7 +496,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                     + (thn_imh_jmh - (*thn_data)(idx - yp))/(dx_dy) * (*un_data)(lower_x_idx - yp)
                                     + ((*thn_data)(idx - yp) - thn_iph_jmh)/(dx_dy) * (*un_data)(upper_x_idx - yp)
                                     + ((*thn_data)(idx) - thn_imh_jmh)/(dx_dy) * (*un_data)(lower_x_idx)
-                                    + (thn_iph_jmh - (*thn_data)(idx))/(dx_dy) * (*un_data)(upper_x_idx)) - d_D * d_params.xi * (*us_data)(lower_y_idx);
+                                    + (thn_iph_jmh - (*thn_data)(idx))/(dx_dy) * (*un_data)(upper_x_idx)) 
+                                    - d_D * d_params.xi * (*us_data)(lower_y_idx)  * thn_lower_y * convertToThs(thn_lower_y);
                     un_i_jmhalf /= d_D * d_params.eta_n *
                                        (-((*thn_data)(idx) + (*thn_data)(idx - yp)) / (dy_dy) -
                                         (thn_iph_jmh + thn_imh_jmh) / (dx_dx)) +
@@ -511,7 +513,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                 + (convertToThs(thn_imh_jmh)/dy_dy * (*us_data)(lower_x_idx - yp))
                                 + (convertToThs((*thn_data)(idx - xp)) - convertToThs(thn_imh_jph))/(dx_dy) * (*us_data)(upper_y_idx - xp)
                                 + (convertToThs(thn_imh_jmh) - convertToThs((*thn_data)(idx - xp)))/(dx_dy) * (*us_data)(lower_y_idx - xp)
-                                + (convertToThs((*thn_data)(idx))-convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_y_idx)) - d_D * d_params.xi * (*un_data)(lower_x_idx);
+                                + (convertToThs((*thn_data)(idx))-convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_y_idx)) 
+                                - d_D * d_params.xi * (*un_data)(lower_x_idx) * thn_lower_x * convertToThs(thn_lower_x);
                     us_imhalf_j /=
                         d_D * d_params.eta_s *
                             (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - xp))) / (dx_dx) -
@@ -527,7 +530,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                 + (convertToThs(thn_imh_jmh) - convertToThs((*thn_data)(idx - yp)))/(dx_dy) * (*us_data)(lower_x_idx - yp)
                                 + (convertToThs((*thn_data)(idx - yp)) - convertToThs(thn_iph_jmh))/(dx_dy) * (*us_data)(upper_x_idx - yp)
                                 + (convertToThs((*thn_data)(idx)) - convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_x_idx)
-                                + (convertToThs(thn_iph_jmh) - convertToThs((*thn_data)(idx)))/(dx_dy) * (*us_data)(upper_x_idx)) - d_D * d_params.xi * (*un_data)(lower_y_idx);
+                                + (convertToThs(thn_iph_jmh) - convertToThs((*thn_data)(idx)))/(dx_dy) * (*us_data)(upper_x_idx)) 
+                                - d_D * d_params.xi * (*un_data)(lower_y_idx) * thn_lower_y * convertToThs(thn_lower_y);
                     us_i_jmhalf /=
                         d_D * d_params.eta_s *
                             (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - yp))) / (dy_dy) -
