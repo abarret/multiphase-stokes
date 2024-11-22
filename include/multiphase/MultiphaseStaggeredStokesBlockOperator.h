@@ -1,5 +1,5 @@
-#ifndef included_multiphase_MultiphaseStaggeredStokesOperator
-#define included_multiphase_MultiphaseStaggeredStokesOperator
+#ifndef included_multiphase_MultiphaseStaggeredStokesBlockOperator
+#define included_multiphase_MultiphaseStaggeredStokesBlockOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -46,27 +46,23 @@ namespace multiphase
  * incompressible flow solver.
  *
  * This class knows how to apply the following operator:
- * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths                D_p*thn*grad ][un]
- * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   D_p*ths*grad ][us]
- * [ D_div*div(thn)                    D_div*div(ths)                    0            ][p ]
+ * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths                ][un]
+ * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   ][us]
  * in which
- * A_i = D_u*eta_i*div(thn*((grad+grad^T)-div*I))
+ * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
  *   -- C: Constant, set via setCandDCoefficients().
  *   -- D_u: Constant, set via setCandDCoefficients().
  *   -- thn: Cell centered patch index for volume fraction, set via setThnIdx().
- *   -- D_p: Constant, set via setCandDCoefficients(). A default value is set to -1.0.
- *   -- D_div: Constant, set via setCandDCoefficients(). A default value is set to 1.0.
  *
- * Note that C and D values are typically set by the time stepping scheme. Default values for D_p and D_div are set for
- * solving a standard linear system.
+ * Note that C and D values are typically set by the time stepping scheme. 
  *
  * This class handles the case in which the drag coefficient is variable.
  *
  * \see INSStaggeredHierarchyIntegrator
  */
-class MultiphaseStaggeredStokesOperator : public IBTK::LinearOperator
+class MultiphaseStaggeredStokesBlockOperator : public IBTK::LinearOperator
 {
 public:
     /*!
@@ -75,14 +71,14 @@ public:
      * Note that C and D MUST be provided by the call to setCandDCoefficients(). Their default values are 0.0 and -1.0
      * by default.
      */
-    MultiphaseStaggeredStokesOperator(const std::string& object_name,
-                                      bool homogeneous_bc,
-                                      const MultiphaseParameters& params);
+    MultiphaseStaggeredStokesBlockOperator(const std::string& object_name,
+                                           bool homogeneous_bc,
+                                           const MultiphaseParameters& params);
 
     /*!
      * \brief Destructor.
      */
-    ~MultiphaseStaggeredStokesOperator();
+    ~MultiphaseStaggeredStokesBlockOperator();
 
     /*!
      * \brief Set the PoissonSpecifications object used to specify the C and D values for the momentum equations
@@ -95,7 +91,7 @@ public:
      * \brief Set coefficients used for relative magnitudes for evaluating the operators. This is usually used for time
      * stepping schemes.
      */
-    void setCandDCoefficients(double C, double D_u, double D_p = -1.0, double D_div = 1.0);
+    void setCandDCoefficients(double C, double D_u);
 
     /*!
      * \brief Set the cell centered patch index for the volume fraction.
@@ -117,15 +113,11 @@ public:
      * \param us_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
      *condition coefficients for the network velocity.
 
-     * \param P_bc_coef   Pointer to object that can set the Robin boundary condition
-     *coefficients for the pressure.
-     *
      * \param thn_bc_coef   Pointer to object that can set the Robin boundary condition
      *coefficients for the volume fraction.
      */
     virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                                     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef,
                                     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
 
     /*!
@@ -231,8 +223,6 @@ protected:
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_us_bc_coef;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_thn_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
 
@@ -252,14 +242,14 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
 
 private:
-    void applySpecialized(int A_P_idx, int A_un_idx, int A_us_idx, int p_idx, int un_idx, int us_idx, int thn_idx);
+    void applySpecialized(int A_un_idx, int A_us_idx, int un_idx, int us_idx, int thn_idx);
 
     /*!
      * \brief Default constructor.
      *
      * \note This constructor is not implemented and should not be used.
      */
-    MultiphaseStaggeredStokesOperator() = delete;
+    MultiphaseStaggeredStokesBlockOperator() = delete;
 
     /*!
      * \brief Copy constructor.
@@ -268,7 +258,7 @@ private:
      *
      * \param from The value to copy to this object.
      */
-    MultiphaseStaggeredStokesOperator(const MultiphaseStaggeredStokesOperator& from) = delete;
+    MultiphaseStaggeredStokesBlockOperator(const MultiphaseStaggeredStokesBlockOperator& from) = delete;
 
     /*!
      * \brief Assignment operator.
@@ -279,7 +269,7 @@ private:
      *
      * \return A reference to this object.
      */
-    MultiphaseStaggeredStokesOperator& operator=(const MultiphaseStaggeredStokesOperator& that) = delete;
+    MultiphaseStaggeredStokesBlockOperator& operator=(const MultiphaseStaggeredStokesBlockOperator& that) = delete;
 
     // Synchronization variable
     SAMRAI::tbox::Pointer<SAMRAI::pdat::OutersideVariable<NDIM, double>> d_os_var;
@@ -289,7 +279,7 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::CoarsenSchedule<NDIM>>> d_os_coarsen_scheds;
 
     /// Parameters
-    double d_C = 0.0, d_D_u = -1.0, d_D_p = -1.0, d_D_div = 1.0;
+    double d_C = 0.0, d_D_u = -1.0;
     int d_thn_idx = IBTK::invalid_index;
     const MultiphaseParameters& d_params;
 
@@ -306,4 +296,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_multiphase_MultiphaseStaggeredStokesOperator
+#endif // #ifndef included_multiphase_MultiphaseStaggeredStokesBlockOperator
