@@ -44,6 +44,7 @@ main(int argc, char* argv[])
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
 
     PetscOptionsSetValue(nullptr, "-solver_ksp_rtol", "1.0e-12");
+    PetscOptionsSetValue(nullptr, "-solver_ksp_type", "fgmres");
 
     { // cleanup dynamically allocated objects prior to shutdown
 
@@ -383,7 +384,7 @@ main(int argc, char* argv[])
                        Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
         pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
-        pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
+        pout << "|e|_1  = " << e_vec.L1Norm() << "\n\n";
 
         HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
@@ -405,7 +406,6 @@ main(int argc, char* argv[])
         out << "|e|_oo = " << e_vec.maxNorm() << "\n";
         out << "|e|_2  = " << e_vec.L2Norm() << "\n";
         out << "|e|_1  = " << e_vec.L1Norm() << "\n\n";
-        out << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 
         out << "Error in u_n :\n"
             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"

@@ -109,7 +109,7 @@ MultigridAlg {
 }
 
 GriddingAlgorithm {
-   max_levels = 1                 // Maximum number of levels in hierarchy.
+   max_levels = 2                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 2, 2              // vector ratio to next coarser level

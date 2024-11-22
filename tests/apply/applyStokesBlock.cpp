@@ -276,7 +276,7 @@ main(int argc, char* argv[])
                        Pointer<SAMRAIVectorReal<NDIM, double>>(&e_vec, false)); // analytical
         pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
-        pout << "|e|_1  = " << e_vec.L1Norm() << "\n";
+        pout << "|e|_1  = " << e_vec.L1Norm() << "\n\n";
 
         hier_math_ops.setPatchHierarchy(patch_hierarchy);
         hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
@@ -310,7 +310,8 @@ main(int argc, char* argv[])
         out << "Error in RHS_us :\n"
             << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
             << "  L2-norm:  " << hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx) << "\n"
-            << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n";
+            << "  max-norm: " << hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx) << "\n"
+            << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 
         // Interpolate the side-centered data to cell centers for output.
         static const bool synch_cf_interface = true;

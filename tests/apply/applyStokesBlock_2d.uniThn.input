@@ -76,7 +76,7 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 1                 // Maximum number of levels in hierarchy.
+   max_levels = 2                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 4, 4              // vector ratio to next coarser level
