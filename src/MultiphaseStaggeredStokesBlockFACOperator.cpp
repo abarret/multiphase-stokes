@@ -460,10 +460,6 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                                     (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
                     double thn_imh_jmh = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
                                                     (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
-                    double thn_iph_jph = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + xp) + (*thn_data)(idx_c_up + yp) +
-                                                    (*thn_data)(idx_c_up + xp + yp)); // thn(i+1/2,j+1/2)
-                    double thn_iph_jmh = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + xp) + (*thn_data)(idx_c_up - yp) +
-                                                    (*thn_data)(idx_c_up + xp - yp)); // thn(i+1/2,j-1/2)
 
                     double dx_dx = (dx[0] * dx[0]);
                     double dy_dy = (dx[1] * dx[1]);
@@ -524,10 +520,6 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                                     (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
                     double thn_iph_jmh = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
                                                     (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
-                    double thn_imh_jph = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) + (*thn_data)(idx_c_up + yp) +
-                                                    (*thn_data)(idx_c_up - xp + yp)); // thn(i-1/2,j+1/2)
-                    double thn_iph_jph = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + xp) + (*thn_data)(idx_c_up + yp) +
-                                                    (*thn_data)(idx_c_up + xp + yp)); // thn(i+1/2,j+1/2)
 
                     double dx_dx = (dx[0] * dx[0]);
                     double dy_dy = (dx[1] * dx[1]);
