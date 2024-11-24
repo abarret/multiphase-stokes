@@ -149,7 +149,7 @@ thn_bc {
 }
 
 KrylovSolver {
-
+   ksp_type = "fgmres"
 }
 
 KrylovPrecondStrategy {
