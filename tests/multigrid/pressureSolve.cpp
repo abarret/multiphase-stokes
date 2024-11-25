@@ -11,10 +11,10 @@
 #include "ibtk/CartSideDoubleRT0Refine.h"
 #include "ibtk/PETScKrylovLinearSolver.h"
 #include <ibtk/AppInitializer.h>
-#include <ibtk/IBTKInit.h>
-#include <ibtk/LinearOperator.h>
 #include <ibtk/CCLaplaceOperator.h>
 #include <ibtk/CCPoissonSolverManager.h>
+#include <ibtk/IBTKInit.h>
+#include <ibtk/LinearOperator.h>
 #include <ibtk/PhysicalBoundaryUtilities.h>
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
@@ -85,7 +85,7 @@ main(int argc, char* argv[])
         Pointer<CellVariable<NDIM, double>> thn_cc_var = new CellVariable<NDIM, double>("thn");
         Pointer<SideVariable<NDIM, double>> thn_ths_sq_var = new SideVariable<NDIM, double>("thn_ths_sq_sc");
 
-        // Results of laplace operator 
+        // Results of laplace operator
         Pointer<CellVariable<NDIM, double>> f_cc_var = new CellVariable<NDIM, double>("f");
 
         // Error terms.
@@ -175,21 +175,22 @@ main(int argc, char* argv[])
         {
             Pointer<PatchLevel<NDIM>> level = patch_hierarchy->getPatchLevel(ln);
             for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-            {   
+            {
                 Pointer<Patch<NDIM>> patch = level->getPatch(p());
                 SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
                 const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
                 SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
-                SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_ths_sq_data = patch->getPatchData(thn_ths_sq_idx); 
+                SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_ths_sq_data =
+                    patch->getPatchData(thn_ths_sq_idx);
 
-                for(int axis = 0; axis < NDIM; axis++) 
+                for (int axis = 0; axis < NDIM; axis++)
                 {
-                    for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), axis); si; si++) 
+                    for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
                     {
                         const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // if axis = 0, (i-1/2,j)
 
-                        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-                        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+                        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i-1,j)
+                        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
                         // thn at sides
                         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
                         double thn_sq = thn_lower * thn_lower;
@@ -203,16 +204,12 @@ main(int argc, char* argv[])
         // Setup the Poisson solver.
         PoissonSpecifications poisson_spec("poisson_spec");
         poisson_spec.setCZero();
-        poisson_spec.setDPatchDataId(thn_ths_sq_idx); 
+        poisson_spec.setDPatchDataId(thn_ths_sq_idx);
         RobinBcCoefStrategy<NDIM>* bc_coef = nullptr;
         CCLaplaceOperator laplace_op("laplace_op");
         laplace_op.setPoissonSpecifications(poisson_spec);
         laplace_op.setPhysicalBcCoef(bc_coef);
         laplace_op.initializeOperatorState(u_vec, f_vec);
-        
-        // Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-        // stokes_op->setPhysicalBoundaryHelper(bc_helper);
-        // stokes_op->setThnIdx(thn_cc_idx);
 
         string solver_type = input_db->getString("solver_type");
         Pointer<Database> solver_db = input_db->getDatabase("solver_db");
@@ -236,7 +233,7 @@ main(int argc, char* argv[])
         // This subtracts the projection of solution on the nullspace.
         // The nullspace consists of constants.
         HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
-                patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         double integral = hier_cc_data_ops.integral(p_cc_idx, wgt_cc_idx);
         hier_cc_data_ops.addScalar(p_cc_idx, p_cc_idx, -1.0 * integral);
 
