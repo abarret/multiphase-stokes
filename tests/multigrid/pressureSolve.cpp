@@ -95,7 +95,7 @@ main(int argc, char* argv[])
         const int p_cc_idx = var_db->registerVariableAndContext(p_cc_var, ctx, IntVector<NDIM>(1));
         const int thn_cc_idx =
             var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1)); // 1 layer of ghost cells
-        const int thn_ths_sq_idx = var_db->registerVariableAndContext(thn_ths_sq_var, ctx, IntVector<NDIM>(1)); 
+        const int thn_ths_sq_idx = var_db->registerVariableAndContext(thn_ths_sq_var, ctx, IntVector<NDIM>(0));
         const int f_cc_idx = var_db->registerVariableAndContext(f_cc_var, ctx, IntVector<NDIM>(1));
         const int e_cc_idx = var_db->registerVariableAndContext(e_cc_var, ctx, IntVector<NDIM>(1));
 
@@ -118,6 +118,9 @@ main(int argc, char* argv[])
             done = !patch_hierarchy->finerLevelExists(level_number);
             ++level_number;
         }
+
+        const int coarsest_ln = 0;
+        const int finest_ln = patch_hierarchy->getFinestLevelNumber();
 
         // Allocate data on each level of the patch hierarchy.
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
@@ -159,7 +162,13 @@ main(int argc, char* argv[])
         f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
         thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(e_cc_idx, e_cc_var, patch_hierarchy, 0.0);
-        
+
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp{ ITC(thn_cc_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE") };
+        HierarchyGhostCellInterpolation hier_ghost_fill;
+        hier_ghost_fill.initializeOperatorState(ghost_cell_comp, patch_hierarchy, coarsest_ln, finest_ln);
+        hier_ghost_fill.fillData(0.0);
+
         // This computes Thn^2 + Ths^2
         SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
         for (int ln = 0; ln <= patch_hierarchy->getFinestLevelNumber(); ++ln)
@@ -210,7 +219,7 @@ main(int argc, char* argv[])
         string precond_type = input_db->getString("precond_type");
         Pointer<Database> precond_db = input_db->getDatabase("precond_db");
         Pointer<PoissonSolver> poisson_solver = CCPoissonSolverManager::getManager()->allocateSolver(
-            solver_type, "poisson_solver", solver_db, "", precond_type, "poisson_precond", precond_db, "");
+            solver_type, "poisson_solver", solver_db, "solver_", precond_type, "poisson_precond", precond_db, "");
         poisson_solver->setPoissonSpecifications(poisson_spec);
         poisson_solver->setPhysicalBcCoef(bc_coef);
         poisson_solver->initializeSolverState(u_vec, f_vec);
