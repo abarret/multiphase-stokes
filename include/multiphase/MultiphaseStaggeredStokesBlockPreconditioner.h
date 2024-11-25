@@ -5,6 +5,7 @@
 
 #include <multiphase/MultiphaseLSCSchurComplementSolver.h>
 #include <multiphase/MultiphaseStokesBlockSolver.h>
+#include <ibtk/PoissonSolver.h>
 
 namespace multiphase
 {
@@ -43,13 +44,23 @@ public:
 private:
     // Velocity solver settings.
     std::unique_ptr<MultiphaseStokesBlockSolver> d_stokes_solver;
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_solver_db;
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_precond_db;
 
     // Pressure solver settings.
-    std::unique_ptr<MultiphaseLSCSchurComplementSolver> d_pressure_solver;
+    std::unique_ptr<IBTK::PoissonSolver> d_pressure_solver;
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_solver_db;
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_precond_db;
 
     // Hierarchy data
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
     int d_coarsest_ln = IBTK::invalid_level_number, d_finest_ln = IBTK::invalid_level_number;
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_thn_ths_sq_var;
+    int d_thn_ths_sq_idx = IBTK::invalid_index;
+
+    int d_thn_idx = IBTK::invalid_index;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coefs = nullptr;
 };
 } // namespace multiphase
 #endif
