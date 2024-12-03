@@ -3,7 +3,7 @@ USING_VAR_XI = FALSE
 USE_PRECOND = TRUE
 PRECOND_TYPE = "MULTIGRID"
 w = 0.75
-C = 100.0
+C = 1.0
 D = -1.0
 IS_VEL_NULLSPACE = FALSE
 
@@ -12,7 +12,7 @@ ETAN = 1.0
 ETAS = 1.0
 NU = 1.0
 
-MAX_MULTIGRID_LEVELS = 2  
+MAX_MULTIGRID_LEVELS = 3
 PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 
 un {
@@ -29,6 +29,10 @@ p {
    function = "0.0"
 } // pressure has mean 0
 
+thn {
+   function = "0.25*sin(2*PI*X_0)*sin(2*PI*X_1) + 0.5"
+}
+
 f_un {
    c = C
    d = D
@@ -36,8 +40,8 @@ f_un {
    etan = ETAN
    xi = XI
    etas = ETAS
-   function_0 = "(3*(2*c*nu-d*(16*etan*nu*PI^2+xi))*cos(2*PI*X_1)*sin(2*PI*X_0))/(8*nu)"
-   function_1 = "(3*(2*c*nu-d*(16*etan*nu*PI^2+xi))*cos(2*PI*X_0)*sin(2*PI*X_1))/(8*nu)"
+   function_0 = "(1/(8*nu))*cos(2*PI*X_1)*sin(2*PI*X_0)*(4*c*nu-4*d*(8*etan*nu*PI^2+xi)+2*nu*(c-16*d*etan*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
+   function_1 = "(1/(8*nu))*cos(2*PI*X_0)*sin(2*PI*X_1)*(4*c*nu-4*d*(8*etan*nu*PI^2+xi)+2*nu*(c-16*d*etan*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
 }
 
 f_us {
@@ -47,32 +51,21 @@ f_us {
    etan = ETAN
    xi = XI
    etas = ETAS
-   function_0 = "((-2*c*nu+16*d*etas*nu*PI^2+3*d*xi)*cos(2*PI*X_1)*sin(2*PI*X_0))/(8*nu)"
-   function_1 = "((-2*c*nu+16*d*etas*nu*PI^2+3*d*xi)*cos(2*PI*X_0)*sin(2*PI*X_1))/(8*nu)"
+   function_0 = "(1/(8*nu))*cos(2*PI*X_1)*sin(2*PI*X_0)*(-4*c*nu+4*d*(8*etas*nu*PI^2+xi)+2*nu*(c-16*d*etas*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
+   function_1 = "(1/(8*nu))*cos(2*PI*X_0)*sin(2*PI*X_1)*(-4*c*nu+4*d*(8*etas*nu*PI^2+xi)+2*nu*(c-16*d*etas*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)"
 }
 
 f_p {
-   function = "2*PI*cos(2*PI*X_0)*cos(2*PI*X_1)"
+   function = "PI*sin(4*PI*X_0)*sin(4*PI*X_1)"
 }
 
-thn {
-   function = "0.75"
-}
 
 KrylovSolver {
-
+   ksp_type = "fgmres"
 }
 
 KrylovPrecondStrategy {
 
-}
-
-KrylovPrecond {
-   cycle_type = "V_CYCLE"
-   num_pre_sweeps = 3
-   num_post_sweeps = 3
-   enable_logging = FALSE
-   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
 BlockPreconditioner {
@@ -112,6 +105,15 @@ BlockPreconditioner {
   }
 }
 
+
+KrylovPrecond {
+   cycle_type = "V_CYCLE"
+   num_pre_sweeps = 3
+   num_post_sweeps = 3
+   enable_logging = FALSE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
+}
+
 Main {
 // log file parameters
    log_file_name = "logfile"
@@ -119,7 +121,7 @@ Main {
 
 // visualization dump parameters
    viz_writer = "VisIt"
-   viz_dump_dirname = "viz2d"
+   viz_dump_dirname = "viz2d_multigrid"
    visit_number_procs_per_file = 1
 
 // timer dump parameters
@@ -146,7 +148,7 @@ MultigridAlg {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 2, 2              // vector ratio to next coarser level
@@ -187,5 +189,5 @@ TimerManager{
    print_exclusive = FALSE
    print_total = TRUE
    print_threshold = 1.0
-   timer_list = "IBTK::*::*"
+   timer_list = "IBTK::*::*","IBAMR::*::*","*::*::*"
 }
