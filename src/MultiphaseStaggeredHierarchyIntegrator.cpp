@@ -2,6 +2,7 @@
 
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
@@ -164,6 +165,7 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
     d_use_accel_ts = input_db->getBoolWithDefault("use_accel_ts", d_use_accel_ts);
     d_accel_ts_safety_fac = input_db->getDoubleWithDefault("accel_ts_safety_factor", d_accel_ts_safety_fac);
     d_regularize_thn = input_db->getDoubleWithDefault("regualarize_thn", d_regularize_thn);
+
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
 

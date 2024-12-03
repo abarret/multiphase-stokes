@@ -70,26 +70,6 @@ static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
 
-void
-convert_to_ndim_cc(const int dst_idx, const int cc_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
-{
-    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
-            Pointer<CellData<NDIM, double>> cc_data = patch->getPatchData(cc_idx);
-            for (CellIterator<NDIM> ci(dst_data->getGhostBox()); ci; ci++)
-            {
-                const CellIndex<NDIM>& idx = ci();
-                for (int d = 0; d < dst_data->getDepth(); ++d) (*dst_data)(idx, d) = (*cc_data)(idx);
-            }
-        }
-    }
-}
-
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::string& object_name,
                                                                      bool homogeneous_bc,
@@ -440,15 +420,8 @@ MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     // Allocate synchronization variable
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        if (!level->checkAllocated(d_os_idx)) level->allocatePatchData(d_os_idx);
-        if (!level->checkAllocated(d_sc_scr_idx)) level->allocatePatchData(d_sc_scr_idx);
-        if (!level->checkAllocated(d_nc_scr_idx)) level->allocatePatchData(d_nc_scr_idx);
-        if (!level->checkAllocated(d_cc_ndim_idx)) level->allocatePatchData(d_cc_ndim_idx);
-        if (!level->checkAllocated(d_thn_scr_idx)) level->allocatePatchData(d_thn_scr_idx);
-    }
+    allocate_patch_data(
+        { d_os_idx, d_sc_scr_idx, d_nc_scr_idx, d_cc_ndim_idx, d_thn_scr_idx }, d_hierarchy, d_solution_time, coarsest_ln, finest_ln);
 
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
     d_os_coarsen_op = grid_geom->lookupCoarsenOperator(d_os_var, "CONSERVATIVE_COARSEN");
@@ -555,15 +528,7 @@ MultiphaseStaggeredStokesOperator::deallocateOperatorState()
     // Deallocate synchronization variable
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        if (level->checkAllocated(d_os_idx)) level->deallocatePatchData(d_os_idx);
-        if (level->checkAllocated(d_sc_scr_idx)) level->deallocatePatchData(d_sc_scr_idx);
-        if (level->checkAllocated(d_nc_scr_idx)) level->deallocatePatchData(d_nc_scr_idx);
-        if (level->checkAllocated(d_cc_ndim_idx)) level->deallocatePatchData(d_cc_ndim_idx);
-        if (level->checkAllocated(d_thn_scr_idx)) level->deallocatePatchData(d_thn_scr_idx);
-    }
+    deallocate_patch_data({ d_os_idx, d_sc_scr_idx, d_nc_scr_idx, d_cc_ndim_idx, d_thn_scr_idx }, d_hierarchy, coarsest_ln, finest_ln);
     d_os_coarsen_scheds.clear();
     d_os_coarsen_alg = nullptr;
 
@@ -672,7 +637,7 @@ MultiphaseStaggeredStokesOperator::applySpecialized(const int A_P_idx,
                             nullptr,
                             d_solution_time);
     // Interpolate to cell sides
-    convert_to_ndim_cc(d_cc_ndim_idx, thn_idx, d_hierarchy);
+    convert_to_ndim_cc(d_cc_ndim_idx, thn_idx, *d_hierarchy);
     d_hier_math_ops->interp(d_sc_scr_idx, d_sc_scr_var, true, d_cc_ndim_idx, d_cc_ndim_var, nullptr, d_solution_time);
 
     // Compute the forces on momentum.

@@ -7,6 +7,7 @@
 
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/MultiphaseConvectiveManager.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
@@ -32,6 +33,7 @@
 #include "tbox/Database.h"
 #include "tbox/Pointer.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -378,7 +380,6 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_grad_thn_var;
     SAMRAI::tbox::Array<double> d_abs_grad_thresh, d_rel_grad_thresh;
     double d_max_grad_thn = std::numeric_limits<double>::quiet_NaN();
-
 
     /*!
      * Drawing information.
