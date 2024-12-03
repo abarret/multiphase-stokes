@@ -1,4 +1,5 @@
 USE_PRECONDITIONER = TRUE
+PRECOND_TYPE = "BLOCK"
 RHO = 1.0
 N = 16
 MAX_MULTIGRID_LEVELS = 3
@@ -12,7 +13,7 @@ DT_MAX = CFL_MAX * DX / U_MAX
 END_TIME = 5*DT_MAX
 ENABLE_LOGGING = FALSE
 W = 0.75
-VIZ_DUMP_TIME_INTERVAL = 0.005
+VIZ_DUMP_TIME_INTERVAL = 0.005  
 DELTA = 0.175
 TAG_BUFFER = 1
 REGRID_INTERVAL = 10
@@ -23,34 +24,16 @@ ADV_DIFF_CONVECTIVE_TS_TYPE = "ADAMS_BASHFORTH"
 ADV_DIFF_CONVECTIVE_FORM = "CONSERVATIVE"
 
 // Complex Fluid parameters
-USE_CF = TRUE
-FLUID_MODEL = "USER_DEFINED"
-EVOLVE_TYPE = "STANDARD"
-LOG_DETERMINANT     = TRUE
-CONVECTIVE_OPERATOR_TYPE     = "CUI"
-OUTPUT_CONFORMATION_TENSOR = TRUE
-OUTPUT_STRESS_TENSOR = TRUE
-OUTPUT_DIVERGENCE = TRUE
-RELAXATION_TIME = 4.0
-VISCOSITY = 2.0
-USING_EXACT_U = FALSE
-BDRY_INTERP_TYPE = "LINEAR"
-PROJECT_CONFORM_TENS = FALSE
+USE_CF = FALSE
 
 VISCOUS_TS_TYPE = "TRAPEZOIDAL_RULE"
 HAS_VEL_NULLSPACE = FALSE
 
 ETA_S = 0.04
-L_S = -ETA_S
-ETA_N = 2.0
-L_N = -ETA_N
+ETA_N = 4.0
 NU_N = 1.0
 NU_S = 1.0
 XI = 250.0*ETA_S
-
-z_init {
-   function_0 = "1.0"
-}
 
 un {
    function_0 = "0.0"
@@ -72,63 +55,68 @@ thn {
 }
 
 FN_FCN {
-   function_0 = "(t < 0.2) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_0) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
-   function_1 = "(t < 0.2) ? (2*PI*cos(2*PI*X_1)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
+   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
 }
 
 FS_FCN {
-   function_0 = "(t < 0.2) ? (2*PI*sin(2*PI*X_0)*cos(2*PI*X_0) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)) : 0.0"
-   function_1 = "(t < 0.2) ? (2*PI*cos(2*PI*X_1)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)) : 0.0"
-}
-
-CFINSForcing {
-InitialConditions{
- function_0 = "1.0"
- function_1 = "1.0"
- function_2 = "0.0"
-}
-relaxation_time = RELAXATION_TIME
-alpha = VISCOSITY
-fluid_model         = FLUID_MODEL
-evolution_type = EVOLVE_TYPE
-log_determinant     = LOG_DETERMINANT
-convective_operator_type     = CONVECTIVE_OPERATOR_TYPE
-output_stress_tensor = OUTPUT_STRESS_TENSOR
-output_conformation_tensor = OUTPUT_CONFORMATION_TENSOR
-output_divergence = OUTPUT_DIVERGENCE
-interp_type = BDRY_INTERP_TYPE
-project_conformation_tensor = PROJECT_CONFORM_TENS
+   function_0 = "2*PI*sin(2*PI*X_0)*cos(2*PI*X_1) + 8*PI*PI*sin(2*PI*X_0)*cos(2*PI*X_1)"
+   function_1 = "2*PI*cos(2*PI*X_0)*sin(2*PI*X_1) - 8*PI*PI*cos(2*PI*X_0)*sin(2*PI*X_1)"
 }
 
 INSVCTwoFluidStaggeredHierarchyIntegrator {
-   creeping_flow = TRUE
-   convec_limiter_type = "CUI"
    rho                           = RHO
    start_time                    = START_TIME
    end_time                      = END_TIME
    num_cycles                    = NUM_CYCLES
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
-   mu = 0.0 // TO ELIMINATE WARNINGS
    use_preconditioner = USE_PRECONDITIONER
-   grad_abs_thresh = 0.20, 0.80, 1.75
+   precond_type = PRECOND_TYPE
+   grad_abs_thresh = 0.75
    use_grad_tagging = TRUE
    tag_buffer = TAG_BUFFER
    regrid_interval = REGRID_INTERVAL
-   viscous_time_stepping_type = VISCOUS_TS_TYPE
-   has_vel_nullspace = HAS_VEL_NULLSPACE
 
    solver_db {
       ksp_type = "fgmres"
    }
 
    precond_db {
-      relaxation_parameter = W
-      cycle_type = "V_CYCLE"
-      num_pre_sweeps = 5
-      num_post_sweeps = 5
-      enable_logging = FALSE
-      max_multigrid_levels = MAX_MULTIGRID_LEVELS
+      stokes_solver_db {
+         ksp_type = "fgmres"  
+      }
+
+      stokes_precond_db {
+         cycle_type = "V_CYCLE"
+         num_pre_sweeps = 3
+         num_post_sweeps = 3
+         enable_logging = FALSE
+         max_multigrid_levels = MAX_MULTIGRID_LEVELS
+      }
+
+      pressure_solver_type = "PETSC_KRYLOV_SOLVER"
+      pressure_solver_db {
+         ksp_type = "fgmres"
+      }
+
+      pressure_precond_type = "POINT_RELAXATION_FAC_PRECONDITIONER"
+      pressure_precond_db {
+         num_pre_sweeps  = 0
+         num_post_sweeps = 3
+         prolongation_method = "LINEAR_REFINE"
+         restriction_method  = "CONSERVATIVE_COARSEN"
+         coarse_solver_type  = "HYPRE_LEVEL_SOLVER"
+         coarse_solver_rel_residual_tol = 1.0e-12
+         coarse_solver_abs_residual_tol = 1.0e-50
+         coarse_solver_max_iterations = 1
+         coarse_solver_db {
+            solver_type          = "PFMG"
+            num_pre_relax_steps  = 0
+            num_post_relax_steps = 3
+            enable_logging       = FALSE
+         }
+      }
    }
 }
 
@@ -146,7 +134,7 @@ AdvDiffIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "output"
+   log_file_name = "logfile"
    log_all_nodes = FALSE
 
 // visualization dump parameters
@@ -174,7 +162,7 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 4, 4              // vector ratio to next coarser level
@@ -195,9 +183,6 @@ GriddingAlgorithm {
    efficiency_tolerance = 0.70e0  // min % of tag cells in new patch level
    combine_efficiency   = 0.85e0  // chop box if sum of volumes of smaller
                                   // boxes < efficiency * vol of large box
-
-   proper_nesting_buffer = 1
-   allow_patches_smaller_than_minimum_size_to_prevent_overlaps = FALSE
 }
 
 StandardTagAndInitialize {

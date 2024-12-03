@@ -60,6 +60,40 @@
 #include <string>
 #include <vector>
 
+// Fortran Routines
+#define velocity_R_B_G_S IBTK_FC_FUNC_(velocity_rbgs, VRBGS)
+
+extern "C"
+{
+    void velocity_R_B_G_S(const double*, // dx
+                            const int&,    // ilower0
+                            const int&,    // iupper0
+                            const int&,    // ilower1
+                            const int&,    // iupper1
+                            double* const, // un_data_0
+                            double* const, // un_data_1
+                            const int&,    // un_gcw
+                            double* const, // us_data_0
+                            double* const, // us_data_0
+                            const int&,    // us_gcw
+                            double* const, // f_un_data_0
+                            double* const, // f_un_data_1
+                            const int&,    // f_un_gcw
+                            double* const, // f_us_data_0
+                            double* const, // f_us_data_1
+                            const int&,    // f_us_gcw
+                            double* const, // thn_data
+                            const int&,    // thn_gcw
+                            const double&, // eta_n    
+                            const double&, // eta_s    
+                            const double&, // nu_n
+                            const double&, // nu_s
+                            const double&, // xi
+                            const double&, // w = under relaxation factor
+                            const double&, // C in C*u term
+                            const double&, // D
+                            const int&);   // red_or_black
+}
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 namespace multiphase
 {
@@ -358,11 +392,13 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
     IntVector<NDIM> xp(1, 0), yp(0, 1);
 
     // outer for loop for number of sweeps
-    for (int sweep = 0; sweep < num_sweeps; sweep++)
+    // Change to 2 * num_sweeps if using red-black
+    for (int sweep = 0; sweep < 2*num_sweeps; sweep++)
     {   
         if (level_num > 0)
-        {
-            if (sweep > 0)
+        {   
+             // Use 1 here if using red-black ordering.
+            if (sweep > 1)
             {
                 // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
                 int patch_counter = 0;
@@ -415,6 +451,9 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
+            double dx_dx = (dx[0] * dx[0]);
+            double dy_dy = (dx[1] * dx[1]);
+            double dx_dy = (dx[0] * dx[1]);
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
@@ -432,6 +471,31 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                 d_bc_us_helper->copyDataAtDirichletBoundaries(us_data, f_us_data, patch);
             }
 
+            double* const un_data_0 = un_data->getPointer(0);
+            double* const un_data_1 = un_data->getPointer(1);
+            double* const us_data_0 = us_data->getPointer(0);
+            double* const us_data_1 = us_data->getPointer(1);
+            double* const thn_ptr_data = thn_data->getPointer(0);
+            double* const f_un_data_0 = f_un_data->getPointer(0);
+            double* const f_un_data_1 = f_un_data->getPointer(1);
+            double* const f_us_data_0 = f_us_data->getPointer(0);
+            double* const f_us_data_1 = f_us_data->getPointer(1);
+
+            const Box<NDIM>& patch_box = patch->getBox();
+            const IntVector<NDIM>& patch_lower =
+                patch_box.lower(); // patch_lower(0), patch_lower(1) are min indices in x and y-dir
+            const IntVector<NDIM>& patch_upper =
+                patch_box.upper(); // patch_upper(0), patch_upper(1) are max indices in x and y-dir
+
+            const IntVector<NDIM>& thn_gcw = thn_data->getGhostCellWidth();
+            const IntVector<NDIM>& un_gcw = un_data->getGhostCellWidth();
+            const IntVector<NDIM>& us_gcw = us_data->getGhostCellWidth();
+            const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
+            const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
+            int red_or_black = sweep % 2; // red = 0 and black = 1
+            // if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
+            //     d_bc_us_helper->patchTouchesDirichletBoundary(patch))
+
             if (d_params.isVariableDrag())
             {
                 // Place var xi implementation here
@@ -440,124 +504,35 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
             }// end variable drag
             else // use constant xi coefficient
             {
-                // Gauss-Seidel iterations with successive under relaxation
-                for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
-                {
-                    const SAMRAI::pdat::SideIndex<NDIM>& idx = si();           // axis = 0, (i-1/2,j)
-
-                    SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-                    SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                    SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
-                    SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
-                    SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
-                    SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
-
-                    // thn at sides
-                    double thn_lower_x = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up));     // thn(i-1/2,j)
-
-                    // thn at corners
-                    double thn_imh_jph = 0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
-                                                    (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
-                    double thn_imh_jmh = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
-                                                    (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
-
-                    double dx_dx = (dx[0] * dx[0]);
-                    double dy_dy = (dx[1] * dx[1]);
-                    double dx_dy = (dx[0] * dx[1]);
-
-                    // Solve for network velocities
-                    double un_imhalf_j = (*f_un_data)(lower_x_idx);   
-                    un_imhalf_j -= d_D * d_params.eta_n * ((thn_imh_jph-(*thn_data)(idx))/(dx_dy) * (*un_data)(upper_y_idx) 
-                                    + ((*thn_data)(idx-xp))/(dx_dx) * (*un_data)(lower_x_idx - xp) 
-                                    + ((*thn_data)(idx)/dx_dx * (*un_data)(upper_x_idx)) 
-                                    + (thn_imh_jph/dy_dy * (*un_data)(lower_x_idx + yp)) 
-                                    + (thn_imh_jmh/dy_dy * (*un_data)(lower_x_idx - yp))
-                                    + ((*thn_data)(idx - xp) - thn_imh_jph)/(dx_dy) * (*un_data)(upper_y_idx - xp)
-                                    + (thn_imh_jmh - (*thn_data)(idx - xp))/(dx_dy) * (*un_data)(lower_y_idx - xp)
-                                    + ((*thn_data)(idx)-thn_imh_jmh)/(dx_dy) * (*un_data)(lower_y_idx)) 
-                                    - d_D * d_params.xi * (*us_data)(lower_x_idx) * thn_lower_x * convertToThs(thn_lower_x);
-                    un_imhalf_j /= d_D * d_params.eta_n *
-                                       (-((*thn_data)(idx) + (*thn_data)(idx - xp)) / (dx_dx) -
-                                        (thn_imh_jph + thn_imh_jmh) / (dy_dy)) +
-                                   d_D * d_params.xi * thn_lower_x * convertToThs(thn_lower_x) + d_C * thn_lower_x;
-                    (*un_data)(lower_x_idx) = (1.0 - d_w) * (*un_data)(lower_x_idx) + d_w * un_imhalf_j;
-
-                    // Solve for solvent velocities
-                    double us_imhalf_j = (*f_us_data)(lower_x_idx);   
-                    us_imhalf_j -= d_D * d_params.eta_s * ((convertToThs(thn_imh_jph)-convertToThs((*thn_data)(idx)))/(dx_dy) * (*us_data)(upper_y_idx) 
-                                + (convertToThs((*thn_data)(idx-xp)))/(dx_dx) * (*us_data)(lower_x_idx - xp) 
-                                + (convertToThs((*thn_data)(idx))/dx_dx * (*us_data)(upper_x_idx)) 
-                                + (convertToThs(thn_imh_jph)/dy_dy * (*us_data)(lower_x_idx + yp)) 
-                                + (convertToThs(thn_imh_jmh)/dy_dy * (*us_data)(lower_x_idx - yp))
-                                + (convertToThs((*thn_data)(idx - xp)) - convertToThs(thn_imh_jph))/(dx_dy) * (*us_data)(upper_y_idx - xp)
-                                + (convertToThs(thn_imh_jmh) - convertToThs((*thn_data)(idx - xp)))/(dx_dy) * (*us_data)(lower_y_idx - xp)
-                                + (convertToThs((*thn_data)(idx))-convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_y_idx)) 
-                                - d_D * d_params.xi * (*un_data)(lower_x_idx) * thn_lower_x * convertToThs(thn_lower_x);
-                    us_imhalf_j /=
-                        d_D * d_params.eta_s *
-                            (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - xp))) / (dx_dx) -
-                             (convertToThs(thn_imh_jph) + convertToThs(thn_imh_jmh)) / (dy_dy)) +
-                        d_D * d_params.xi * thn_lower_x * convertToThs(thn_lower_x) + d_C * convertToThs(thn_lower_x);
-                    (*us_data)(lower_x_idx) = (1.0 - d_w) * (*us_data)(lower_x_idx) + d_w * us_imhalf_j;
-                } // side-centers in x-dir
-
-                for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
-                {
-                    const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
-
-                    SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-                    SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-                    SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
-                    SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
-                    SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
-                    SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
-
-                    // thn at sides
-                    double thn_lower_y = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
-
-                    // thn at corners
-                    double thn_imh_jmh = 0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) +
-                                                    (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
-                    double thn_iph_jmh = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
-                                                    (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
-
-                    double dx_dx = (dx[0] * dx[0]);
-                    double dy_dy = (dx[1] * dx[1]);
-                    double dx_dy = (dx[0] * dx[1]);
-                    
-                    double un_i_jmhalf = (*f_un_data)(lower_y_idx);
-                    un_i_jmhalf -= d_D * d_params.eta_n * ((thn_imh_jmh/dx_dx) * (*un_data)(lower_y_idx - xp)
-                                    + (thn_iph_jmh/dx_dx) * (*un_data)(lower_y_idx + xp)
-                                    + ((*thn_data)(idx)/dy_dy) * (*un_data)(upper_y_idx)
-                                    + ((*thn_data)(idx - yp)/dy_dy) * (*un_data)(lower_y_idx - yp)
-                                    + (thn_imh_jmh - (*thn_data)(idx - yp))/(dx_dy) * (*un_data)(lower_x_idx - yp)
-                                    + ((*thn_data)(idx - yp) - thn_iph_jmh)/(dx_dy) * (*un_data)(upper_x_idx - yp)
-                                    + ((*thn_data)(idx) - thn_imh_jmh)/(dx_dy) * (*un_data)(lower_x_idx)
-                                    + (thn_iph_jmh - (*thn_data)(idx))/(dx_dy) * (*un_data)(upper_x_idx)) 
-                                    - d_D * d_params.xi * (*us_data)(lower_y_idx)  * thn_lower_y * convertToThs(thn_lower_y);
-                    un_i_jmhalf /= d_D * d_params.eta_n *
-                                    (-((*thn_data)(idx) + (*thn_data)(idx - yp)) / (dy_dy) -
-                                        (thn_iph_jmh + thn_imh_jmh) / (dx_dx)) +
-                                d_D * d_params.xi * thn_lower_y * convertToThs(thn_lower_y) + d_C * thn_lower_y;
-                    (*un_data)(lower_y_idx) = (1.0 - d_w) * (*un_data)(lower_y_idx) + d_w * un_i_jmhalf;
-
-                    double us_i_jmhalf = (*f_us_data)(lower_y_idx);
-                    us_i_jmhalf -= d_D * d_params.eta_s * ((convertToThs(thn_imh_jmh)/dx_dx) * (*us_data)(lower_y_idx - xp)
-                                + (convertToThs(thn_iph_jmh)/dx_dx) * (*us_data)(lower_y_idx + xp)
-                                + (convertToThs((*thn_data)(idx))/dy_dy) * (*us_data)(upper_y_idx)
-                                + (convertToThs((*thn_data)(idx - yp))/dy_dy) * (*us_data)(lower_y_idx - yp)
-                                + (convertToThs(thn_imh_jmh) - convertToThs((*thn_data)(idx - yp)))/(dx_dy) * (*us_data)(lower_x_idx - yp)
-                                + (convertToThs((*thn_data)(idx - yp)) - convertToThs(thn_iph_jmh))/(dx_dy) * (*us_data)(upper_x_idx - yp)
-                                + (convertToThs((*thn_data)(idx)) - convertToThs(thn_imh_jmh))/(dx_dy) * (*us_data)(lower_x_idx)
-                                + (convertToThs(thn_iph_jmh) - convertToThs((*thn_data)(idx)))/(dx_dy) * (*us_data)(upper_x_idx)) 
-                                - d_D * d_params.xi * (*un_data)(lower_y_idx) * thn_lower_y * convertToThs(thn_lower_y);
-                    us_i_jmhalf /=
-                        d_D * d_params.eta_s *
-                            (-(convertToThs((*thn_data)(idx)) + convertToThs((*thn_data)(idx - yp))) / (dy_dy) -
-                            (convertToThs(thn_iph_jmh) + convertToThs(thn_imh_jmh)) / (dx_dx)) +
-                        d_D * d_params.xi * thn_lower_y * convertToThs(thn_lower_y) + d_C * convertToThs(thn_lower_y);
-                    (*us_data)(lower_y_idx) = (1.0 - d_w) * (*us_data)(lower_y_idx) + d_w * us_i_jmhalf;
-                } // side-centers in y-dir
+                // Red-Black Gauss-Seidel with successive under relaxation
+                velocity_R_B_G_S(dx,
+                                 patch_lower(0), // ilower0
+                                 patch_upper(0), // iupper0
+                                 patch_lower(1), // ilower1
+                                 patch_upper(1), // iupper1
+                                 un_data_0,
+                                 un_data_1,
+                                 un_gcw.min(),
+                                 us_data_0,
+                                 us_data_1,
+                                 us_gcw.min(),
+                                 f_un_data_0,
+                                 f_un_data_1,
+                                 f_un_gcw.min(),
+                                 f_us_data_0,
+                                 f_us_data_1,
+                                 f_us_gcw.min(),
+                                 thn_ptr_data,
+                                 thn_gcw.min(),
+                                 d_params.eta_n,
+                                 d_params.eta_s,
+                                 d_params.nu_n,
+                                 d_params.nu_s,
+                                 d_params.xi,
+                                 d_w,
+                                 d_C,
+                                 d_D,
+                                 red_or_black);
             } // end constant xi coefficient
         } // patches
     }// sweeps

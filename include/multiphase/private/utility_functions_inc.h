@@ -80,5 +80,32 @@ deallocate_patch_data(const int idx,
     comps.setFlag(idx);
     deallocate_patch_data(comps, hierarchy, coarsest_ln, finest_ln);
 }
+
+inline void
+set_valid_level_numbers(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, int& coarsest_ln, int& finest_ln)
+{
+    coarsest_ln = coarsest_ln == IBTK::invalid_level_number ? 0 : coarsest_ln;
+    finest_ln = finest_ln == IBTK::invalid_level_number ? hierarchy.getFinestLevelNumber() : finest_ln;
+}
+
+inline void
+convert_to_ndim_cc(const int dst_idx, const int cc_idx, SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy)
+{
+    for (int ln = 0; ln <= hierarchy.getFinestLevelNumber(); ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy.getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> cc_data = patch->getPatchData(cc_idx);
+            for (SAMRAI::pdat::CellIterator<NDIM> ci(dst_data->getGhostBox()); ci; ci++)
+            {
+                const SAMRAI::pdat::CellIndex<NDIM>& idx = ci();
+                for (int d = 0; d < dst_data->getDepth(); ++d) (*dst_data)(idx, d) = (*cc_data)(idx);
+            }
+        }
+    }
+}
 } // namespace multiphase
 #endif

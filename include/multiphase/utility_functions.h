@@ -220,6 +220,10 @@ void deallocate_patch_data(const int idx,
                            int finest_ln);
 //\}
 
+void set_valid_level_numbers(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, int& coarsest_ln, int& finest_ln);
+
+void convert_to_ndim_cc(int dst_idx, int cc_idx, SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy);
+
 template <typename T>
 inline T
 string_to_enum(const std::string& /*val*/)
@@ -273,6 +277,31 @@ enum_to_string<TimeSteppingType>(TimeSteppingType val)
     if (val == TimeSteppingType::BDF2) return "BDF2";
     return "UNKNOWN_TIME_STEPPING_TYPE";
 } // enum_to_string
+
+enum class PreconditionerType
+{
+    MULTIGRID,
+    BLOCK,
+    UNKNOWN_TYPE = -1
+};
+
+template <>
+inline PreconditionerType
+string_to_enum<PreconditionerType>(const std::string& val)
+{
+    if (strcasecmp(val.c_str(), "MULTIGRID") == 0) return PreconditionerType::MULTIGRID;
+    if (strcasecmp(val.c_str(), "BLOCK") == 0) return PreconditionerType::BLOCK;
+    return PreconditionerType::UNKNOWN_TYPE;
+}
+
+template <>
+inline std::string
+enum_to_string<PreconditionerType>(PreconditionerType val)
+{
+    if (val == PreconditionerType::MULTIGRID) return "MULTIGRID";
+    if (val == PreconditionerType::BLOCK) return "BLOCK";
+    return "UNKNOWN_TYPE";
+}
 
 } // namespace multiphase
 

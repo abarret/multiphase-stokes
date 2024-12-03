@@ -1,9 +1,9 @@
 USING_VAR_XI = FALSE
 
 USE_PRECOND = TRUE
-PRECOND_TYPE = "MULTIGRID"
+PRECOND_TYPE = "BLOCK"
 w = 0.75
-C = 100.0
+C = 1.0
 D = -1.0
 IS_VEL_NULLSPACE = FALSE
 
@@ -12,7 +12,7 @@ ETAN = 1.0
 ETAS = 1.0
 NU = 1.0
 
-MAX_MULTIGRID_LEVELS = 2  
+MAX_MULTIGRID_LEVELS = 3
 PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 
 un {
@@ -60,24 +60,12 @@ thn {
 }
 
 KrylovSolver {
-
-}
-
-KrylovPrecondStrategy {
-
-}
-
-KrylovPrecond {
-   cycle_type = "V_CYCLE"
-   num_pre_sweeps = 3
-   num_post_sweeps = 3
-   enable_logging = FALSE
-   max_multigrid_levels = MAX_MULTIGRID_LEVELS
+  ksp_type = "fgmres" // uses right PC by default 
 }
 
 BlockPreconditioner {
   stokes_solver_db {
-    ksp_type = "fgmres"  
+    ksp_type = "fgmres"
   }
 
   stokes_precond_db {
@@ -110,6 +98,14 @@ BlockPreconditioner {
       enable_logging       = FALSE
     }
   }
+}
+
+KrylovPrecond {
+   cycle_type = "V_CYCLE"
+   num_pre_sweeps = 3
+   num_post_sweeps = 3
+   enable_logging = FALSE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
 Main {
@@ -146,7 +142,7 @@ MultigridAlg {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 2, 2              // vector ratio to next coarser level
