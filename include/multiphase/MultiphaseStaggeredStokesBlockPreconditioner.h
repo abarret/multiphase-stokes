@@ -2,10 +2,14 @@
 #define included_MultiphaseStaggeredStokesBlockPreconditioner
 
 #include <ibtk/LinearSolver.h>
-
-#include <multiphase/MultiphaseLSCSchurComplementSolver.h>
-#include <multiphase/MultiphaseStokesBlockSolver.h>
+#include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/PoissonSolver.h>
+
+#include <multiphase/FullFACPreconditioner.h>
+#include <multiphase/MultiphaseLSCSchurComplementSolver.h>
+#include <multiphase/MultiphaseParameters.h>
+#include <multiphase/MultiphaseStaggeredStokesBlockFACOperator.h>
+#include <multiphase/MultiphaseStokesBlockSolver.h>
 
 namespace multiphase
 {
@@ -42,15 +46,28 @@ public:
     void deallocateSolverState() override;
 
 private:
+    // Velocity and Pressure vectors
+    SAMRAI::solv::SAMRAIVectorReal<NDIM, double> d_u_vec, d_p_vec;
+    SAMRAI::solv::SAMRAIVectorReal<NDIM, double> d_bu_vec, d_bp_vec;
+
+    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>> d_hier_cc_data_ops;
+    SAMRAI::tbox::Pointer<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>> d_hier_sc_data_ops;
+
     // Velocity solver settings.
-    std::unique_ptr<MultiphaseStokesBlockSolver> d_stokes_solver;
+    std::unique_ptr<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_solver_db;
+    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
+    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockFACOperator> d_stokes_precond_op;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_precond_db;
+    MultiphaseParameters d_params;
 
     // Pressure solver settings.
-    std::unique_ptr<IBTK::PoissonSolver> d_pressure_solver;
+    SAMRAI::tbox::Pointer<IBTK::PoissonSolver> d_pressure_solver;
+    std::string d_pressure_solver_type = "PETSC_KRYLOV_SOLVER";
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_solver_db;
+    std::string d_pressure_precond_type = "POINT_RELAXATION_FAC_PRECONDITIONER";
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_precond_db;
+    SAMRAI::solv::PoissonSpecifications d_pressure_coefs;
 
     // Hierarchy data
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
