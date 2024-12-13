@@ -36,6 +36,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::MultiphaseStaggeredStokesBlockPrec
     d_us_scr_idx = var_db->registerVariableAndContext(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
     d_fn_scr_idx = var_db->registerVariableAndContext(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
     d_fs_scr_idx = var_db->registerVariableAndContext(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    d_p_scr_idx = var_db->registerVariableAndContext(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
 
     // Set up the solver databases
     d_stokes_solver_db = input_db->getDatabase("stokes_solver_db");
@@ -71,16 +72,6 @@ bool
 MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& x,
                                                           SAMRAIVectorReal<NDIM, double>& b)
 {
-    // Pull out components of the vectors
-    x.setToScalar(0.0); // Currently inputs are NaN's, so set them to 0 for now...
-    const int un_idx = x.getComponentDescriptorIndex(UN_COMP_IDX);
-    const int us_idx = x.getComponentDescriptorIndex(US_COMP_IDX);
-    const int p_idx = x.getComponentDescriptorIndex(P_COMP_IDX);
-
-    const int bn_idx = b.getComponentDescriptorIndex(UN_COMP_IDX);
-    const int bs_idx = b.getComponentDescriptorIndex(US_COMP_IDX);
-    const int bp_idx = b.getComponentDescriptorIndex(P_COMP_IDX);
-
     // Create the individual vectors, add components to the vectors
     SAMRAIVectorReal<NDIM, double> u_vec(d_object_name + "::U_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln),
         p_vec(d_object_name + "::P_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln);
@@ -93,12 +84,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
 
     SAMRAIVectorReal<NDIM, double> bu_vec(d_object_name + "::BU_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln),
         bp_vec(d_object_name + "::BP_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln);
-    bu_vec.addComponent(
-        b.getComponentVariable(0), b.getComponentDescriptorIndex(0), b.getControlVolumeIndex(0), d_hier_sc_data_ops);
-    bu_vec.addComponent(
-        b.getComponentVariable(1), b.getComponentDescriptorIndex(1), b.getControlVolumeIndex(1), d_hier_sc_data_ops);
-    bp_vec.addComponent(
-        b.getComponentVariable(2), b.getComponentDescriptorIndex(2), b.getControlVolumeIndex(2), d_hier_cc_data_ops);
+    bu_vec.addComponent(d_fn_scr_var, d_fn_scr_idx, b.getControlVolumeIndex(0), d_hier_sc_data_ops);
+    bu_vec.addComponent(d_fs_scr_var, d_fs_scr_idx, b.getControlVolumeIndex(1), d_hier_sc_data_ops);
+    bp_vec.addComponent(d_p_scr_var, d_p_scr_idx, b.getControlVolumeIndex(2), d_hier_cc_data_ops);
 
     /*
      * The preconditioner solves:
@@ -118,8 +106,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
      */
 
     // First solve the approximate Schur complement system
-    // The approximate Schur complement is S*p=db with S = (G^T*G)*(G^T*A*G)^(-1)*(G^T*G)
+    // The approximate Schur complement is -S*p=db with S = (G^T*G)*(G^T*A*G)^(-1)*(G^T*G)
     // We first solve G^T*G*p_1 = b_p.
+    d_hier_cc_data_ops->copyData(d_p_scr_idx, b.getComponentDescriptorIndex(2));
     d_pressure_solver->solveSystem(p_vec, bp_vec);
 
     // Fill ghost cells for p_vec.
@@ -132,15 +121,23 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
 
     // Now compute the RHS for the next solve:
     // b_p = G^T*A*G*p_1
+    // Note the negative here to account for -S in the original operator.
     multiphase_grad_on_hierarchy(*d_hierarchy,
                                  d_un_scr_idx,
                                  d_us_scr_idx,
                                  d_thn_idx,
                                  p_vec.getComponentDescriptorIndex(0),
-                                 1.0,
-                                 true,
+                                 -1.0,
+                                 false,
                                  d_coarsest_ln,
                                  d_finest_ln);
+
+    std::vector<ITC> u_ghost_comps{ ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN"),
+                                    ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN") };
+    hier_ghost_fill.deallocateOperatorState();
+    hier_ghost_fill.initializeOperatorState(u_ghost_comps, d_hierarchy, d_coarsest_ln, d_finest_ln);
+    hier_ghost_fill.fillData(d_solution_time);
+
     accumulateMomentumWithoutPressureConstantCoefficient(*d_hierarchy,
                                                          d_fn_scr_idx,
                                                          d_fs_scr_idx,
@@ -148,10 +145,11 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                                                          d_us_scr_idx,
                                                          d_thn_idx,
                                                          d_params,
-                                                         1.0,
-                                                         1.0,
+                                                         d_C,
+                                                         d_D,
                                                          d_coarsest_ln,
                                                          d_finest_ln);
+
     applyCoincompressibility(*d_hierarchy,
                              bp_vec.getComponentDescriptorIndex(0),
                              d_fn_scr_idx,
@@ -165,7 +163,16 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     // G^T*G*p = b_p.
     d_pressure_solver->solveSystem(p_vec, bp_vec);
 
+    // Fill ghost cells for p_vec.
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    hier_ghost_fill.deallocateOperatorState();
+    hier_ghost_fill.initializeOperatorState(ghost_comps, d_hierarchy, d_coarsest_ln, d_finest_ln);
+    hier_ghost_fill.fillData(d_solution_time);
+
     // Now compute the appropriate RHS for the velocity sub problem.
+    d_hier_sc_data_ops->copyData(bu_vec.getComponentDescriptorIndex(0), b.getComponentDescriptorIndex(0));
+    d_hier_sc_data_ops->copyData(bu_vec.getComponentDescriptorIndex(1), b.getComponentDescriptorIndex(1));
+
     for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -191,8 +198,8 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                     // interfaces. Consider using HierarchyMathOps::grad() instead.
                     const double dp = ((*p_data)(idx.toCell(1)) - (*p_data)(idx.toCell(0))) / dx[axis];
                     const double thn = 0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0)));
-                    (*bun_data)(idx) = (*bun_data)(idx) + thn * dp;
-                    (*bus_data)(idx) = (*bun_data)(idx) + convertToThs(thn) * dp;
+                    (*bun_data)(idx) = (*bun_data)(idx)-thn * dp;
+                    (*bus_data)(idx) = (*bus_data)(idx)-convertToThs(thn) * dp;
                 }
             }
         }
@@ -201,6 +208,16 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     // Now solve the velocity block
     d_stokes_solver->solveSystem(u_vec, bu_vec);
 
+    // Remove contributions of nullspace
+    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
+    for (const auto& null_vec : null_vecs)
+    {
+        const double dot_prod = x.dot(null_vec);
+        // Removes the projection of the solution onto the nullspace
+        x.linearSum(1.0, Pointer<SAMRAIVectorReal<NDIM, double>>(&x, false), -dot_prod, null_vec);
+    }
+
+    // TODO: What should we be returning here??
     return true;
 }
 
@@ -237,7 +254,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
         b.getComponentVariable(2), b.getComponentDescriptorIndex(2), b.getControlVolumeIndex(2), d_hier_cc_data_ops);
 
     // Allocate patch data and compute thn_ths_sq.
-    allocate_patch_data({ d_thn_ths_sq_idx, d_un_scr_idx, d_us_scr_idx, d_fn_scr_idx, d_fs_scr_idx },
+    allocate_patch_data({ d_thn_ths_sq_idx, d_un_scr_idx, d_us_scr_idx, d_fn_scr_idx, d_fs_scr_idx, d_p_scr_idx },
                         d_hierarchy,
                         d_solution_time,
                         d_coarsest_ln,
@@ -295,7 +312,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     Pointer<MultiphaseStaggeredStokesBlockOperator> stokes_op =
         new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params);
     d_stokes_solver =
-        std::make_unique<PETScKrylovLinearSolver>("stokes_solver", d_stokes_solver_db, d_object_name + "_stokes_");
+        std::make_unique<PETScKrylovLinearSolver>("stokes_solver", d_stokes_solver_db, "stokes_velocity_");
     d_stokes_solver->setOperator(stokes_op);
     d_stokes_precond_op =
         new MultiphaseStaggeredStokesBlockFACOperator(d_object_name + "::stokes_precond_op", "", d_params);
@@ -319,7 +336,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
     LinearSolver::deallocateSolverState();
 
     // Deallocate any scratch data.
-    deallocate_patch_data({ d_thn_ths_sq_idx, d_un_scr_idx, d_us_scr_idx, d_fn_scr_idx, d_fs_scr_idx },
+    deallocate_patch_data({ d_thn_ths_sq_idx, d_un_scr_idx, d_us_scr_idx, d_fn_scr_idx, d_fs_scr_idx, d_p_scr_idx },
                           d_hierarchy,
                           d_coarsest_ln,
                           d_finest_ln);

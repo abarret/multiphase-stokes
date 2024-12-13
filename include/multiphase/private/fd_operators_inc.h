@@ -757,13 +757,13 @@ multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
             const double thn = 0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0)));
             if (do_accumulate)
             {
-                (*Gun_data)(idx) += thn * dp;
-                (*Gus_data)(idx) += convertToThs(thn) * dp;
+                (*Gun_data)(idx) += C * thn * dp;
+                (*Gus_data)(idx) += C * convertToThs(thn) * dp;
             }
             else
             {
-                (*Gun_data)(idx) = thn * dp;
-                (*Gus_data)(idx) = convertToThs(thn) * dp;
+                (*Gun_data)(idx) = C * thn * dp;
+                (*Gus_data)(idx) = C * convertToThs(thn) * dp;
             }
         }
     }

@@ -3,7 +3,7 @@ USING_VAR_XI = FALSE
 USE_PRECOND = TRUE
 PRECOND_TYPE = "BLOCK"
 w = 0.75
-C = 100.0
+C = 1.0
 D = -1.0
 IS_VEL_NULLSPACE = FALSE
 
@@ -12,7 +12,7 @@ ETAN = 1.0
 ETAS = 1.0
 NU = 1.0
 
-MAX_MULTIGRID_LEVELS = 2
+MAX_MULTIGRID_LEVELS = 5
 PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 
 un {
@@ -60,17 +60,17 @@ thn {
 }
 
 KrylovSolver {
-
+  ksp_type = "fgmres"
 }
 
 BlockPreconditioner {
   stokes_solver_db {
-
+    ksp_type = "fgmres"
   }
 
   stokes_precond_db {
     cycle_type = "V_CYCLE"
-    num_pre_sweeps = 0
+    num_pre_sweeps = 3
     num_post_sweeps = 3
     enable_logging = FALSE
     max_multigrid_levels = MAX_MULTIGRID_LEVELS
@@ -78,7 +78,7 @@ BlockPreconditioner {
 
   pressure_solver_type = "PETSC_KRYLOV_SOLVER"
   pressure_solver_db {
-
+     ksp_type = "fgmres"
   }
 
   pressure_precond_type = "POINT_RELAXATION_FAC_PRECONDITIONER"
@@ -122,7 +122,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 16
+N = 64
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]

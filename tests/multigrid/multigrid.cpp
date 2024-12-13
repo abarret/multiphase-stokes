@@ -369,6 +369,7 @@ main(int argc, char* argv[])
                     "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"));
             precond->setThnIdx(thn_cc_idx);
             precond->setCAndDCoefficients(C, D);
+            precond->setNullspace(false, null_vecs);
 
             krylov_solver->setPreconditioner(precond);
         }
