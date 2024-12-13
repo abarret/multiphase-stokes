@@ -13,12 +13,18 @@
 
 namespace multiphase
 {
-class MultiphaseStaggeredStokesBlockPreconditioner : IBTK::LinearSolver
+class MultiphaseStaggeredStokesBlockPreconditioner : public IBTK::LinearSolver
 {
 public:
-    MultiphaseStaggeredStokesBlockPreconditioner(std::string object_name);
+    MultiphaseStaggeredStokesBlockPreconditioner(std::string object_name,
+                                                 const MultiphaseParameters& params,
+                                                 SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     virtual ~MultiphaseStaggeredStokesBlockPreconditioner();
+
+    void setThnIdx(const int thn_idx);
+
+    void setCAndDCoefficients(double C, double D);
 
     /*!
      * Solve Mx = b with M the approximate schur complement preconditioner with
@@ -46,10 +52,6 @@ public:
     void deallocateSolverState() override;
 
 private:
-    // Velocity and Pressure vectors
-    SAMRAI::solv::SAMRAIVectorReal<NDIM, double> d_u_vec, d_p_vec;
-    SAMRAI::solv::SAMRAIVectorReal<NDIM, double> d_bu_vec, d_bp_vec;
-
     SAMRAI::tbox::Pointer<SAMRAI::math::HierarchyCellDataOpsReal<NDIM, double>> d_hier_cc_data_ops;
     SAMRAI::tbox::Pointer<SAMRAI::math::HierarchySideDataOpsReal<NDIM, double>> d_hier_sc_data_ops;
 
@@ -67,7 +69,11 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_solver_db;
     std::string d_pressure_precond_type = "POINT_RELAXATION_FAC_PRECONDITIONER";
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_precond_db;
-    SAMRAI::solv::PoissonSpecifications d_pressure_coefs;
+    SAMRAI::solv::PoissonSpecifications d_pressure_coefs = SAMRAI::solv::PoissonSpecifications("PressureSpecs");
+
+    // Coefficients for stokes block problem
+    double d_C = std::numeric_limits<double>::quiet_NaN();
+    double d_D = std::numeric_limits<double>::quiet_NaN();
 
     // Hierarchy data
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
@@ -78,6 +84,14 @@ private:
 
     int d_thn_idx = IBTK::invalid_index;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coefs = nullptr;
+
+    // Scratch variable and indices
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_scr_var, d_us_scr_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_fn_scr_var, d_fs_scr_var;
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_p_scr_var;
+    int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index;
+    int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
+    int d_p_scr_idx = IBTK::invalid_index;
 };
 } // namespace multiphase
 #endif

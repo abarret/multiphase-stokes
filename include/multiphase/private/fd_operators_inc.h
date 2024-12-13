@@ -2,7 +2,6 @@
 #define included_multiphase_fd_operators_inc
 
 #include "multiphase/fd_operators.h"
-#include "multiphase/utility_functions.h"
 
 #include <CartesianPatchGeometry.h>
 #include <CellData.h>
@@ -423,6 +422,33 @@ accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointe
     }
 }
 
+inline void
+accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                     const int F_un_idx,
+                                                     const int F_us_idx,
+                                                     const int un_idx,
+                                                     const int us_idx,
+                                                     const int thn_idx,
+                                                     const MultiphaseParameters& params,
+                                                     const double C,
+                                                     const double D_u,
+                                                     int coarsest_ln,
+                                                     int finest_ln)
+{
+    set_valid_level_numbers(hierarchy, coarsest_ln, finest_ln);
+
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy.getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
+                patch, F_un_idx, F_us_idx, un_idx, us_idx, thn_idx, params, C, D_u);
+        }
+    }
+}
+
 // Accumulate the momentum forces with thn only provided at cell centers.
 inline void
 accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
@@ -614,6 +640,29 @@ applyCoincompressibility(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
     }
 }
 
+inline void
+applyCoincompressibility(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         int A_idx,
+                         int un_idx,
+                         int us_idx,
+                         int thn_idx,
+                         double D,
+                         int coarsest_ln,
+                         int finest_ln)
+{
+    set_valid_level_numbers(hierarchy, coarsest_ln, finest_ln);
+
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy.getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            applyCoincompressibility(patch, A_idx, un_idx, us_idx, thn_idx, D);
+        }
+    }
+}
+
 // TODO: This routine will be removed as we'll use IABMR's CCLaplaceOperator class to create this operator.
 inline void
 preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
@@ -655,6 +704,69 @@ preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> p
 
         (*GtG_data)(idx) = D_div*D_p*(th_sq_uxx + th_sq_uyy + ddx_th_sq*ux + ddy_th_sq*uy);
     }
-} 
+}
+
+inline void
+multiphase_grad_on_hierarchy(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                             const int Gun_idx,
+                             const int Gus_idx,
+                             const int thn_idx,
+                             const int p_idx,
+                             const double C,
+                             const bool do_accumulate,
+                             int coarsest_ln,
+                             int finest_ln)
+{
+    set_valid_level_numbers(hierarchy, coarsest_ln, finest_ln);
+
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy.getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            multiphase_grad(*patch, Gun_idx, Gus_idx, thn_idx, p_idx, C, do_accumulate);
+        }
+    }
+}
+
+inline void
+multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
+                const int Gun_idx,
+                const int Gus_idx,
+                const int thn_idx,
+                const int p_idx,
+                const double C,
+                const bool do_accumulate)
+{
+    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch.getPatchGeometry();
+    const double* const dx = pgeom->getDx();
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> Gun_data = patch.getPatchData(Gun_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> Gus_data = patch.getPatchData(Gus_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch.getPatchData(p_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch.getPatchData(thn_idx);
+
+    for (int axis = 0; axis < NDIM; ++axis)
+    {
+        for (SAMRAI::pdat::SideIterator<NDIM> si(patch.getBox(), axis); si; si++)
+        {
+            const SAMRAI::pdat::SideIndex<NDIM>& idx = si();
+            // Note: This does not account for any synchronization that needs to occur at coarse-fine
+            // interfaces. Consider using HierarchyMathOps::grad() instead.
+            const double dp = ((*p_data)(idx.toCell(1)) - (*p_data)(idx.toCell(0))) / dx[axis];
+            const double thn = 0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0)));
+            if (do_accumulate)
+            {
+                (*Gun_data)(idx) += thn * dp;
+                (*Gus_data)(idx) += convertToThs(thn) * dp;
+            }
+            else
+            {
+                (*Gun_data)(idx) = thn * dp;
+                (*Gus_data)(idx) = convertToThs(thn) * dp;
+            }
+        }
+    }
+}
 } // namespace multiphase
 #endif

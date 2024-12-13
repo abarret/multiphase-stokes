@@ -1,4 +1,5 @@
 #include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
@@ -340,27 +341,46 @@ main(int argc, char* argv[])
             new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
         krylov_solver->setOperator(stokes_op);
 
-        // Now create a preconditioner
-        Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
-        fac_precondition_strategy->setThnIdx(thn_cc_idx);
-        fac_precondition_strategy->setCandDCoefficients(C, D);
-        fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
-        Pointer<FullFACPreconditioner> Krylov_precond =
-            new FullFACPreconditioner("KrylovPrecond",
-                                      fac_precondition_strategy,
-                                      app_initializer->getComponentDatabase("KrylovPrecond"),
-                                      "Krylov_precond_");
         bool use_precond = input_db->getBool("USE_PRECOND");
-        Krylov_precond->setNullspace(false, null_vecs);
-        if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
+        const auto precond_type =
+            use_precond ? multiphase::string_to_enum<PreconditionerType>(input_db->getString("PRECOND_TYPE")) :
+                          PreconditionerType::UNKNOWN_TYPE;
+        if (use_precond && precond_type == PreconditionerType::MULTIGRID)
+        {
+            // Now create a preconditioner
+            Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
+                new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
+                    "KrylovPrecondStrategy", "Krylov_precond_", params);
+            fac_precondition_strategy->setThnIdx(thn_cc_idx);
+            fac_precondition_strategy->setCandDCoefficients(C, D);
+            fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
+            Pointer<FullFACPreconditioner> Krylov_precond =
+                new FullFACPreconditioner("KrylovPrecond",
+                                          fac_precondition_strategy,
+                                          app_initializer->getComponentDatabase("KrylovPrecond"),
+                                          "Krylov_precond_");
+            Krylov_precond->setNullspace(false, null_vecs);
+            krylov_solver->setPreconditioner(Krylov_precond);
+        }
+        else if (use_precond && precond_type == PreconditionerType::BLOCK)
+        {
+            Pointer<MultiphaseStaggeredStokesBlockPreconditioner> precond =
+                new MultiphaseStaggeredStokesBlockPreconditioner(
+                    "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"));
+            precond->setThnIdx(thn_cc_idx);
+            precond->setCAndDCoefficients(C, D);
+
+            krylov_solver->setPreconditioner(precond);
+        }
 
         krylov_solver->setNullspace(false, null_vecs);
         krylov_solver->initializeSolverState(u_vec, f_vec);
-        // We need to set thn_cc_idx on the dense hierarchy.
-        // TODO: find a better way to do this
-        if (use_precond)
+
+        if (use_precond && precond_type == PreconditionerType::MULTIGRID)
         {
+            Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
+            // We need to set thn_cc_idx on the dense hierarchy.
+            // TODO: find a better way to do this
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
             // Allocate data
             for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
@@ -386,10 +406,9 @@ main(int argc, char* argv[])
             ghost_cell_fill.fillData(0.0);
 
             if (using_var_xi)
-            {
                 Krylov_precond->transferToDense(params.xi_idx, true);
-            }
         }
+
         hier_math_ops.setPatchHierarchy(patch_hierarchy);
         hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
         // just computes quadrature weights
@@ -410,8 +429,9 @@ main(int argc, char* argv[])
         krylov_solver->solveSystem(u_vec, f_vec);
 
         // Deallocate data
-        if (use_precond)
+        if (use_precond && precond_type == PreconditionerType::MULTIGRID)
         {
+            Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
             for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
             {

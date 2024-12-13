@@ -2,6 +2,7 @@
 #define included_multiphase_fd_operators
 
 #include "multiphase/MultiphaseParameters.h"
+#include "multiphase/utility_functions.h"
 
 #include "tbox/Pointer.h"
 
@@ -136,6 +137,17 @@ void accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::P
                                                                  const MultiphaseParameters& params,
                                                                  const double C,
                                                                  const double D_u);
+void accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                          const int F_un_idx,
+                                                          const int F_us_idx,
+                                                          const int un_idx,
+                                                          const int us_idx,
+                                                          const int thn_idx,
+                                                          const MultiphaseParameters& params,
+                                                          const double C,
+                                                          const double D_u,
+                                                          int coarsest_ln = IBTK::invalid_index,
+                                                          int finest_ln = IBTK::invalid_index);
 ///\}
 
 /*!
@@ -174,12 +186,22 @@ void accumulateMomentumWithoutPressureOnPatchVariableDrag(SAMRAI::tbox::Pointer<
  *
  * This function linearly interpolates the volume fraction to cell sides as needed.
  */
+///{
 void applyCoincompressibility(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
                               int A_idx,
                               int un_idx,
                               int us_idx,
                               int thn_idx,
                               double D);
+void applyCoincompressibility(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                              int A_idx,
+                              int un_idx,
+                              int us_idx,
+                              int thn_idx,
+                              double D,
+                              int coarsest_ln = IBTK::invalid_level_number,
+                              int finest_ln = IBTK::invalid_level_number);
+///}
 
 /*!
  * Computes the G^T*G operator on a given patch. G^T*G is used by the block preconditioner.
@@ -197,7 +219,37 @@ void preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDI
                                    const MultiphaseParameters& params,
                                    const double C,
                                    const double D_div,
-                                   const double D_p);                              
+                                   const double D_p);
+
+/*!
+ * Compute G*[u_n; u_s] with G = C*[thn*grad, ths*grad]^T * p.
+ *
+ * We assume that thn and p are cell centered and have ghost cells already filled.
+ *
+ * Gun_idx and Gus_idx should be a side centered quantities.
+ *
+ * If do_accumulate is true, the gradient is accumulated into Gun_idx and Gus_idx. Otherwise, the values in Gun_idx and
+ * Gus_idx are overwritten.
+ */
+///{
+void multiphase_grad_on_hierarchy(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                  int Gun_idx,
+                                  int Gus_idx,
+                                  int thn_idx,
+                                  int p_idx,
+                                  double C,
+                                  bool do_accumulate = true,
+                                  int coarsest_ln = IBTK::invalid_level_number,
+                                  int finest_ln = IBTK::invalid_level_number);
+
+void multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
+                     int Gun_idx,
+                     int Gus_idx,
+                     int thn_idx,
+                     int p_idx,
+                     double C,
+                     bool do_accumulate = true);
+///}
 } // namespace multiphase
 
 #include "multiphase/private/fd_operators_inc.h"

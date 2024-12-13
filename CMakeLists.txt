@@ -13,6 +13,7 @@ SET(MULTIPHASE_SRC
     src/MultiphaseStaggeredStokesOperator.cpp
     src/MultiphaseStaggeredStokesBlockFACOperator.cpp
     src/MultiphaseStaggeredStokesBlockOperator.cpp
+    src/MultiphaseStaggeredStokesBlockPreconditioner.cpp
     src/RBGS.f
     )
 
