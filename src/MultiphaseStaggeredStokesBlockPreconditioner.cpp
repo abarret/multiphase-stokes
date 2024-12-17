@@ -72,6 +72,7 @@ bool
 MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& x,
                                                           SAMRAIVectorReal<NDIM, double>& b)
 {
+    x.setToScalar(0.0);
     // Create the individual vectors, add components to the vectors
     SAMRAIVectorReal<NDIM, double> u_vec(d_object_name + "::U_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln),
         p_vec(d_object_name + "::P_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln);
