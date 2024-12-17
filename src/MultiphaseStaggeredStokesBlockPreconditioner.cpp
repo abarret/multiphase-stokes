@@ -328,6 +328,24 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
 
     d_stokes_precond->transferToDense(d_thn_idx);
 
+    // Fill ghost cells on the dense hierarchy
+    {
+        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
+        // Also fill in theta ghost cells
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(1);
+        ghost_cell_comp[0] = ITC(d_thn_idx,
+                                 "CONSERVATIVE_LINEAR_REFINE",
+                                 false,
+                                 "NONE",
+                                 "LINEAR",
+                                 true,
+                                 nullptr); // defaults to fill corner
+        HierarchyGhostCellInterpolation ghost_cell_fill;
+        ghost_cell_fill.initializeOperatorState(
+            ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+        ghost_cell_fill.fillData(0.0);
+    }
     // Setup any needed communication algorithms and scratch indices
 }
 
