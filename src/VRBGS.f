@@ -125,8 +125,8 @@ c
 
           ! solve for solvent velocities
           us_imhalf_j = f_us_data_0(i0,i1) 
-     &     - (D * eta_s * us_data_1(i0,i1+1) *
-     &      ((toThs(thn_imh_jph) - toThs(thn_data(i0,i1))) / (dx_dy)
+     &     - (D * eta_s * (us_data_1(i0,i1+1) *
+     &      (toThs(thn_imh_jph) - toThs(thn_data(i0,i1))) / (dx_dy)
      &      + (toThs(thn_data(i0-1,i1)))/(dx_dx) * us_data_0(i0-1,i1) 
      &      + (toThs(thn_data(i0,i1))/dx_dx * us_data_0(i0+1,i1)) 
      &      + (toThs(thn_imh_jph)/dy_dy * us_data_0(i0,i1+1)) 
