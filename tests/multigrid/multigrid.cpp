@@ -45,6 +45,8 @@ main(int argc, char* argv[])
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
 
     PetscOptionsSetValue(nullptr, "-solver_ksp_rtol", "1.0e-12");
+    PetscOptionsSetValue(nullptr, "-stokes_pressure_ksp_max_it", "5");
+    PetscOptionsSetValue(nullptr, "-stokes_velocity_ksp_max_it", "5");
 
     { // cleanup dynamically allocated objects prior to shutdown
 

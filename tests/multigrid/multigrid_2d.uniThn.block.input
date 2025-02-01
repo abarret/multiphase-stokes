@@ -12,7 +12,7 @@ ETAN = 1.0
 ETAS = 1.0
 NU = 1.0
 
-MAX_MULTIGRID_LEVELS = 5
+MAX_MULTIGRID_LEVELS = 3
 PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 
 un {
@@ -60,7 +60,7 @@ thn {
 }
 
 KrylovSolver {
-  ksp_type = "fgmres"
+  ksp_type = "fgmres" // uses right PC by default 
 }
 
 BlockPreconditioner {
@@ -122,7 +122,7 @@ Main {
    timer_enabled = TRUE
 }
 
-N = 64
+N = 16
 
 CartesianGeometry {
    domain_boxes       = [(0,0), (N - 1,N - 1)]
