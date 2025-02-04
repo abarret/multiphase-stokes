@@ -70,26 +70,6 @@ static Timer* t_initialize_operator_state;
 static Timer* t_deallocate_operator_state;
 } // namespace
 
-void
-convert_to_ndim_cc(const int dst_idx, const int cc_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
-{
-    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
-            Pointer<CellData<NDIM, double>> cc_data = patch->getPatchData(cc_idx);
-            for (CellIterator<NDIM> ci(dst_data->getGhostBox()); ci; ci++)
-            {
-                const CellIndex<NDIM>& idx = ci();
-                for (int d = 0; d < dst_data->getDepth(); ++d) (*dst_data)(idx, d) = (*cc_data)(idx);
-            }
-        }
-    }
-}
-
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 MultiphaseStaggeredStokesBlockOperator::MultiphaseStaggeredStokesBlockOperator(const std::string& object_name,
                                                                                bool homogeneous_bc,
@@ -183,8 +163,7 @@ MultiphaseStaggeredStokesBlockOperator::setVelocityPoissonSpecifications(const P
 } // setVelocityPoissonSpecifications
 
 void
-MultiphaseStaggeredStokesBlockOperator::setCandDCoefficients(const double C,
-                                                             const double D_u)
+MultiphaseStaggeredStokesBlockOperator::setCandDCoefficients(const double C, const double D_u)
 {
     d_C = C;
     d_D_u = D_u;
@@ -237,7 +216,8 @@ MultiphaseStaggeredStokesBlockOperator::setPhysicalBcCoefs(const std::vector<Rob
 } // setPhysicalBcCoefs
 
 void
-MultiphaseStaggeredStokesBlockOperator::setPhysicalBoundaryHelper(Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper)
+MultiphaseStaggeredStokesBlockOperator::setPhysicalBoundaryHelper(
+    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper)
 {
 #if !defined(NDEBUG)
     TBOX_ASSERT(bc_helper);
@@ -557,7 +537,7 @@ MultiphaseStaggeredStokesBlockOperator::applySpecialized(const int A_un_idx,
     d_hier_math_ops->interp(
         d_nc_scr_idx, d_nc_scr_var, true, thn_idx, Pointer<CellVariable<NDIM, double>>(nullptr), nullptr, d_new_time);
     // Interpolate to cell sides
-    convert_to_ndim_cc(d_cc_ndim_idx, thn_idx, d_hierarchy);
+    convert_to_ndim_cc(d_cc_ndim_idx, thn_idx, *d_hierarchy);
     d_hier_math_ops->interp(d_sc_scr_idx, d_sc_scr_var, true, d_cc_ndim_idx, d_cc_ndim_var, nullptr, d_new_time);
 
     // Compute the forces on momentum.
@@ -571,17 +551,8 @@ MultiphaseStaggeredStokesBlockOperator::applySpecialized(const int A_un_idx,
             //     //accumulateMomentumWithoutPressureOnPatchVariableDrag(
             //     //    patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D_u);
             // else
-            accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch,
-                                                                        A_un_idx,
-                                                                        A_us_idx,
-                                                                        un_idx,
-                                                                        us_idx,
-                                                                        thn_idx,
-                                                                        d_nc_scr_idx,
-                                                                        d_sc_scr_idx,
-                                                                        d_params,
-                                                                        d_C,
-                                                                        d_D_u);
+            accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
+                patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, d_nc_scr_idx, d_sc_scr_idx, d_params, d_C, d_D_u);
         }
     }
 }

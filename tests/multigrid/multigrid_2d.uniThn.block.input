@@ -1,9 +1,9 @@
 USING_VAR_XI = FALSE
 
 USE_PRECOND = TRUE
-PRECOND_TYPE = "MULTIGRID"
+PRECOND_TYPE = "BLOCK"
 w = 0.75
-C = 100.0
+C = 1.0
 D = -1.0
 IS_VEL_NULLSPACE = FALSE
 
@@ -12,7 +12,7 @@ ETAN = 1.0
 ETAS = 1.0
 NU = 1.0
 
-MAX_MULTIGRID_LEVELS = 2
+MAX_MULTIGRID_LEVELS = 3
 PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 
 un {
@@ -60,11 +60,44 @@ thn {
 }
 
 KrylovSolver {
-
+  ksp_type = "fgmres" // uses right PC by default 
 }
 
-KrylovPrecondStrategy {
+BlockPreconditioner {
+  stokes_solver_db {
+    ksp_type = "fgmres"
+  }
 
+  stokes_precond_db {
+    cycle_type = "V_CYCLE"
+    num_pre_sweeps = 3
+    num_post_sweeps = 3
+    enable_logging = FALSE
+    max_multigrid_levels = MAX_MULTIGRID_LEVELS
+  }
+
+  pressure_solver_type = "PETSC_KRYLOV_SOLVER"
+  pressure_solver_db {
+     ksp_type = "fgmres"
+  }
+
+  pressure_precond_type = "POINT_RELAXATION_FAC_PRECONDITIONER"
+  pressure_precond_db {
+    num_pre_sweeps  = 0
+    num_post_sweeps = 3
+    prolongation_method = "LINEAR_REFINE"
+    restriction_method  = "CONSERVATIVE_COARSEN"
+    coarse_solver_type  = "HYPRE_LEVEL_SOLVER"
+    coarse_solver_rel_residual_tol = 1.0e-12
+    coarse_solver_abs_residual_tol = 1.0e-50
+    coarse_solver_max_iterations = 1
+    coarse_solver_db {
+      solver_type          = "PFMG"
+      num_pre_relax_steps  = 0
+      num_post_relax_steps = 3
+      enable_logging       = FALSE
+    }
+  }
 }
 
 KrylovPrecond {
@@ -109,7 +142,7 @@ MultigridAlg {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 2, 2              // vector ratio to next coarser level
