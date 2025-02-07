@@ -109,6 +109,26 @@ public:
         return d_f_us_sc_var;
     }
 
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> getNetworkAdvectionVelocityVariable() const
+    {
+        return d_U_adv_diff_var;
+    }
+
+    inline SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> getSolventAdvectionVelocityVariable() const
+    {
+        return d_us_adv_diff_var;
+    }
+
+    /*!
+     * Register an advection-diffusion solver with this incompressible
+     * Navier-Stokes solver.
+     *
+     * Note that this covers up the INSHierarchyIntegrator registration call, resulting in different behavior if this
+     * function is called while the class is used polymorphically.
+     */
+    void registerAdvDiffHierarchyIntegrator(
+        SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_hier_integrator);
+
     /*!
      * Register physical boundary condition objects. Note that we currently only work with periodic and Dirichlet
      * conditions on the velocity.
@@ -116,7 +136,8 @@ public:
      * This class does not assume ownership of the bc objects, so they must be deleted by the user.
      */
     void registerPhysicalBoundaryConditions(std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
-                                            std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> us_bc_coefs);
+                                            std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> us_bc_coefs,
+                                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_bc_coef = nullptr);
 
     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getNetworkBoundaryConditions() const;
     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& getSolventBoundaryConditions() const;
@@ -196,6 +217,7 @@ public:
      * the volume fraction.
      */
     void advectNetworkVolumeFraction(SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> adv_diff_integrator,
+                                     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr,
                                      bool has_meaningful_mid_value = true);
 
     /*!
@@ -350,6 +372,7 @@ private:
      * Boundary conditions
      */
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs, d_us_bc_coefs;
+    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_p_bc_coef = nullptr;
 
     /*!
      * Fluid solver variables.
@@ -376,7 +399,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
-    bool d_has_vel_nullspace = false;
+    bool d_has_vel_nullspace = false, d_has_pressure_nullspace = true;
 
     /*!
      * Solver information
@@ -457,6 +480,12 @@ private:
 
     // Dummy boundary condition objects
     std::vector<std::unique_ptr<SAMRAI::solv::LocationIndexRobinBcCoefs<NDIM>>> d_dummy_bcs;
+
+    // Solvent advection velocity variable
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceVariable<NDIM, double>> d_us_adv_diff_var;
+
+    // Network CFL number
+    double d_cfl_un_current = std::numeric_limits<double>::quiet_NaN();
 };
 } // namespace multiphase
 

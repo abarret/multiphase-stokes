@@ -83,6 +83,12 @@ main(int argc, char* argv[])
         ins_integrator->setViscosityCoefficient(eta_n, eta_s);
         ins_integrator->setDragCoefficient(xi, nu, nu);
 
+        Pointer<CartGridFunction> fn_fcn =
+            new muParserCartGridFunction("fn_fcn", input_db->getDatabase("FN"), grid_geometry);
+        Pointer<CartGridFunction> fs_fcn =
+            new muParserCartGridFunction("fs_fcn", input_db->getDatabase("FS"), grid_geometry);
+        ins_integrator->setForcingFunctionsScaled(fn_fcn, fs_fcn);
+
         // Create boundary condition objects for velocity
         std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
         for (int d = 0; d < NDIM; ++d)
@@ -94,7 +100,8 @@ main(int argc, char* argv[])
             us_bc_coefs[d] =
                 new muParserRobinBcCoefs(us_bc_coef_name, input_db->getDatabase(us_bc_coef_name), grid_geometry);
         }
-        ins_integrator->registerPhysicalBoundaryConditions(un_bc_coefs, us_bc_coefs);
+        auto p_bc_coef = std::make_unique<muParserRobinBcCoefs>("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
+        ins_integrator->registerPhysicalBoundaryConditions(un_bc_coefs, us_bc_coefs, p_bc_coef.get());
 
         // Create boundary condition objects for volume fraction
         auto thn_bc_coef =

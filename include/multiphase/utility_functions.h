@@ -8,6 +8,8 @@
 #include <PatchLevel.h>
 #include <SideData.h>
 
+#include <set>
+
 namespace multiphase
 {
 

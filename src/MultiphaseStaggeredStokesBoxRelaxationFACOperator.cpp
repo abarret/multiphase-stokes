@@ -328,11 +328,11 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError()");
+                     "multiphase::MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError()");
                  t_solve_coarsest_level = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
+                     "multiphase::MultiphaseStaggeredStokesBoxRelaxationFACOperator::solveCoarsestLevel()");
                  t_compute_residual = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
+                     "multiphase::MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual()"););
     return;
 }
 
@@ -1017,9 +1017,9 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        level->allocatePatchData(d_un_scr_idx, d_new_time);
-        level->allocatePatchData(d_us_scr_idx, d_new_time);
-        level->allocatePatchData(d_p_scr_idx, d_new_time);
+        level->allocatePatchData(d_un_scr_idx, d_solution_time);
+        level->allocatePatchData(d_us_scr_idx, d_solution_time);
+        level->allocatePatchData(d_p_scr_idx, d_solution_time);
     }
 
     // Set up physical boundary condition helpers
@@ -1233,7 +1233,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::performProlongation(const std
     refine_alg.registerRefine(dst_idxs[2], src_idxs[2], dst_idxs[2], d_p_prolong_op);
 
     refine_alg.resetSchedule(d_prolong_scheds[dst_ln]);
-    d_prolong_scheds[dst_ln]->fillData(d_new_time);
+    d_prolong_scheds[dst_ln]->fillData(d_solution_time);
     d_prolong_alg->resetSchedule(d_prolong_scheds[dst_ln]);
     return;
 }
@@ -1272,7 +1272,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::performGhostFilling(const std
     refine_alg.registerRefine(dst_idxs[2], dst_idxs[2], dst_idxs[2], Pointer<RefineOperator<NDIM>>());
 
     refine_alg.resetSchedule(d_ghostfill_no_restrict_scheds[dst_ln]);
-    d_ghostfill_no_restrict_scheds[dst_ln]->fillData(d_new_time);
+    d_ghostfill_no_restrict_scheds[dst_ln]->fillData(d_solution_time);
     d_ghostfill_no_restrict_alg->resetSchedule(d_ghostfill_no_restrict_scheds[dst_ln]);
 }
 

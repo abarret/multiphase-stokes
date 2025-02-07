@@ -125,18 +125,19 @@ IBMultiphaseHierarchyIntegrator::preprocessIntegrateHierarchy(const double curre
             d_f_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::f"), current_time);
 
         d_hier_velocity_data_ops->setToScalar(d_fn_idx, 0.0);
-        d_u_phys_bdry_op->setPatchDataIndex(d_fn_idx);
+        d_un_phys_bdry_op->setPatchDataIndex(d_fn_idx);
+        d_un_phys_bdry_op->setHomogeneousBc(true);
         d_ib_method_ops->spreadForce(
-            d_fn_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), current_time);
+            d_fn_idx, d_un_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), current_time);
 
         d_hier_velocity_data_ops->setToScalar(d_cross_links_un_idx, 0.0);
         d_hier_velocity_data_ops->setToScalar(d_cross_links_us_idx, 0.0);
 
         if (d_cross_links_strategy)
         {
-            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
+            d_un_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
             d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
-                                                d_u_phys_bdry_op,
+                                                d_un_phys_bdry_op,
                                                 getProlongRefineSchedules(d_object_name + "::fn"),
                                                 current_time,
                                                 true /*spread_network*/,
@@ -151,6 +152,7 @@ IBMultiphaseHierarchyIntegrator::preprocessIntegrateHierarchy(const double curre
         }
 
         d_u_phys_bdry_op->setHomogeneousBc(false);
+        d_un_phys_bdry_op->setHomogeneousBc(false);
         if (d_f_current_idx != invalid_index) d_hier_velocity_data_ops->copyData(d_f_current_idx, d_f_idx);
         if (d_fn_current_idx != invalid_index) d_hier_velocity_data_ops->copyData(d_fn_current_idx, d_fn_idx);
         if (d_cross_links_current_un_idx != invalid_index)
@@ -225,17 +227,18 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
             d_f_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::f"), half_time);
 
         d_hier_velocity_data_ops->setToScalar(d_fn_idx, 0.0);
-        d_u_phys_bdry_op->setPatchDataIndex(d_fn_idx);
+        d_un_phys_bdry_op->setPatchDataIndex(d_fn_idx);
+        d_un_phys_bdry_op->setHomogeneousBc(true);
         d_ibn_method_ops->spreadForce(
-            d_fn_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), half_time);
+            d_fn_idx, d_un_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), half_time);
 
         d_hier_velocity_data_ops->setToScalar(d_cross_links_un_idx, 0.0);
         d_hier_velocity_data_ops->setToScalar(d_cross_links_us_idx, 0.0);
         if (d_cross_links_strategy)
         {
-            d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
+            d_un_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
             d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
-                                                d_u_phys_bdry_op,
+                                                d_un_phys_bdry_op,
                                                 getProlongRefineSchedules(d_object_name + "::fn"),
                                                 half_time,
                                                 true /*spread_network*/,
@@ -250,6 +253,7 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
         }
 
         d_u_phys_bdry_op->setHomogeneousBc(false);
+        d_un_phys_bdry_op->setHomogeneousBc(false);
         break;
     case TRAPEZOIDAL_RULE:
         if (d_use_structure_predictor || cycle_num > 0)
@@ -269,17 +273,18 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
                 d_f_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::f"), new_time);
 
             d_hier_velocity_data_ops->setToScalar(d_fn_idx, 0.0);
-            d_u_phys_bdry_op->setPatchDataIndex(d_fn_idx);
+            d_un_phys_bdry_op->setPatchDataIndex(d_fn_idx);
+            d_un_phys_bdry_op->setHomogeneousBc(true);
             d_ibn_method_ops->spreadForce(
-                d_fn_idx, d_u_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), new_time);
+                d_fn_idx, d_un_phys_bdry_op, getProlongRefineSchedules(d_object_name + "::fn"), new_time);
 
             d_hier_velocity_data_ops->setToScalar(d_cross_links_un_idx, 0.0);
             d_hier_velocity_data_ops->setToScalar(d_cross_links_us_idx, 0.0);
             if (d_cross_links_strategy)
             {
-                d_u_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
+                d_un_phys_bdry_op->setPatchDataIndex(d_cross_links_un_idx);
                 d_cross_links_strategy->spreadForce(d_cross_links_un_idx,
-                                                    d_u_phys_bdry_op,
+                                                    d_un_phys_bdry_op,
                                                     getProlongRefineSchedules(d_object_name + "::fn"),
                                                     new_time,
                                                     true /*spread_network*/,
@@ -294,6 +299,7 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
             }
 
             d_u_phys_bdry_op->setHomogeneousBc(false);
+            d_un_phys_bdry_op->setHomogeneousBc(false);
             d_hier_velocity_data_ops->linearSum(d_f_idx, 0.5, d_f_current_idx, 0.5, d_f_idx);
             d_hier_velocity_data_ops->linearSum(d_fn_idx, 0.5, d_fn_current_idx, 0.5, d_fn_idx);
         }
@@ -309,6 +315,7 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
 
     // Solve the incompressible Navier-Stokes equations.
     d_ib_method_ops->preprocessSolveFluidEquations(current_time, new_time, cycle_num);
+    d_ibn_method_ops->preprocessSolveFluidEquations(current_time, new_time, cycle_num);
     if (d_enable_logging)
         plog << d_object_name << "::integrateHierarchy(): solving the incompressible Navier-Stokes equations\n";
     if (d_current_num_cycles > 1)
@@ -346,7 +353,8 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
                                              getCoarsenSchedules(d_object_name + "::u::CONSERVATIVE_COARSEN"),
                                              getGhostfillRefineSchedules(d_object_name + "::u"),
                                              new_time);
-        d_u_phys_bdry_op->setPatchDataIndex(d_un_idx);
+        d_un_phys_bdry_op->setPatchDataIndex(d_un_idx);
+        d_un_phys_bdry_op->setHomogeneousBc(false);
         d_ibn_method_ops->interpolateVelocity(d_un_idx,
                                               getCoarsenSchedules(d_object_name + "::un::CONSERVATIVE_COARSEN"),
                                               getGhostfillRefineSchedules(d_object_name + "::un"),
@@ -367,7 +375,8 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
                                              getGhostfillRefineSchedules(d_object_name + "::u"),
                                              half_time);
         Pointer<IBMethod> ops = d_ib_method_ops;
-        d_u_phys_bdry_op->setPatchDataIndex(d_un_idx);
+        d_un_phys_bdry_op->setPatchDataIndex(d_un_idx);
+        d_un_phys_bdry_op->setHomogeneousBc(false);
         d_ibn_method_ops->interpolateVelocity(d_un_idx,
                                               getCoarsenSchedules(d_object_name + "::un::CONSERVATIVE_COARSEN"),
                                               getGhostfillRefineSchedules(d_object_name + "::un"),
@@ -388,7 +397,8 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
                                              getCoarsenSchedules(d_object_name + "::u::CONSERVATIVE_COARSEN"),
                                              getGhostfillRefineSchedules(d_object_name + "::u"),
                                              new_time);
-        d_u_phys_bdry_op->setPatchDataIndex(d_un_idx);
+        d_un_phys_bdry_op->setPatchDataIndex(d_un_idx);
+        d_un_phys_bdry_op->setHomogeneousBc(false);
         d_ibn_method_ops->interpolateVelocity(d_un_idx,
                                               getCoarsenSchedules(d_object_name + "::un::CONSERVATIVE_COARSEN"),
                                               getGhostfillRefineSchedules(d_object_name + "::un"),
@@ -499,6 +509,8 @@ IBMultiphaseHierarchyIntegrator::postprocessIntegrateHierarchy(const double curr
                                          getCoarsenSchedules(d_object_name + "::u::CONSERVATIVE_COARSEN"),
                                          getGhostfillRefineSchedules(d_object_name + "::u"),
                                          new_time);
+    d_un_phys_bdry_op->setPatchDataIndex(d_un_idx);
+    d_un_phys_bdry_op->setHomogeneousBc(false);
     d_ibn_method_ops->interpolateVelocity(d_un_idx,
                                           getCoarsenSchedules(d_object_name + "::un::CONSERVATIVE_COARSEN"),
                                           getGhostfillRefineSchedules(d_object_name + "::un"),
@@ -522,12 +534,17 @@ IBMultiphaseHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHier
 {
     if (d_integrator_is_initialized) return;
 
+    Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = d_ins_hier_integrator;
+#ifndef NDEBUG
+    TBOX_ASSERT(ins_integrator);
+#endif
     // Finish initializing the hierarchy integrator.
     IBHierarchyIntegrator::initializeHierarchyIntegrator(hierarchy, gridding_alg);
 
     const IntVector<NDIM> ib_ghosts(d_ib_method_ops->getMinimumGhostCellWidth());
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int u_scr_idx = var_db->mapVariableAndContextToIndex(d_u_var, getScratchContext());
     d_un_idx = var_db->registerVariableAndContext(d_un_var, d_ib_context, ib_ghosts);
     d_fn_idx = var_db->registerVariableAndContext(d_fn_var, d_ib_context, ib_ghosts);
     d_cross_links_un_idx = var_db->registerVariableAndContext(d_cross_links_un_var, d_ib_context, ib_ghosts);
@@ -536,6 +553,9 @@ IBMultiphaseHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHier
     d_ib_data.setFlag(d_fn_idx);
     d_ib_data.setFlag(d_cross_links_un_idx);
     d_ib_data.setFlag(d_cross_links_us_idx);
+
+    d_un_phys_bdry_op = new CartSideRobinPhysBdryOp(
+        u_scr_idx, ins_integrator->getNetworkBoundaryConditions(), /*homogeneous_bc*/ false);
 
     if (d_time_stepping_type == FORWARD_EULER || d_time_stepping_type == TRAPEZOIDAL_RULE)
     {
@@ -548,10 +568,6 @@ IBMultiphaseHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHier
     }
 
     // Setup the fluid solver for IB forces.
-    Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = d_ins_hier_integrator;
-#ifndef NDEBUG
-    TBOX_ASSERT(ins_integrator);
-#endif
 
     // Note we use setForcingFunctionsScaled() instead of setForcingFunctions() because
     // IBMultiphaseEulerianForceFunction does note scale by volume fraction.
@@ -574,7 +590,7 @@ IBMultiphaseHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<PatchHier
     d_un_ghostfill_alg = new RefineAlgorithm<NDIM>();
     d_un_ghostfill_op = nullptr;
     d_un_ghostfill_alg->registerRefine(d_un_idx, d_un_idx, d_un_idx, d_un_ghostfill_op);
-    std::unique_ptr<RefinePatchStrategy<NDIM>> un_phys_bdry_op_unique(d_u_phys_bdry_op);
+    std::unique_ptr<RefinePatchStrategy<NDIM>> un_phys_bdry_op_unique(d_un_phys_bdry_op);
     registerGhostfillRefineAlgorithm(d_object_name + "::un", d_un_ghostfill_alg, std::move(un_phys_bdry_op_unique));
 
     d_un_coarsen_alg = new CoarsenAlgorithm<NDIM>();
@@ -623,8 +639,8 @@ IBMultiphaseHierarchyIntegrator::initializePatchHierarchy(Pointer<PatchHierarchy
     const int un_current_idx = var_db->mapVariableAndContextToIndex(d_un_var, getCurrentContext());
     d_hier_velocity_data_ops->copyData(d_un_idx, un_current_idx);
     const bool initial_time = IBTK::rel_equal_eps(d_integrator_time, d_start_time);
-    d_u_phys_bdry_op->setPatchDataIndex(d_un_idx);
-    d_u_phys_bdry_op->setHomogeneousBc(false);
+    d_un_phys_bdry_op->setPatchDataIndex(d_un_idx);
+    d_un_phys_bdry_op->setHomogeneousBc(false);
     d_ibn_method_ops->initializePatchHierarchy(hierarchy,
                                                gridding_alg,
                                                d_un_idx,

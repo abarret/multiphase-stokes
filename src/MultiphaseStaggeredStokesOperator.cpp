@@ -159,11 +159,12 @@ MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::
                        d_default_thn_bc_coef);
 
     // Setup Timers.
-    IBAMR_DO_ONCE(t_apply = TimerManager::getManager()->getTimer("IBAMR::TwoFluidStaggeredStokesOperator::apply()");
+    IBAMR_DO_ONCE(t_apply =
+                      TimerManager::getManager()->getTimer("multiphase::MultiphaseStaggeredStokesOperator::apply()");
                   t_initialize_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::initializeOperatorState()");
+                      "multiphase::MultiphaseStaggeredStokesOperator::initializeOperatorState()");
                   t_deallocate_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::deallocateOperatorState()"););
+                      "multiphase::MultiphaseStaggeredStokesOperator::deallocateOperatorState()"););
     return;
 } // TwoFluidStaggeredStokesOperator
 
@@ -260,12 +261,16 @@ MultiphaseStaggeredStokesOperator::setPhysicalBcCoefs(const std::vector<RobinBcC
 } // setPhysicalBcCoefs
 
 void
-MultiphaseStaggeredStokesOperator::setPhysicalBoundaryHelper(Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper)
+MultiphaseStaggeredStokesOperator::setPhysicalBoundaryHelper(
+    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper,
+    Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper)
 {
 #if !defined(NDEBUG)
-    TBOX_ASSERT(bc_helper);
+    TBOX_ASSERT(bc_un_helper);
+    TBOX_ASSERT(bc_us_helper);
 #endif
-    d_bc_helper = bc_helper;
+    d_bc_un_helper = bc_un_helper;
+    d_bc_us_helper = bc_us_helper;
     return;
 } // setPhysicalBoundaryHelper
 
@@ -295,7 +300,9 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
-                                                             d_un_bc_coefs);
+                                                             d_un_bc_coefs,
+                                                             nullptr,
+                                                             "QUADRATIC");
     transaction_comps[1] = InterpolationTransactionComponent(us_scratch_idx,
                                                              us_idx,
                                                              SC_DATA_REFINE_TYPE,
@@ -303,14 +310,18 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
-                                                             d_us_bc_coefs);
+                                                             d_us_bc_coefs,
+                                                             nullptr,
+                                                             "QUADRATIC");
     transaction_comps[2] = InterpolationTransactionComponent(P_idx,
                                                              CC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
-                                                             d_P_bc_coef);
+                                                             d_P_bc_coef,
+                                                             nullptr,
+                                                             "QUADRATIC");
 
     d_hier_bdry_fill->resetTransactionComponents(transaction_comps);
     d_hier_bdry_fill->setHomogeneousBc(d_homogeneous_bc);
@@ -335,10 +346,13 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
 
     applySpecialized(A_P_idx, A_un_idx, A_us_idx, P_idx, un_scratch_idx, us_scratch_idx, thn_idx);
 
-    if (d_bc_helper)
+    if (d_bc_un_helper)
     {
-        d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
-        d_bc_helper->copyDataAtDirichletBoundaries(A_us_idx, us_scratch_idx);
+        d_bc_un_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
+    }
+    if (d_bc_us_helper)
+    {
+        d_bc_us_helper->copyDataAtDirichletBoundaries(A_us_idx, us_scratch_idx);
     }
 
     {
@@ -347,7 +361,7 @@ MultiphaseStaggeredStokesOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMR
                                              ITC(A_un_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
         HierarchyGhostCellInterpolation ghost_cell_fill;
         ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(d_new_time);
+        ghost_cell_fill.fillData(d_solution_time);
     }
 
     auto sync_fcn = [&](const int dst_idx) -> void
@@ -467,7 +481,8 @@ MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     }
 #endif
 
-    if (d_bc_helper) d_bc_helper->cacheBcCoefData(d_us_bc_coefs, d_solution_time, d_hierarchy);
+    if (d_bc_un_helper) d_bc_un_helper->cacheBcCoefData(d_un_bc_coefs, d_solution_time, d_hierarchy);
+    if (d_bc_us_helper) d_bc_us_helper->cacheBcCoefData(d_us_bc_coefs, d_solution_time, d_hierarchy);
 
     // Indicate the operator is initialized.
     d_is_initialized = true;
@@ -543,15 +558,19 @@ MultiphaseStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
         x->allocateVectorData();
         b->allocateVectorData();
         x->setToScalar(0.0);
-        if (d_bc_helper)
+        if (d_bc_un_helper)
         {
             const int un_idx = x->getComponentDescriptorIndex(0);
+            const int P_idx = x->getComponentDescriptorIndex(2);
+            d_bc_un_helper->enforceNormalVelocityBoundaryConditions(
+                un_idx, P_idx, d_un_bc_coefs, d_solution_time, d_homogeneous_bc);
+        }
+        if (d_bc_us_helper)
+        {
             const int us_idx = x->getComponentDescriptorIndex(1);
             const int P_idx = x->getComponentDescriptorIndex(2);
-            d_bc_helper->enforceNormalVelocityBoundaryConditions(
-                un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
-            d_bc_helper->enforceNormalVelocityBoundaryConditions(
-                us_idx, P_idx, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
+            d_bc_us_helper->enforceNormalVelocityBoundaryConditions(
+                us_idx, P_idx, d_us_bc_coefs, d_solution_time, d_homogeneous_bc);
         }
         apply(*x, *b);
         y.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&y, false), b);
@@ -559,13 +578,19 @@ MultiphaseStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
         b->freeVectorComponents();
     }
     const bool homogeneous_bc = true;
-    if (d_bc_helper)
+    if (d_bc_un_helper)
     {
         const int un_idx = y.getComponentDescriptorIndex(0);
+        const int P_idx = y.getComponentDescriptorIndex(2);
+        d_bc_un_helper->enforceNormalVelocityBoundaryConditions(
+            un_idx, P_idx, d_un_bc_coefs, d_solution_time, homogeneous_bc);
+    }
+    if (d_bc_us_helper)
+    {
         const int us_idx = y.getComponentDescriptorIndex(1);
         const int P_idx = y.getComponentDescriptorIndex(2);
-        d_bc_helper->enforceNormalVelocityBoundaryConditions(un_idx, P_idx, d_un_bc_coefs, d_new_time, homogeneous_bc);
-        d_bc_helper->enforceNormalVelocityBoundaryConditions(us_idx, P_idx, d_us_bc_coefs, d_new_time, homogeneous_bc);
+        d_bc_us_helper->enforceNormalVelocityBoundaryConditions(
+            us_idx, P_idx, d_us_bc_coefs, d_solution_time, homogeneous_bc);
     }
     return;
 } // modifyRhsForBcs
@@ -573,15 +598,19 @@ MultiphaseStaggeredStokesOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double
 void
 MultiphaseStaggeredStokesOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& u)
 {
-    if (d_bc_helper)
+    if (d_bc_un_helper)
     {
         const int un_idx = u.getComponentDescriptorIndex(0);
+        const int P_idx = u.getComponentDescriptorIndex(2);
+        d_bc_un_helper->enforceNormalVelocityBoundaryConditions(
+            un_idx, P_idx, d_un_bc_coefs, d_solution_time, d_homogeneous_bc);
+    }
+    if (d_bc_us_helper)
+    {
         const int us_idx = u.getComponentDescriptorIndex(1);
         const int P_idx = u.getComponentDescriptorIndex(2);
-        d_bc_helper->enforceNormalVelocityBoundaryConditions(
-            un_idx, P_idx, d_un_bc_coefs, d_new_time, d_homogeneous_bc);
-        d_bc_helper->enforceNormalVelocityBoundaryConditions(
-            us_idx, P_idx, d_us_bc_coefs, d_new_time, d_homogeneous_bc);
+        d_bc_us_helper->enforceNormalVelocityBoundaryConditions(
+            us_idx, P_idx, d_us_bc_coefs, d_solution_time, d_homogeneous_bc);
     }
     return;
 } // imposeSolBcs
@@ -603,15 +632,20 @@ MultiphaseStaggeredStokesOperator::applySpecialized(const int A_P_idx,
                          d_sc_scr_idx,
                          d_sc_scr_var,
                          nullptr,
-                         d_new_time,
+                         d_solution_time,
                          true);
 
     // Interpolate and synchronize volume fraction
-    d_hier_math_ops->interp(
-        d_nc_scr_idx, d_nc_scr_var, true, thn_idx, Pointer<CellVariable<NDIM, double>>(nullptr), nullptr, d_new_time);
+    d_hier_math_ops->interp(d_nc_scr_idx,
+                            d_nc_scr_var,
+                            true,
+                            thn_idx,
+                            Pointer<CellVariable<NDIM, double>>(nullptr),
+                            nullptr,
+                            d_solution_time);
     // Interpolate to cell sides
     convert_to_ndim_cc(d_cc_ndim_idx, thn_idx, d_hierarchy);
-    d_hier_math_ops->interp(d_sc_scr_idx, d_sc_scr_var, true, d_cc_ndim_idx, d_cc_ndim_var, nullptr, d_new_time);
+    d_hier_math_ops->interp(d_sc_scr_idx, d_sc_scr_var, true, d_cc_ndim_idx, d_cc_ndim_var, nullptr, d_solution_time);
 
     // Compute the forces on momentum.
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)

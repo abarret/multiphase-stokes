@@ -62,6 +62,7 @@ main(int argc, char* argv[])
         // Create the boundary condition objects
         std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
         RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
+        RobinBcCoefStrategy<NDIM>* p_bc_coef = nullptr;
         bool is_periodic = grid_geometry->getPeriodicShift().max() == 1;
         if (!is_periodic)
         {
@@ -76,6 +77,8 @@ main(int argc, char* argv[])
             }
             std::string thn_bc_name = "thn_bc";
             thn_bc_coef = new muParserRobinBcCoefs(thn_bc_name, input_db->getDatabase(thn_bc_name), grid_geometry);
+            if (input_db->isDatabase("p_bc"))
+                p_bc_coef = new muParserRobinBcCoefs("p_bc", input_db->getDatabase("p_bc"), grid_geometry);
         }
 
         // Create variables and register them with the variable database.
@@ -298,10 +301,11 @@ main(int argc, char* argv[])
         params.eta_s = input_db->getDouble("ETAS");
         MultiphaseStaggeredStokesOperator stokes_op("stokes_op", false, params);
         stokes_op.setCandDCoefficients(C, D);
-        stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, nullptr, thn_bc_coef);
+        stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);
 
-        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-        stokes_op.setPhysicalBoundaryHelper(bc_helper);
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper = new StaggeredStokesPhysicalBoundaryHelper();
+        stokes_op.setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
 
         stokes_op.setThnIdx(thn_cc_idx);
         stokes_op.initializeOperatorState(u_vec, f_vec);
