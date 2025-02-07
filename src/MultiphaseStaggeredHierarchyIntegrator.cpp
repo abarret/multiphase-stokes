@@ -23,6 +23,8 @@
 #include "ibamr/ibamr_enums.h"
 #include "ibamr/ibamr_utilities.h"
 #include "ibamr/namespaces.h" // IWYU pragma: keep
+#include <ibamr/INSVCStaggeredPressureBcCoef.h>
+#include <ibamr/INSVCStaggeredVelocityBcCoef.h>
 
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/CartCellDoubleBoundsPreservingConservativeLinearRefine.h"
@@ -112,12 +114,17 @@
 namespace multiphase
 {
 
+namespace
+{
+static Timer* t_integrate_hierarchy = nullptr;
+static Timer* t_preprocess_integrate_hierarchy = nullptr;
+static Timer* t_postprocess_integrate_hierarchy = nullptr;
+} // namespace
+
 /////////////////////////////// PUBLIC ///////////////////////////////////////
-MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
-    std::string object_name,
-    Pointer<Database> input_db,
-    Pointer<CartesianGridGeometry<NDIM>> grid_geometry,
-    bool register_for_restart)
+MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(std::string object_name,
+                                                                               Pointer<Database> input_db,
+                                                                               bool register_for_restart)
     : INSHierarchyIntegrator(std::move(object_name),
                              input_db,
                              new SideVariable<NDIM, double>(object_name + "::Us"),
@@ -132,7 +139,13 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
                              new CellVariable<NDIM, double>(object_name + "::Q"),
                              "CONSERVATIVE_COARSEN",
                              "CONSTANT_REFINE",
-                             register_for_restart)
+                             register_for_restart),
+      d_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "::un_sc")),
+      d_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "::us_sc")),
+      d_f_un_sc_var(new SideVariable<NDIM, double>(d_object_name + "::f_un_sc")),
+      d_f_us_sc_var(new SideVariable<NDIM, double>(d_object_name + "::f_us_sc")),
+      d_f_cc_var(new CellVariable<NDIM, double>(d_object_name + "::f_cc")),
+      d_thn_cc_var(new CellVariable<NDIM, double>(d_object_name + "::thn_cc"))
 {
     // We do not use d_viscous_time_stepping_type. Use d_viscous_ts_type instead (allows for BDF2).
     d_viscous_time_stepping_type = UNKNOWN_TIME_STEPPING_TYPE;
@@ -155,7 +168,8 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
         input_db->getStringWithDefault("convec_limiter_type", IBAMR::enum_to_string(d_convec_limiter_type)));
     d_convective_time_stepping_type = IBAMR::string_to_enum<IBAMR::TimeSteppingType>(
         input_db->getStringWithDefault("convec_ts_type", "FORWARD_EULER"));
-
+    d_use_accel_ts = input_db->getBoolWithDefault("use_accel_ts", d_use_accel_ts);
+    d_accel_ts_safety_fac = input_db->getDoubleWithDefault("accel_ts_safety_factor", d_accel_ts_safety_fac);
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
@@ -187,6 +201,26 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
         }
     }
 
+    d_U_var = d_us_sc_var;
+
+    // Create some dummy boundary condition objects. These can be overwritten by calling
+    // registerPhysicalBoundaryConditions().
+    d_un_bc_coefs.resize(NDIM);
+    d_us_bc_coefs.resize(NDIM);
+    for (int d = 0; d < NDIM; ++d)
+    {
+        d_dummy_bcs.push_back(std::make_unique<LocationIndexRobinBcCoefs<NDIM>>("u_dummy", nullptr));
+        d_un_bc_coefs[d] = d_dummy_bcs[d].get();
+        d_us_bc_coefs[d] = d_dummy_bcs[d].get();
+    }
+    d_U_bc_coefs = d_us_bc_coefs;
+
+    IBTK_DO_ONCE(t_integrate_hierarchy = TimerManager::getManager()->getTimer(
+                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::integrateHierarchy()");
+                 t_preprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
+                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::preprocess()");
+                 t_postprocess_integrate_hierarchy = TimerManager::getManager()->getTimer(
+                     "multiphase::INSVCTwoFluidStaggeredHierarchyIntegrator::postprocess()"););
     return;
 } // MultiphaseStaggeredHierarchyIntegrator
 
@@ -236,8 +270,13 @@ MultiphaseStaggeredHierarchyIntegrator::registerPhysicalBoundaryConditions(
     std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs,
     std::vector<RobinBcCoefStrategy<NDIM>*> us_bc_coefs)
 {
-    d_un_bc_coefs = std::move(un_bc_coefs);
-    d_us_bc_coefs = std::move(us_bc_coefs);
+    for (int d = 0; d < NDIM; ++d)
+    {
+        if (un_bc_coefs[d]) d_un_bc_coefs[d] = un_bc_coefs[d];
+        if (us_bc_coefs[d]) d_us_bc_coefs[d] = us_bc_coefs[d];
+    }
+    // Treat solvent as U
+    d_U_bc_coefs = d_us_bc_coefs;
 }
 
 const std::vector<RobinBcCoefStrategy<NDIM>*>&
@@ -419,6 +458,57 @@ MultiphaseStaggeredHierarchyIntegrator::setForcingFunctionsScaled(Pointer<CartGr
 }
 
 void
+MultiphaseStaggeredHierarchyIntegrator::setForcingFunctionsScaledByBoth(Pointer<CartGridFunction> fn_fcn,
+                                                                        Pointer<CartGridFunction> fs_fcn)
+{
+    if (fn_fcn)
+    {
+        if (d_f_un_thn_ths_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_un_fcn = d_f_un_thn_ths_fcn;
+            if (p_f_un_fcn)
+            {
+                p_f_un_fcn->addFunction(fn_fcn);
+            }
+            else
+            {
+                p_f_un_fcn = new CartGridFunctionSet(d_object_name + "::fn_thn_ths_fcn_set");
+                p_f_un_fcn->addFunction(d_f_un_thn_ths_fcn);
+                p_f_un_fcn->addFunction(fn_fcn);
+                d_f_un_thn_ths_fcn = p_f_un_fcn;
+            }
+        }
+        else
+        {
+            d_f_un_thn_ths_fcn = fn_fcn;
+        }
+    }
+
+    if (fs_fcn)
+    {
+        if (d_f_us_thn_ths_fcn)
+        {
+            Pointer<CartGridFunctionSet> p_f_us_fcn = d_f_us_thn_ths_fcn;
+            if (p_f_us_fcn)
+            {
+                p_f_us_fcn->addFunction(fs_fcn);
+            }
+            else
+            {
+                p_f_us_fcn = new CartGridFunctionSet(d_object_name + "::fs_thn_ths_fcn_set");
+                p_f_us_fcn->addFunction(d_f_us_thn_ths_fcn);
+                p_f_us_fcn->addFunction(fs_fcn);
+                d_f_us_thn_ths_fcn = p_f_us_fcn;
+            }
+        }
+        else
+        {
+            d_f_us_thn_ths_fcn = fs_fcn;
+        }
+    }
+}
+
+void
 MultiphaseStaggeredHierarchyIntegrator::setInitialNetworkVolumeFraction(Pointer<CartGridFunction> thn_init_fcn)
 {
     d_thn_init_fcn = thn_init_fcn;
@@ -443,7 +533,6 @@ MultiphaseStaggeredHierarchyIntegrator::advectNetworkVolumeFraction(
     d_thn_integrator = adv_diff_integrator;
 
     // Set up thn to be advected
-    d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
     d_thn_integrator->registerTransportedQuantity(d_thn_cc_var, true /*output_Q*/);
     d_thn_integrator->setAdvectionVelocity(d_thn_cc_var, d_U_adv_diff_var);
     d_thn_integrator->setAdvectionVelocityIsDivergenceFree(d_U_adv_diff_var, false); // Not divergence free in general.
@@ -458,18 +547,16 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
 {
     if (d_integrator_is_initialized) return;
 
+    d_hierarchy = hierarchy;
+    d_gridding_alg = gridding_alg;
+
     // Here we do all we need to ensure that calls to advanceHierarchy() or integrateHierarchy() are valid.
     // NOTE: This function is called before the patch hierarchy has valid patch levels.
     // To set initial data, we should do this in initializeLevelDataSpecialized().
 
     // First create the variables we need.
     // NOTE: d_P_var is a member variable of the base class.
-    // NOTE: This may have been created above with the advection diffusion integrator.
-    if (!d_thn_cc_var) d_thn_cc_var = new CellVariable<NDIM, double>(d_object_name + "::thn_cc");
     d_grad_thn_var = new CellVariable<NDIM, double>(d_object_name + "grad_thn_cc", NDIM);
-    d_f_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::f_un_sc");
-    d_f_us_sc_var = new SideVariable<NDIM, double>(d_object_name + "::f_us_sc");
-    d_f_cc_var = new CellVariable<NDIM, double>(d_object_name + "::f_cc");
     d_un_rhs_var = new SideVariable<NDIM, double>(d_object_name + "::un_rhs");
     d_us_rhs_var = new SideVariable<NDIM, double>(d_object_name + "::us_rhs");
     d_p_rhs_var = new CellVariable<NDIM, double>(d_object_name + "::p_rhs");
@@ -547,7 +634,7 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
         d_params.xi_idx = xi_idx;
     }
 
-    // Register a scratch force object
+    // Register a scratch force object.
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     d_fn_scr_idx = var_db->registerClonedPatchDataIndex(d_f_un_sc_var, f_un_idx);
     d_fs_scr_idx = var_db->registerClonedPatchDataIndex(d_f_us_sc_var, f_us_idx);
@@ -585,17 +672,17 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
         for (int d = 0; d < NDIM; ++d)
             d_visit_writer->registerPlotQuantity("Us_" + std::to_string(d), "SCALAR", us_draw_idx, d, 1.0, "NODE");
 
-        d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "CELL");
-
-        d_visit_writer->registerPlotQuantity("Div", "SCALAR", div_draw_idx, 0, 1.0, "CELL");
-
-        d_visit_writer->registerPlotQuantity("Fn", "VECTOR", fn_draw_idx, 0, 1.0, "NODE");
+        d_visit_writer->registerPlotQuantity("Fn", "VECTOR", fn_draw_idx, 0, 1.0, "CELL");
         for (int d = 0; d < NDIM; ++d)
             d_visit_writer->registerPlotQuantity("Fn_" + std::to_string(d), "SCALAR", fn_draw_idx, d, 1.0, "CELL");
 
-        d_visit_writer->registerPlotQuantity("Fs", "VECTOR", fs_draw_idx, 0, 1.0, "NODE");
+        d_visit_writer->registerPlotQuantity("Fs", "VECTOR", fs_draw_idx, 0, 1.0, "CELL");
         for (int d = 0; d < NDIM; ++d)
             d_visit_writer->registerPlotQuantity("Fs_" + std::to_string(d), "SCALAR", fs_draw_idx, d, 1.0, "CELL");
+
+        d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "CELL");
+
+        d_visit_writer->registerPlotQuantity("Div", "SCALAR", div_draw_idx, 0, 1.0, "CELL");
 
         // Only need to plot this variable if we aren't advecting it.
         // If we do advect theta, the advection integrator will plot it.
@@ -781,6 +868,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
                                                                      const double new_time,
                                                                      const int num_cycles)
 {
+    IBTK_TIMER_START(t_preprocess_integrate_hierarchy);
     // Do anything that needs to be done before we call integrateHierarchy().
     INSHierarchyIntegrator::preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
 
@@ -1052,6 +1140,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     }
 
     executePreprocessIntegrateHierarchyCallbackFcns(current_time, new_time, num_cycles);
+    IBTK_TIMER_STOP(t_preprocess_integrate_hierarchy);
     return;
 } // preprocessIntegrateHierarchy
 
@@ -1060,6 +1149,7 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
                                                                       const double new_time,
                                                                       const int cycle_num)
 {
+    IBTK_TIMER_START(t_integrate_hierarchy);
     INSHierarchyIntegrator::integrateHierarchySpecialized(current_time, new_time, cycle_num);
     double half_time = 0.5 * (current_time + new_time);
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -1105,7 +1195,7 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     }
     const double dt = new_time - current_time;
 
-    // Now compute momentum forces
+    // Compute forces
     Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_temp");
     f_vec->allocateVectorData(current_time);
     f_vec->setToScalar(0.0);
@@ -1166,7 +1256,7 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     // Reset the RHS
     d_rhs_vec->subtract(d_rhs_vec, f_vec);
 
-    // Destroy the forces
+    // Destroy forces
     f_vec->deallocateVectorData();
     f_vec->freeVectorComponents();
 
@@ -1192,7 +1282,7 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
                 adv_diff_hier_integrator->integrateHierarchy(current_time, new_time, adv_diff_cycle_num);
         }
     }
-
+    IBTK_TIMER_STOP(t_integrate_hierarchy);
     return;
 } // integrateHierarchy
 
@@ -1202,6 +1292,7 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
                                                                       const bool skip_synchronize_new_state_data,
                                                                       const int num_cycles)
 {
+    IBTK_TIMER_START(t_postprocess_integrate_hierarchy);
     // Do anything that needs to be done after integrateHierarchy().
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
         current_time, new_time, skip_synchronize_new_state_data, num_cycles);
@@ -1284,6 +1375,7 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
     d_stokes_solver = nullptr;
     d_precond_op = nullptr;
     d_stokes_precond = nullptr;
+    IBTK_TIMER_STOP(t_postprocess_integrate_hierarchy);
     return;
 } // postprocessIntegrateHierarchy
 
@@ -1515,6 +1607,44 @@ MultiphaseStaggeredHierarchyIntegrator::isVariableDrag() const
     return d_params.isVariableDrag();
 }
 
+double
+MultiphaseStaggeredHierarchyIntegrator::getMaximumTimeStepSizeSpecialized()
+{
+    double dt = INSHierarchyIntegrator::getMaximumTimeStepSizeSpecialized();
+    if (!d_use_accel_ts) return dt;
+    double dt_loc = std::numeric_limits<double>::max();
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+            Pointer<SideData<NDIM, double>> fn_data = patch->getPatchData(d_f_un_sc_var, getCurrentContext());
+            Pointer<SideData<NDIM, double>> fs_data = patch->getPatchData(d_f_us_sc_var, getCurrentContext());
+
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            const double* const dx = pgeom->getDx();
+            const double dx_min = *std::min_element(dx, dx + NDIM);
+
+            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
+            {
+                const CellIndex<NDIM>& idx = ci();
+                VectorNd fn, fs;
+                for (int d = 0; d < NDIM; ++d)
+                {
+                    fn[d] = 0.5 * ((*fn_data)(SideIndex<NDIM>(idx, d, 0)) + (*fn_data)(SideIndex<NDIM>(idx, d, 1)));
+                    fs[d] = 0.5 * ((*fs_data)(SideIndex<NDIM>(idx, d, 0)) + (*fs_data)(SideIndex<NDIM>(idx, d, 1)));
+                }
+                double f_max = std::max(fn.norm(), fs.norm());
+                dt_loc = std::min(dt_loc, d_accel_ts_safety_fac * std::sqrt(dx_min / f_max));
+            }
+        }
+    }
+    return std::max(dt, dt_loc);
+}
+
 void
 MultiphaseStaggeredHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<NDIM, double>>& f_vec,
                                                       const double current_time,
@@ -1574,6 +1704,19 @@ MultiphaseStaggeredHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<N
         d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
     }
 
+    if (d_f_un_thn_ths_fcn)
+    {
+        d_f_un_thn_ths_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn_and_ths(fn_cloned_idx, fn_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fn_scr_idx, d_fn_scr_idx, fn_cloned_idx);
+    }
+    if (d_f_us_thn_ths_fcn)
+    {
+        d_f_us_thn_ths_fcn->setDataOnPatchHierarchy(fs_cloned_idx, d_f_us_sc_var, d_hierarchy, eval_time);
+        multiply_sc_and_thn_and_ths(fs_cloned_idx, fs_cloned_idx, thn_idx, d_hierarchy);
+        d_hier_sc_data_ops->add(d_fs_scr_idx, d_fs_scr_idx, fs_cloned_idx);
+    }
+
     // Copy our accumulated forces into a permanent location
     const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
     const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
@@ -1607,6 +1750,7 @@ MultiphaseStaggeredHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<N
             f_vec->getComponentDescriptorIndex(1), d_fs_scr_idx, f_vec->getComponentDescriptorIndex(1));
     }
 
+    // Remove cloned patch indices
     deallocate_patch_data({ fn_cloned_idx, fs_cloned_idx }, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
     var_db->removePatchDataIndex(fn_cloned_idx);
     var_db->removePatchDataIndex(fs_cloned_idx);

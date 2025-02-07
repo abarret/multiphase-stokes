@@ -1,0 +1,4 @@
+ADD_EXECUTABLE(ib_peristalsis ib_ex.cpp)
+SET_TARGET_PROPERTIES(ib_peristalsis PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/ib_peristalsis" OUTPUT_NAME ib_ex)
+TARGET_LINK_LIBRARIES(ib_peristalsis PRIVATE MultiphaseLib)
+

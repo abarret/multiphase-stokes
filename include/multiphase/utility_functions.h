@@ -144,6 +144,38 @@ multiply_sc_and_ths(const int dst_idx,
     }
 }
 
+// Multiply ths and side centered quantity and fill in the side centered dst_idx. Note that cell centered data should
+// already have ghost cells filled. dst_idx can be the same as sc_idx.
+inline void
+multiply_sc_and_thn_and_ths(const int dst_idx,
+                            const int sc_idx,
+                            const int thn_idx,
+                            SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                            const bool extended_box = false)
+{
+    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> sc_data = patch->getPatchData(sc_idx);
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> dst_data = patch->getPatchData(dst_idx);
+            const SAMRAI::hier::Box<NDIM>& box = extended_box ? sc_data->getGhostBox() : patch->getBox();
+            for (int axis = 0; axis < NDIM; ++axis)
+            {
+                for (SAMRAI::pdat::SideIterator<NDIM> si(box, axis); si; si++)
+                {
+                    const SAMRAI::pdat::SideIndex<NDIM>& idx = si();
+                    const double thn = 0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0)));
+                    (*dst_data)(idx) = thn * convertToThs(thn) * (*sc_data)(idx);
+                }
+            }
+        }
+    }
+}
+
 /*!
  * \brief Allocate patch data on the specified levels and at the specified time.
  *
