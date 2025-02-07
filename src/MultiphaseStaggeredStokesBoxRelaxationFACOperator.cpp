@@ -91,8 +91,10 @@ extern "C"
                  const int&,    // f_us_gcw
                  double* const, // thn_data
                  const int&,    // thn_gcw
-                 const double&, // eta_n    // whatever will be passed in will be treated as a reference to a double
-                 const double&, // eta_s    // telling the compiler that the function is expecting a reference
+                 const double&, // eta_n
+                 const double&, // eta_s
+                 const double&, // lambda_n
+                 const double&, // lambda_s
                  const double&, // nu_n
                  const double&, // nu_s
                  const double&, // xi
@@ -124,9 +126,10 @@ extern "C"
                       const int&,    // f_us_gcw
                       double* const, // thn_data
                       const int&,    // thn_gcw
-                      const double&, // eta_n    // whatever will be passed in will be treated as a reference to a
-                                     // double
-                      const double&, // eta_s    // telling the compiler that the function is expecting a reference
+                      const double&, // eta_n
+                      const double&, // eta_s
+                      const double&, // lambda_n
+                      const double&, // lambda_s
                       const double&, // nu_n
                       const double&, // nu_s
                       const double&, // xi
@@ -163,6 +166,8 @@ extern "C"
                         const int&,    // thn_gcw
                         const double&, // eta_n
                         const double&, // eta_s
+                        const double&, // lambda_n
+                        const double&, // lambda_s
                         double* const, // xi_0
                         double* const, // xi_1
                         const int&,    // xi_gcw
@@ -196,6 +201,8 @@ extern "C"
                              const int&,    // thn_gcw
                              const double&, // eta_n
                              const double&, // eta_s
+                             const double&, // lambda_n
+                             const double&, // lambda_s
                              double* const, // xi_0
                              double* const, // xi_1
                              const int&,    // xi_gcw
@@ -265,7 +272,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
       d_thn_bc_coef(d_default_thn_bc_coef.get()),
       d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
-      d_params(params)
+      d_params(params),
+      d_thn_scr_var(new CellVariable<NDIM, double>(d_object_name + "::Thn"))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -325,6 +333,14 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
         var_db->removePatchDataIndex(d_mask_idx);
     }
     d_mask_idx = var_db->registerVariableAndContext(d_mask_var, d_ctx, IntVector<NDIM>(0));
+
+    if (var_db->checkVariableExists(d_thn_scr_var->getName()))
+    {
+        d_thn_scr_var = var_db->getVariable(d_thn_scr_var->getName());
+        d_thn_scr_idx = var_db->mapVariableAndContextToIndex(d_thn_scr_var, d_ctx);
+        var_db->removePatchDataIndex(d_thn_scr_idx);
+    }
+    d_thn_scr_idx = var_db->registerVariableAndContext(d_thn_scr_var, d_ctx, IntVector<NDIM>(1));
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
@@ -501,13 +517,41 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
 {
     if (num_sweeps == 0) return;
 
+    // Note that thn ghost cells are always filled under inhomogeneous conditions.
+    using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
+        d_thn_scr_idx, d_thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
+    HierarchyGhostCellInterpolation hier_bdry_fill;
+    hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
+    hier_bdry_fill.setHomogeneousBc(false);
+    hier_bdry_fill.fillData(d_solution_time);
+
+    if (d_regularize_thn)
+    {
+        for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+            for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+            {
+                Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(d_thn_scr_idx);
+                for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
+                {
+                    const CellIndex<NDIM>& idx = ci();
+                    (*thn_data)(idx) = std::max((*thn_data)(idx), d_min_thn);
+                    (*thn_data)(idx) = std::min((*thn_data)(idx), 1.0 - d_min_thn);
+                }
+            }
+        }
+    }
+
     IBTK_TIMER_START(t_smooth_error);
 
     // Get the vector components. These pull out patch data indices
     const int un_idx = error.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = error.getComponentDescriptorIndex(1); // solvent velocity, Us
     const int P_idx = error.getComponentDescriptorIndex(2);  // pressure
-    const int thn_idx = d_thn_idx;
+    const int thn_idx = d_thn_scr_idx;
     const int f_un_idx = residual.getComponentDescriptorIndex(0); // RHS_Un
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
     const int f_P_idx = residual.getComponentDescriptorIndex(2);  // RHS_pressure
@@ -690,6 +734,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                         thn_gcw.min(),
                                         d_params.eta_n,
                                         d_params.eta_s,
+                                        d_params.lambda_n,
+                                        d_params.lambda_s,
                                         xi_data->getPointer(0),
                                         xi_data->getPointer(1),
                                         xi_data->getGhostCellWidth().min(),
@@ -728,6 +774,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                  thn_gcw.min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
+                                 d_params.lambda_n,
+                                 d_params.lambda_s,
                                  d_params.nu_n,
                                  d_params.nu_s,
                                  d_params.xi,
@@ -770,6 +818,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                                    thn_gcw.min(),
                                    d_params.eta_n,
                                    d_params.eta_s,
+                                   d_params.lambda_n,
+                                   d_params.lambda_s,
                                    xi_data->getPointer(0),
                                    xi_data->getPointer(1),
                                    xi_data->getGhostCellWidth().min(),
@@ -805,6 +855,8 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                             thn_gcw.min(),
                             d_params.eta_n,
                             d_params.eta_s,
+                            d_params.lambda_n,
+                            d_params.lambda_s,
                             d_params.nu_n,
                             d_params.nu_s,
                             d_params.xi,
@@ -843,6 +895,34 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
 {
     IBTK_TIMER_START(t_compute_residual);
 
+    // Note that thn ghost cells are always filled under inhomogeneous conditions.
+    using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
+        d_thn_scr_idx, d_thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
+    HierarchyGhostCellInterpolation hier_bdry_fill;
+    hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy, coarsest_level_num, finest_level_num);
+    hier_bdry_fill.setHomogeneousBc(false);
+    hier_bdry_fill.fillData(d_solution_time);
+
+    if (d_regularize_thn)
+    {
+        for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+        {
+            Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+            for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+            {
+                Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(d_thn_scr_idx);
+                for (CellIterator<NDIM> ci(thn_data->getGhostBox()); ci; ci++)
+                {
+                    const CellIndex<NDIM>& idx = ci();
+                    (*thn_data)(idx) = std::max((*thn_data)(idx), d_min_thn);
+                    (*thn_data)(idx) = std::min((*thn_data)(idx), 1.0 - d_min_thn);
+                }
+            }
+        }
+    }
+
     // Get the vector components. These pull out patch data indices
     const int un_idx = solution.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = solution.getComponentDescriptorIndex(1); // solvent velocity, Us
@@ -853,7 +933,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     const int res_un_idx = residual.getComponentDescriptorIndex(0);
     const int res_us_idx = residual.getComponentDescriptorIndex(1);
     const int res_P_idx = residual.getComponentDescriptorIndex(2);
-    const int thn_idx = d_thn_idx;
+    const int thn_idx = d_thn_scr_idx;
 
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
@@ -1020,6 +1100,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::initializeOperatorState(const
         level->allocatePatchData(d_un_scr_idx, d_solution_time);
         level->allocatePatchData(d_us_scr_idx, d_solution_time);
         level->allocatePatchData(d_p_scr_idx, d_solution_time);
+        level->allocatePatchData(d_thn_scr_idx, d_solution_time);
     }
 
     // Set up physical boundary condition helpers
@@ -1194,6 +1275,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::deallocateOperatorState()
         level->deallocatePatchData(d_us_scr_idx);
         level->deallocatePatchData(d_p_scr_idx);
         level->deallocatePatchData(d_mask_idx);
+        level->deallocatePatchData(d_thn_scr_idx);
     }
 
     d_is_initialized = false;

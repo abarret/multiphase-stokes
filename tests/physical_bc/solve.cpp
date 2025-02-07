@@ -42,6 +42,7 @@ main(int argc, char* argv[])
     IBTKInit ibtk_init(argc, argv, MPI_COMM_WORLD);
 
     PetscOptionsSetValue(nullptr, "-solver_ksp_rtol", "1.0e-12");
+    PetscOptionsSetValue(nullptr, "-solver_ksp_type", "fgmres");
 
     { // cleanup dynamically allocated objects prior to shutdown
 
@@ -328,6 +329,8 @@ main(int argc, char* argv[])
         params.eta_n = input_db->getDouble("ETAN");
         params.eta_s = input_db->getDouble("ETAS");
         params.nu_n = params.nu_s = input_db->getDouble("NU");
+        params.lambda_n = -params.eta_n;
+        params.lambda_s = -params.eta_s;
         Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
             new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
         const double C = input_db->getDouble("C");

@@ -39,9 +39,55 @@
 
 namespace multiphase
 {
+
+/*!
+ * \brief Class ThnCartGridFunction is an abstract class intended to help set the volume fraction. It is an extension of
+ * IBTK::CartGridFunction and improves the interface to inform implementations at which point in the time step the
+ * volume fraction should be set.
+ *
+ * The protected member d_time_pt will be set before setDataOnPatchHierarchy is called. This variable should be used to
+ * set the volume fraction at the correct time point.
+ */
+class ThnCartGridFunction : public IBTK::CartGridFunction
+{
+public:
+    ThnCartGridFunction(std::string object_name) : CartGridFunction(std::move(object_name))
+    {
+    }
+    using IBTK::CartGridFunction::setDataOnPatchHierarchy;
+    /*!
+     * \brief Calls setTimePoint() followed by setDataOnPatchHierarchy().
+     */
+    inline void setDataOnPatchHierarchy(int data_idx,
+                                        SAMRAI::tbox::Pointer<SAMRAI::hier::Variable<NDIM>> var,
+                                        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+                                        double data_time,
+                                        IBTK::TimePoint time_pt,
+                                        bool initial_time = false,
+                                        int coarsest_ln = IBTK::invalid_level_number,
+                                        int finest_ln = IBTK::invalid_level_number)
+    {
+        setTimePoint(time_pt);
+        setDataOnPatchHierarchy(data_idx, var, hierarchy, data_time, initial_time, coarsest_ln, finest_ln);
+    }
+
+    /*!
+     * \brief Sets the time point at which the volume fraction should be set.
+     */
+    inline void setTimePoint(IBTK::TimePoint time_pt)
+    {
+        d_time_pt = time_pt;
+    }
+
+protected:
+    IBTK::TimePoint d_time_pt = IBTK::TimePoint::UNKNOWN_TIME;
+};
 /*!
  * \brief Class MultiphaseStaggeredHierarchyIntegrator provides a staggered-grid solver
  * for the incompressible Navier-Stokes equations on an AMR grid hierarchy.
+ *
+ * This class will regularize the volume fraction during the application of the Stokes operators. The regularization
+ * parameter can be set in the input database. Note that no regularization occurs in the momentum transport component.
  */
 class MultiphaseStaggeredHierarchyIntegrator : public IBAMR::INSHierarchyIntegrator
 {
@@ -154,6 +200,7 @@ public:
      * \brief Set the viscosity coefficients for the viscous stresses.
      */
     void setViscosityCoefficient(double eta_n, double eta_s);
+    void setViscosityCoefficient(double eta_n, double eta_s, double lambda_n, double lambda_s);
 
     /*!
      * \brief Set the drag coefficients for each phase.
@@ -202,6 +249,9 @@ public:
      * Register the volume fraction function. If a function is not registered, the volume fraction is advected with the
      * fluid.
      *
+     * Note that the volume fraction function does not necessarily need to be of type `ThnCartGridFunction`. A dynamic
+     * cast will be performed before each call to determine the actual type of `thn_fcn`.
+     *
      * An optional argument allows this function to be used as the initial condition for the volume fraction. If this is
      * set to false, users are expected to call setInitialNetworkVolumeFraction.
      */
@@ -249,17 +299,6 @@ public:
                                         bool allocate_data) override;
 
     /*!
-     * Prepare to advance the data from current_time to new_time.
-     */
-    void preprocessIntegrateHierarchy(double current_time, double new_time, int num_cycles = 1) override;
-
-    /*!
-     * Synchronously advance each level in the hierarchy over the given time
-     * increment.
-     */
-    void integrateHierarchySpecialized(double current_time, double new_time, int cycle_num = 0) override;
-
-    /*!
      * Clean up data following call(s) to integrateHierarchy().
      */
     void postprocessIntegrateHierarchy(double current_time,
@@ -285,9 +324,6 @@ public:
                                           bool initial_time,
                                           bool uses_richardson_extrapolation_too);
 
-    void regridHierarchyBeginSpecialized() override;
-    void initializeCompositeHierarchyDataSpecialized(double init_data_time, bool initial_time) override;
-
 protected:
     void setupPlotDataSpecialized() override;
 
@@ -296,57 +332,7 @@ protected:
      */
     double getMaximumTimeStepSizeSpecialized() override;
 
-private:
     bool isVariableDrag() const;
-
-    void approxConvecOp(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
-                        double current_time,
-                        double new_time,
-                        int un_cur_idx,
-                        int us_cur_idx,
-                        int thn_cur_idx,
-                        int un_new_idx,
-                        int us_new_idx,
-                        int thn_new_idx);
-    /*!
-     * Adds all body forces to the provided SAMRAI vector. Assumes first component of f_vec is the network forces and
-     * the second ocmponent is the solvent forces.
-     *
-     * The volume fraction index thn_idx must have at least one layer of ghost cells to account for scaling the forces.
-     */
-    void addBodyForces(SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>& f_vec,
-                       double current_time,
-                       double new_time,
-                       int thn_cur_idx,
-                       int thn_half_idx,
-                       int thn_new_idx);
-
-    /*!
-     * \brief Default constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     */
-    MultiphaseStaggeredHierarchyIntegrator() = delete;
-
-    /*!
-     * \brief Copy constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     *
-     * \param from The value to copy to this object.
-     */
-    MultiphaseStaggeredHierarchyIntegrator(const MultiphaseStaggeredHierarchyIntegrator& from) = delete;
-
-    /*!
-     * \brief Assignment operator.
-     *
-     * \note This operator is not implemented and should not be used.
-     *
-     * \param that The value to assign to this object.
-     *
-     * \return A reference to this object.
-     */
-    MultiphaseStaggeredHierarchyIntegrator& operator=(const MultiphaseStaggeredHierarchyIntegrator& that) = delete;
 
     /*!
      * \brief A helper function to set the volume fractions. Sets thn_scr_idx = 0.5 * (thn_cur_idx + thn_new_idx).
@@ -393,29 +379,6 @@ private:
     SAMRAI::tbox::Array<double> d_abs_grad_thresh, d_rel_grad_thresh;
     double d_max_grad_thn = std::numeric_limits<double>::quiet_NaN();
 
-    /*!
-     * Vectors
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_sol_vec;
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_rhs_vec;
-    std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>> d_nul_vecs;
-    bool d_has_vel_nullspace = false, d_has_pressure_nullspace = true;
-
-    /*!
-     * Solver information
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_solver_db;
-    SAMRAI::tbox::Pointer<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesOperator> d_stokes_op;
-
-    /*!
-     * Preconditioner information
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
-    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
-    double d_w = std::numeric_limits<double>::quiet_NaN();
-    bool d_use_preconditioner = true;
 
     /*!
      * Drawing information.
@@ -442,25 +405,6 @@ private:
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
 
-    bool d_make_div_rhs_sum_to_zero = true;
-
-    /*!
-     * Convective operator
-     */
-    std::unique_ptr<MultiphaseConvectiveManager> d_convec_op;
-    IBAMR::LimiterType d_convec_limiter_type = IBAMR::LimiterType::UNKNOWN_LIMITER_TYPE;
-
-    /*!
-     * AB2 patch index for convective operator
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_Nn_old_var, d_Ns_old_var;
-
-    /*!
-     * BDF2 patch data. Note that for second order accuracy, we need
-     */
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_old_var, d_us_old_var;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_fn_old_var, d_fs_old_var;
-
     // Scratch force index
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
 
@@ -473,8 +417,6 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_xi_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_xi_fcn;
 
-    TimeSteppingType d_viscous_ts_type = TimeSteppingType::TRAPEZOIDAL_RULE;
-
     bool d_use_accel_ts = false;
     double d_accel_ts_safety_fac = 0.1;
 
@@ -486,6 +428,8 @@ private:
 
     // Network CFL number
     double d_cfl_un_current = std::numeric_limits<double>::quiet_NaN();
+
+    double d_regularize_thn = 1.0e-5;
 };
 } // namespace multiphase
 

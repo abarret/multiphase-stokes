@@ -1,5 +1,5 @@
 #include "multiphase/CFMultiphaseOldroydB.h"
-#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStandardHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/CFINSForcing.h>
@@ -30,7 +30,7 @@ using namespace multiphase;
 
 // Function prototypes
 void output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
-                 Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
+                 Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator,
                  Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
                  Pointer<CFINSForcing> conformation_tensor_handler,
                  const int iteration_num,
@@ -61,7 +61,7 @@ main(int argc, char* argv[])
         // application.  These objects are configured from the input database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+        Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator = new MultiphaseStandardHierarchyIntegrator(
             "FluidSolver",
             app_initializer->getComponentDatabase("INSVCTwoFluidStaggeredHierarchyIntegrator"),
             true /*register_for_restart*/);
@@ -89,12 +89,29 @@ main(int argc, char* argv[])
                                         load_balancer);
 
         const double eta_n = input_db->getDouble("ETA_N");
+        const double l_n = input_db->getDouble("L_N");
         const double eta_s = input_db->getDouble("ETA_S");
+        const double l_s = input_db->getDouble("L_S");
         const double xi = input_db->getDouble("XI");
         const double nu_n = input_db->getDouble("NU_N");
         const double nu_s = input_db->getDouble("NU_S");
-        ins_integrator->setViscosityCoefficient(eta_n, eta_s);
+        ins_integrator->setViscosityCoefficient(eta_n, eta_s, l_n, l_s);
         ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
+
+        // If necessary, grab boundary conditions. Note we only use dirichlet conditions on the flow.
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs, us_bc_coefs;
+        if (grid_geometry->getPeriodicShift().min() == 0)
+        {
+            for (int d = 0; d < NDIM; ++d)
+            {
+                std::string u_bc_coefs_name = "u_bc_coefs_" + std::to_string(d);
+                un_bc_coefs.push_back(new muParserRobinBcCoefs(
+                    "un_bc_coefs_" + std::to_string(d), input_db->getDatabase(u_bc_coefs_name), grid_geometry));
+                us_bc_coefs.push_back(new muParserRobinBcCoefs(
+                    "us_bc_coefs_" + std::to_string(d), input_db->getDatabase(u_bc_coefs_name), grid_geometry));
+            }
+        }
+        ins_integrator->registerPhysicalBoundaryConditions(un_bc_coefs, us_bc_coefs);
 
         // Set up visualizations
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
@@ -287,7 +304,7 @@ main(int argc, char* argv[])
 
 void
 output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
-            Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator,
+            Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator,
             Pointer<AdvDiffSemiImplicitHierarchyIntegrator> adv_diff_integrator,
             Pointer<CFINSForcing> conformation_tensor_handler,
             const int iteration_num,

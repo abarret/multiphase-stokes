@@ -1,6 +1,6 @@
 #include "multiphase/IBMultiphaseCrossLinks.h"
 #include "multiphase/IBMultiphaseHierarchyIntegrator.h"
-#include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStandardHierarchyIntegrator.h"
 
 #include <ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h>
 #include <ibamr/CFINSForcing.h>
@@ -241,7 +241,7 @@ main(int argc, char* argv[])
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database
         // and, if this is a restarted run, from the restart database.
-        Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = new MultiphaseStaggeredHierarchyIntegrator(
+        Pointer<MultiphaseStandardHierarchyIntegrator> ins_integrator = new MultiphaseStandardHierarchyIntegrator(
             "INSIntegrator", app_initializer->getComponentDatabase("INSIntegrator"), false);
         Pointer<IBMethod> ib_solvent_ops =
             new IBMethod("IBSolventMethod", app_initializer->getComponentDatabase("IBMethod"));
