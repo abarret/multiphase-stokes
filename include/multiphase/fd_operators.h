@@ -26,7 +26,7 @@ namespace multiphase
  */
 ///\{
 /*!
- * Accumulate the momentum forces for constant coefficient problems with the network volume fraction interpolated 
+ * Accumulate the momentum forces for constant coefficient problems with the network volume fraction interpolated
  * to cell nodes and cell sides.
  */
 void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
@@ -63,8 +63,9 @@ void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SA
 ///\}
 
 /*!
- * Accumulate the forces into respective patch indices for the network and solvent on a given patch. Assumes ghost cells
- * have been filled for the velocities and volume fraction.
+ * Accumulate the forces into respective patch indices for the network and solvent
+ * on a given patch with variable drag.
+ * Assumes ghost cells have been filled for the velocities and volume fraction.
  *
  * Specifically, computes
  *
@@ -107,25 +108,25 @@ void accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::h
  */
 ///\{
 /*!
- * Accumulate the momentum forces for constant coefficient problems with the network volume fraction interpolated 
+ * Accumulate the momentum forces for constant coefficient problems with the network volume fraction interpolated
  * to cell nodes and cell sides.
  */
 void accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                                            int A_un_idx,
-                                                            int A_us_idx,
-                                                            int un_idx,
-                                                            int us_idx,
-                                                            int thn_idx,
-                                                            int thn_nc_idx,
-                                                            int thn_sc_idx,
-                                                            const MultiphaseParameters& params,
-                                                            double C,
-                                                            double D_u);
+                                                                 int A_un_idx,
+                                                                 int A_us_idx,
+                                                                 int un_idx,
+                                                                 int us_idx,
+                                                                 int thn_idx,
+                                                                 int thn_nc_idx,
+                                                                 int thn_sc_idx,
+                                                                 const MultiphaseParameters& params,
+                                                                 double C,
+                                                                 double D_u);
 /*!
  * Accumulate the momentum forces for constant coefficient problems with the network volume fraction only provided at
  * cell centers. In this case, the volume fraction is linearly interpolated to respective sides and nodes when
  * necessary.
- * 
+ *
  * Note that no synchronization is provided on the volume fraction when linear interpolation is done.
  */
 void accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
@@ -151,8 +152,9 @@ void accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHie
 ///\}
 
 /*!
- * Accumulate the forces into respective patch indices for the network and solvent on a given patch. Assumes ghost cells
- * have been filled for the velocities and volume fraction.
+ * Accumulate the forces into respective patch indices for the network and solvent
+ * on a given patch with variable drag.
+ * Assumes ghost cells have been filled for the velocities and volume fraction.
  *
  * Specifically, computes
  *
@@ -176,6 +178,17 @@ void accumulateMomentumWithoutPressureOnPatchVariableDrag(SAMRAI::tbox::Pointer<
                                                           const MultiphaseParameters& params,
                                                           const double C,
                                                           const double D_u);
+void accumulateMomentumWithoutPressureVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                   const int F_un_idx,
+                                                   const int F_us_idx,
+                                                   const int un_idx,
+                                                   const int us_idx,
+                                                   const int thn_idx,
+                                                   const MultiphaseParameters& params,
+                                                   const double C,
+                                                   const double D_u,
+                                                   int coarsest_ln = IBTK::invalid_index,
+                                                   int finest_ln = IBTK::invalid_index);
 
 /*!
  * Computes the divergence of the volume averaged velocity field on a given patch.
