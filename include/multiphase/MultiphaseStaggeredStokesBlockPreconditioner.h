@@ -47,6 +47,11 @@ public:
                                const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& b) override;
 
     /*!
+     * Update solver and preconditioner ops to use the updated volume fraction, if needed.
+     */
+    void updateVolumeFraction(const int thn_idx);
+
+    /*!
      * Deallocate all temporary data used to solve the linear system.
      */
     void deallocateSolverState() override;

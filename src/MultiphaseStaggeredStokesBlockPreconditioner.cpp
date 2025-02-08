@@ -348,6 +348,69 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     }
     // Setup any needed communication algorithms and scratch indices
 }
+void
+MultiphaseStaggeredStokesBlockPreconditioner::updateVolumeFraction(const int thn_idx)
+{
+    // Need ghost cells of thn to compute thn_ths_sq.
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_cell_comp{ ITC(
+        thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", false, d_thn_bc_coefs) };
+    HierarchyGhostCellInterpolation hier_ghost_fill;
+    hier_ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, d_coarsest_ln, d_finest_ln);
+    hier_ghost_fill.fillData(d_solution_time);
+
+    // Compute thn_ths_sq.
+    for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            Pointer<Patch<NDIM>> patch = level->getPatch(p());
+
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<SideData<NDIM, double>> thn_ths_sq_data = patch->getPatchData(d_thn_ths_sq_idx);
+
+            for (int axis = 0; axis < NDIM; ++axis)
+            {
+                for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
+                {
+                    const SideIndex<NDIM>& idx = si();
+
+                    const double thn = 0.5 * ((*thn_data)(idx.toCell(0)) + (*thn_data)(idx.toCell(1)));
+                    const double ths = convertToThs(thn);
+                    (*thn_ths_sq_data)(idx) = thn * thn + ths * ths;
+                }
+            }
+        }
+    }
+    d_pressure_coefs.setDPatchDataId(d_thn_ths_sq_idx);
+
+    d_stokes_precond_op->setThnIdx(thn_idx);
+    Pointer<MultiphaseStaggeredStokesBlockOperator> stokes_op =
+        new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params);
+    stokes_op->setThnIdx(thn_idx);
+    stokes_op->setCandDCoefficients(d_C, d_D);
+    d_stokes_solver->setOperator(stokes_op);
+
+    d_stokes_precond->transferToDense(thn_idx);
+    // Fill ghost cells on the dense hierarchy
+    {
+        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_cell_comp(1);
+        ghost_cell_comp[0] = ITC(thn_idx,
+                                 "CONSERVATIVE_LINEAR_REFINE",
+                                 false,
+                                 "NONE",
+                                 "LINEAR",
+                                 true,
+                                 nullptr); // defaults to fill corner
+        HierarchyGhostCellInterpolation ghost_cell_fill;
+        ghost_cell_fill.initializeOperatorState(
+            ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
+        ghost_cell_fill.fillData(0.0);
+    }
+}
 
 void
 MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
