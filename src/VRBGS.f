@@ -112,13 +112,13 @@ c
      &             * un_data_1(i0-1,i1)
      &      + (thn_data(i0,i1)-thn_imh_jmh)/(dx_dy)
      &             * un_data_1(i0,i1)) 
-     &      - D * xi * us_data_0(i0,i1) 
+     &      + D * xi * us_data_0(i0,i1)
      &             * thn_lower_x * toThs(thn_lower_x))
 
           un_imhalf_j = un_imhalf_j/ (D * eta_n * 
      &      (-(thn_data(i0,i1) + thn_data(i0-1,i1)) / (dx_dx) 
      &      - (thn_imh_jph + thn_imh_jmh) / (dy_dy)) 
-     &      + D * xi * thn_lower_x * toThs(thn_lower_x)
+     &      - D * xi * thn_lower_x * toThs(thn_lower_x)
      &      + C * thn_lower_x)
 
           un_data_0(i0,i1) = (1.d0-w)*un_data_0(i0,i1) + w*un_imhalf_j
@@ -137,13 +137,13 @@ c
      &             * us_data_1(i0-1,i1)
      &      + (toThs(thn_data(i0,i1))-toThs(thn_imh_jmh))/(dx_dy) 
      &             * us_data_1(i0,i1)) 
-     &      - D * xi * un_data_0(i0,i1) * thn_lower_x 
+     &      + D * xi * un_data_0(i0,i1) * thn_lower_x
      &             * toThs(thn_lower_x))
 
           us_imhalf_j = us_imhalf_j/(D * eta_s * 
      &      (-(toThs(thn_data(i0,i1))+toThs(thn_data(i0-1,i1)))/(dx_dx) 
      &       - (toThs(thn_imh_jph) + toThs(thn_imh_jmh)) / (dy_dy)) 
-     &       + D * xi * thn_lower_x * toThs(thn_lower_x)
+     &       - D * xi * thn_lower_x * toThs(thn_lower_x)
      &       + C * toThs(thn_lower_x))
 
           us_data_0(i0,i1) = (1.d0-w)*us_data_0(i0,i1) + w*us_imhalf_j
@@ -179,13 +179,13 @@ c
      &             * un_data_0(i0,i1)
      &       + (thn_iph_jmh - thn_data(i0,i1))/(dx_dy) 
      &             * un_data_0(i0+1,i1)) 
-     &       - D * xi * us_data_1(i0,i1)   
+     &       + D * xi * us_data_1(i0,i1)
      &            * thn_lower_y * toThs(thn_lower_y))
 
           un_i_jmhalf = un_i_jmhalf/ (D * eta_n *
      &       (-(thn_data(i0,i1) + thn_data(i0,i1-1)) / (dy_dy) 
      &       - (thn_iph_jmh + thn_imh_jmh) / (dx_dx)) 
-     &       + D * xi * thn_lower_y * toThs(thn_lower_y) 
+     &       - D * xi * thn_lower_y * toThs(thn_lower_y)
      &       + C * thn_lower_y)
 
           un_data_1(i0,i1) = (1.d0-w)*un_data_1(i0,i1) + w*un_i_jmhalf
@@ -204,13 +204,13 @@ c
      &             * us_data_0(i0,i1)
      &       + (toThs(thn_iph_jmh) - toThs(thn_data(i0,i1)))/(dx_dy) 
      &             * us_data_0(i0+1,i1)) 
-     &       - D * xi * un_data_1(i0,i1)   
+     &       + D * xi * un_data_1(i0,i1)
      &            * thn_lower_y * toThs(thn_lower_y))
 
           us_i_jmhalf = us_i_jmhalf/ (D * eta_s * (
      &       - (toThs(thn_data(i0,i1))+toThs(thn_data(i0,i1-1)))/dy_dy
      &       - (toThs(thn_iph_jmh) + toThs(thn_imh_jmh)) / dx_dx)
-     &       + D * xi * thn_lower_y * toThs(thn_lower_y)
+     &       - D * xi * thn_lower_y * toThs(thn_lower_y)
      &       + C * toThs(thn_lower_y))
 
           us_data_1(i0,i1) = (1.d0-w)*us_data_1(i0,i1) + w*us_i_jmhalf
