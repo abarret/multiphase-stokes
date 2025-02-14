@@ -81,6 +81,43 @@ KrylovPrecond {
    max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
+BlockPreconditioner {
+  stokes_solver_db {
+    ksp_type = "fgmres"  
+  }
+
+  stokes_precond_db {
+    cycle_type = "V_CYCLE"
+    num_pre_sweeps = 3
+    num_post_sweeps = 3
+    enable_logging = FALSE
+    max_multigrid_levels = MAX_MULTIGRID_LEVELS
+  }
+
+  pressure_solver_type = "PETSC_KRYLOV_SOLVER"
+  pressure_solver_db {
+     ksp_type = "fgmres"
+  }
+
+  pressure_precond_type = "POINT_RELAXATION_FAC_PRECONDITIONER"
+  pressure_precond_db {
+    num_pre_sweeps  = 0
+    num_post_sweeps = 3
+    prolongation_method = "LINEAR_REFINE"
+    restriction_method  = "CONSERVATIVE_COARSEN"
+    coarse_solver_type  = "HYPRE_LEVEL_SOLVER"
+    coarse_solver_rel_residual_tol = 1.0e-12
+    coarse_solver_abs_residual_tol = 1.0e-50
+    coarse_solver_max_iterations = 1
+    coarse_solver_db {
+      solver_type          = "PFMG"
+      num_pre_relax_steps  = 0
+      num_post_relax_steps = 3
+      enable_logging       = FALSE
+    }
+  }
+}
+
 Main {
 // log file parameters
    log_file_name = "logfile"

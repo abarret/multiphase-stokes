@@ -7,6 +7,7 @@
 
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/MultiphaseConvectiveManager.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
@@ -359,8 +360,16 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
     SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
     SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
+    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockPreconditioner> d_block_precond_op;
+
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;
+    PreconditionerType d_precond_type;
+
+    /*
+     * Input database
+     */
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_input_db;
 
     /*!
      * Drawing information.

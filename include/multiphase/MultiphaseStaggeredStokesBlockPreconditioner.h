@@ -1,6 +1,8 @@
 #ifndef included_MultiphaseStaggeredStokesBlockPreconditioner
 #define included_MultiphaseStaggeredStokesBlockPreconditioner
 
+#include "Patch.h"
+
 #include <ibtk/LinearSolver.h>
 #include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/PoissonSolver.h>

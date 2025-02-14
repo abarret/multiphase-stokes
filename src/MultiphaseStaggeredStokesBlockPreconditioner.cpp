@@ -351,6 +351,10 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
 void
 MultiphaseStaggeredStokesBlockPreconditioner::updateVolumeFraction(const int thn_idx)
 {
+#ifndef NDEBUG
+    if (!d_is_initialized) TBOX_ERROR(d_object_name + "Error. Uninitialized");
+#endif
+  
     // Need ghost cells of thn to compute thn_ths_sq.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp{ ITC(

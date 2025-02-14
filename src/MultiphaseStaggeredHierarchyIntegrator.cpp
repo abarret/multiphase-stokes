@@ -2,6 +2,7 @@
 
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredHierarchyIntegrator.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
 #include "multiphase/utility_functions.h"
@@ -145,6 +146,7 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
     if (input_db->keyExists("precond_db")) d_precond_db = input_db->getDatabase("precond_db");
     if (input_db->keyExists("w")) d_w = input_db->getDouble("w");
     if (input_db->keyExists("use_preconditioner")) d_use_preconditioner = input_db->getBool("use_preconditioner");
+    if (input_db->keyExists("precond_type") && d_use_preconditioner) d_precond_type = multiphase::string_to_enum<PreconditionerType>(input_db->getString("precond_type"));
     if (input_db->keyExists("use_grad_tagging")) d_use_grad_tagging = input_db->getBool("use_grad_tagging");
     if (input_db->keyExists("grad_rel_thresh")) input_db->getArray("grad_rel_thresh", d_rel_grad_thresh);
     if (input_db->keyExists("grad_abs_thresh")) input_db->getArray("grad_abs_thresh", d_abs_grad_thresh);
@@ -156,6 +158,7 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(
     d_convective_time_stepping_type = IBAMR::string_to_enum<IBAMR::TimeSteppingType>(
         input_db->getStringWithDefault("convec_ts_type", "FORWARD_EULER"));
 
+    d_input_db = input_db;
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
     d_un_sc_var = new SideVariable<NDIM, double>(d_object_name + "::un_sc");
@@ -964,7 +967,7 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     d_stokes_solver->setOperator(d_stokes_op);
 
     // Now create a preconditioner
-    if (d_use_preconditioner)
+    if (d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID)
     {
         d_precond_op =
             new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
@@ -976,12 +979,22 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
         d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);
     }
+    else if (d_use_preconditioner && d_precond_type == PreconditionerType::BLOCK)
+    {
+        d_block_precond_op = new MultiphaseStaggeredStokesBlockPreconditioner(
+            "KrylovPrecondStrategy", d_params, d_input_db->getDatabase("BlockPreconditioner"));
+        d_block_precond_op->setThnIdx(thn_new_idx);
+        d_block_precond_op->setCAndDCoefficients(C, D2);
+        d_block_precond_op->setNullspace(false, d_nul_vecs);
+
+        d_stokes_solver->setPreconditioner(d_block_precond_op);
+    }
 
     d_stokes_solver->setNullspace(false, d_nul_vecs);
     d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
 
     // Set thn_cc_idx on the dense hierarchy.
-    if (d_use_preconditioner)
+    if (d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID)
     {
         Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
         if (d_thn_fcn)
@@ -1076,8 +1089,8 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     int thn_cur_idx, thn_new_idx, thn_scr_idx;
     setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*start_of_ts*/ !d_use_new_thn);
 
-    // Update the preconditioner with new volume fraction
-    if (d_thn_integrator && d_use_preconditioner)
+    // Update the Multigrid preconditioner with new volume fraction
+    if (d_thn_integrator && d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID)
     {
         d_stokes_precond->transferToDense(thn_new_idx);
         // Also fill in ghost cells on the dense hierarchy
@@ -1096,13 +1109,25 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
             ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(new_time);
     }
+    // Update the Block preconditioner with new volume fraction
+    if (d_thn_integrator && d_use_preconditioner && d_precond_type == PreconditionerType::BLOCK)
+    {   
+       d_block_precond_op->updateVolumeFraction(thn_new_idx);
+    }
+
     // Also transfer the drag coefficient, if necessary
-    if (d_use_preconditioner && isVariableDrag())
+    if (d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID && isVariableDrag())
     {
         const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
         d_xi_fcn->setDataOnPatchHierarchy(xi_idx, d_xi_var, d_hierarchy, new_time);
         d_stokes_precond->transferToDense(xi_idx, true);
     }
+    // TODO:If using block PC and var xi, throw runtime error and exit
+    if  (d_use_preconditioner && d_precond_type == PreconditionerType::BLOCK && isVariableDrag())
+    {
+        TBOX_ERROR(d_object_name + "Variable drag feature not available for this preconditioner type.");
+    }
+
     const double dt = new_time - current_time;
 
     // Now compute momentum forces
