@@ -155,7 +155,7 @@ c     Loop over side-centers in x-dir
      &              (us_data_0(i0,i1+1) - us_data_0(i0,i1))
      &       - toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
-          ddy_Thn_dx_vn = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s / dx_dy) *
      &        (toThs(thn_imh_jph) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0-1,i1+1))
      &       - toThs(thn_imh_jmh) *
@@ -176,7 +176,7 @@ c     Loop over side-centers in x-dir
       end do
 c
 c     Loop over side centers in y-dir
-      do i1 = ilow1, iup1 + 1   
+      do i1 = ilow1, iup1 + 1
         do i0 = ilow0, iup0
 c
           ! calculate thn at (i,j-1/2)
@@ -189,7 +189,7 @@ c
      &                   +thn_data(i0+1,i1) + thn_data(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
 
           ! components of second row (y-component of network vel) of network equation
-          ddy_Thn_dy_un = (eta_n / dx_dx) *
+          ddy_Thn_dy_un = (eta_n / dy_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_1(i0,i1+1) - un_data_1(i0,i1)) -
      &          thn_data(i0,i1-1) * 
@@ -221,7 +221,7 @@ c
      &         + C * thn_lower_y * un_data_1(i0,i1) 
           
           ! Solvent equation
-          ddx_Ths_dx_us = (eta_s / dx_dx) *
+          ddx_Ths_dx_us = (eta_s / dy_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_1(i0,i1+1) - us_data_1(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
@@ -307,9 +307,9 @@ c
      &          ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)           ! cell(i0,i1) bottom left node
       double precision thn_sc_data_0(
      &          ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
-     &          ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1) 
+     &          ilow1-thn_sc_gcw:iup1+thn_sc_gcw) 
       double precision thn_sc_data_1(
-     &         ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &         ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
      &         ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1) 
 c
       double precision un_data_0(ilow0-un_gcw:iup0+un_gcw+1,  ! Adding 1 because  no of sides =  no of cells + 1
@@ -401,7 +401,7 @@ c     Loop over side-centers in x-dir
      &              (us_data_0(i0,i1+1) - us_data_0(i0,i1))
      &       - toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
-          ddy_Thn_dx_vn = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s / dx_dy) *
      &        (toThs(thn_imh_jph) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0-1,i1+1))
      &       - toThs(thn_imh_jmh) *
@@ -433,7 +433,7 @@ c
           thn_iph_jmh = thn_nc_data(i0,i1)    ! Lower Left
 
           ! components of second row (y-component of network vel) of network equation
-          ddy_Thn_dy_un = (eta_n / dx_dx) *
+          ddy_Thn_dy_un = (eta_n / dy_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_1(i0,i1+1) - un_data_1(i0,i1)) -
      &          thn_data(i0,i1-1) * 
@@ -458,14 +458,14 @@ c
      &              (un_data_0(i0+1,i1-1) - un_data_0(i0,i1-1)))
           
           drag_n = -(xi / nu_n) * thn_lower_y * 
-     &         toThs(thn_lower_y) * (un_data_1(i0,i1)-us_data_1(i0,i1))
+     &        toThs(thn_lower_y) * (un_data_1(i0,i1)-us_data_1(i0,i1))
      
           f_un_data_1(i0,i1) = D * (ddy_Thn_dy_un + ddx_Thn_dx_un 
      &         + ddx_Thn_dy_vn + ddy_Thn_dx_vn + drag_n) 
      &         + C * thn_lower_y * un_data_1(i0,i1)
           
           ! Solvent equation
-          ddx_Ths_dx_us = (eta_s / dx_dx) *
+          ddx_Ths_dx_us = (eta_s / dy_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_1(i0,i1+1) - us_data_1(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
@@ -490,7 +490,7 @@ c
      &              (us_data_0(i0+1,i1-1) - us_data_0(i0,i1-1)))
           
           drag_s = -(xi / nu_s) * thn_lower_y * 
-     &         toThs(thn_lower_y) * (us_data_1(i0,i1)-un_data_1(i0,i1))
+     &        toThs(thn_lower_y) * (us_data_1(i0,i1)-un_data_1(i0,i1))
      
           f_us_data_1(i0,i1) = D * (ddx_Ths_dx_us + ddy_Ths_dy_us 
      &         + ddy_Ths_dx_vs + ddx_Ths_dy_vs + drag_s) 
@@ -550,8 +550,8 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
 c      
       double precision xi_data_0(ilow0-xi_gcw:iup0+xi_gcw+1,  
      &          ilow1-xi_gcw:iup1+xi_gcw) 
-      double precision xi_data_1(ilow0-un_gcw:iup0+xi_gcw+1,  
-     &          ilow1-xi_gcw:iup1+xi_gcw) 
+      double precision xi_data_1(ilow0-un_gcw:iup0+xi_gcw,  
+     &          ilow1-xi_gcw:iup1+xi_gcw+1) 
 c    
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
      &          ilow1-thn_gcw:iup1+thn_gcw) 
@@ -647,7 +647,7 @@ c     Loop over side-centers in x-dir
      &              (us_data_0(i0,i1+1) - us_data_0(i0,i1))
      &       - toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
-          ddy_Thn_dx_vn = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s / dx_dy) *
      &        (toThs(thn_imh_jph) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0-1,i1+1))
      &       - toThs(thn_imh_jmh) *
@@ -687,7 +687,7 @@ c
      &          thn_data(i0,i1-1) * 
      &              (un_data_1(i0,i1) - un_data_1(i0,i1-1)))
 
-          ddx_Thn_dx_un = (eta_n / dx_dx) *
+          ddx_Thn_dx_un = (eta_n / dy_dy) *
      &         (thn_iph_jmh * 
      &              (un_data_1(i0+1,i1) - un_data_1(i0,i1)) -
      &          thn_imh_jmh * 
@@ -713,7 +713,7 @@ c
      &         + C * thn_lower_y * un_data_1(i0,i1) 
           
           ! Solvent equation
-          ddx_Ths_dx_us = (eta_s / dx_dx) *
+          ddx_Ths_dx_us = (eta_s / dy_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_1(i0,i1+1) - us_data_1(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
