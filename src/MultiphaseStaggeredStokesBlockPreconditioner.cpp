@@ -21,22 +21,59 @@ MultiphaseStaggeredStokesBlockPreconditioner::MultiphaseStaggeredStokesBlockPrec
     const MultiphaseParameters& params,
     Pointer<Database> input_db)
     : d_params(params),
-      d_thn_ths_sq_var(new SideVariable<NDIM, double>(d_object_name + "::ThnThsSq")),
-      d_un_scr_var(new SideVariable<NDIM, double>(d_object_name + "::UN_SCR")),
-      d_us_scr_var(new SideVariable<NDIM, double>(d_object_name + "::US_SCR")),
-      d_fn_scr_var(new SideVariable<NDIM, double>(d_object_name + "::FN_SCR")),
-      d_fs_scr_var(new SideVariable<NDIM, double>(d_object_name + "::FS_SCR")),
-      d_p_scr_var(new CellVariable<NDIM, double>(d_object_name + "::P_SCR"))
+      d_thn_ths_sq_var(new SideVariable<NDIM, double>(object_name + "::ThnThsSq")),
+      d_un_scr_var(new SideVariable<NDIM, double>(object_name + "::UN_SCR")),
+      d_us_scr_var(new SideVariable<NDIM, double>(object_name + "::US_SCR")),
+      d_fn_scr_var(new SideVariable<NDIM, double>(object_name + "::FN_SCR")),
+      d_fs_scr_var(new SideVariable<NDIM, double>(object_name + "::FS_SCR")),
+      d_p_scr_var(new CellVariable<NDIM, double>(object_name + "::P_SCR"))
 {
     LinearSolver::init(std::move(object_name), d_homogeneous_bc);
     auto var_db = VariableDatabase<NDIM>::getDatabase();
-    d_thn_ths_sq_idx =
-        var_db->registerVariableAndContext(d_thn_ths_sq_var, var_db->getContext(d_object_name + "::CTX"));
-    d_un_scr_idx = var_db->registerVariableAndContext(d_un_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_us_scr_idx = var_db->registerVariableAndContext(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_fn_scr_idx = var_db->registerVariableAndContext(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_fs_scr_idx = var_db->registerVariableAndContext(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_p_scr_idx = var_db->registerVariableAndContext(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    
+    // Check if we've already made this variable
+    if (var_db->checkVariableExists(d_object_name + "::ThnThsSq")) {
+        d_thn_ths_sq_var = var_db->getVariable(d_object_name + "::ThnThsSq");
+        d_thn_ths_sq_idx = var_db->mapVariableAndContextToIndex(d_thn_ths_sq_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_thn_ths_sq_idx =
+            var_db->registerVariableAndContext(d_thn_ths_sq_var, var_db->getContext(d_object_name + "::CTX"));
+    }
+
+    if (var_db->checkVariableExists(d_object_name + "::UN_SCR")) {
+        d_un_scr_var = var_db->getVariable(d_object_name + "::UN_SCR");
+        d_un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_un_scr_idx = var_db->registerVariableAndContext(d_un_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
+       
+    if (var_db->checkVariableExists(d_object_name + "::US_SCR")) {
+        d_us_scr_var = var_db->getVariable(d_object_name + "::US_SCR");
+        d_us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_us_scr_idx = var_db->registerVariableAndContext(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }   
+    
+    if (var_db->checkVariableExists(d_object_name + "::FN_SCR")) {
+        d_fn_scr_var = var_db->getVariable(d_object_name + "::FN_SCR");
+        d_fn_scr_idx = var_db->mapVariableAndContextToIndex(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_fn_scr_idx = var_db->registerVariableAndContext(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
+    
+    if (var_db->checkVariableExists(d_object_name + "::FS_SCR")) {
+        d_fs_scr_var = var_db->getVariable(d_object_name + "::FS_SCR");
+        d_fs_scr_idx = var_db->mapVariableAndContextToIndex(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_fs_scr_idx = var_db->registerVariableAndContext(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
+       
+    if (var_db->checkVariableExists(d_object_name + "::P_SCR")) {
+        d_p_scr_var = var_db->getVariable(d_object_name + "::P_SCR");
+        d_p_scr_idx = var_db->mapVariableAndContextToIndex(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_p_scr_idx = var_db->registerVariableAndContext(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
 
     // Set up the solver databases
     d_stokes_solver_db = input_db->getDatabase("stokes_solver_db");
@@ -352,9 +389,10 @@ void
 MultiphaseStaggeredStokesBlockPreconditioner::updateVolumeFraction(const int thn_idx)
 {
 #ifndef NDEBUG
-    if (!d_is_initialized) TBOX_ERROR(d_object_name + "Error. Uninitialized");
+    if (!d_is_initialized) TBOX_ERROR(d_object_name + " Error. Uninitialized");
 #endif
-  
+    // Issue with this function
+    
     // Need ghost cells of thn to compute thn_ths_sq.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp{ ITC(
@@ -390,12 +428,6 @@ MultiphaseStaggeredStokesBlockPreconditioner::updateVolumeFraction(const int thn
     d_pressure_coefs.setDPatchDataId(d_thn_ths_sq_idx);
 
     d_stokes_precond_op->setThnIdx(thn_idx);
-    Pointer<MultiphaseStaggeredStokesBlockOperator> stokes_op =
-        new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params);
-    stokes_op->setThnIdx(thn_idx);
-    stokes_op->setCandDCoefficients(d_C, d_D);
-    d_stokes_solver->setOperator(stokes_op);
-
     d_stokes_precond->transferToDense(thn_idx);
     // Fill ghost cells on the dense hierarchy
     {

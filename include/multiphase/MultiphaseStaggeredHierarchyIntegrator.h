@@ -360,7 +360,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
     SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
     SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockPreconditioner> d_block_precond_op;
+    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockPreconditioner> d_block_precond;
 
     double d_w = std::numeric_limits<double>::quiet_NaN();
     bool d_use_preconditioner = true;

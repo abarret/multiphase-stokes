@@ -981,21 +981,20 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
     }
     else if (d_use_preconditioner && d_precond_type == PreconditionerType::BLOCK)
     {
-        d_block_precond_op = new MultiphaseStaggeredStokesBlockPreconditioner(
+        d_block_precond = new MultiphaseStaggeredStokesBlockPreconditioner(
             "KrylovPrecondStrategy", d_params, d_input_db->getDatabase("BlockPreconditioner"));
-        d_block_precond_op->setThnIdx(thn_new_idx);
-        d_block_precond_op->setCAndDCoefficients(C, D2);
-        d_block_precond_op->setNullspace(false, d_nul_vecs);
-
-        d_stokes_solver->setPreconditioner(d_block_precond_op);
+        d_block_precond->setThnIdx(thn_new_idx);
+        d_block_precond->setCAndDCoefficients(C, D2);
+        d_block_precond->setNullspace(false, d_nul_vecs);
+        d_stokes_solver->setPreconditioner(d_block_precond);
     }
 
     d_stokes_solver->setNullspace(false, d_nul_vecs);
-    d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
+    d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec); // Error after 1 timestep with BLOCK
 
     // Set thn_cc_idx on the dense hierarchy.
     if (d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID)
-    {
+    {   
         Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
         if (d_thn_fcn)
         {
@@ -1112,7 +1111,7 @@ MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(const doub
     // Update the Block preconditioner with new volume fraction
     if (d_thn_integrator && d_use_preconditioner && d_precond_type == PreconditionerType::BLOCK)
     {   
-       d_block_precond_op->updateVolumeFraction(thn_new_idx);
+        d_block_precond->updateVolumeFraction(thn_new_idx);
     }
 
     // Also transfer the drag coefficient, if necessary
