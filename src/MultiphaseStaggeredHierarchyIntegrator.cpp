@@ -965,6 +965,8 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
 
     d_stokes_solver = new PETScKrylovLinearSolver("solver", d_solver_db, "solver_");
     d_stokes_solver->setOperator(d_stokes_op);
+    d_stokes_solver->setNullspace(false, d_nul_vecs);                // Moved before PC setup
+    d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);  // Moved before PC setup
 
     // Now create a preconditioner
     if (d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID)
@@ -985,16 +987,16 @@ MultiphaseStaggeredHierarchyIntegrator::preprocessIntegrateHierarchy(const doubl
             "KrylovPrecondStrategy", d_params, d_input_db->getDatabase("BlockPreconditioner"));
         d_block_precond->setThnIdx(thn_new_idx);
         d_block_precond->setCAndDCoefficients(C, D2);
-        d_block_precond->setNullspace(false, d_nul_vecs);
+         //FIXME
+        d_block_precond->setNullspace(true); // BLOCK also works if setNullspace() is never called
         d_stokes_solver->setPreconditioner(d_block_precond);
     }
-
-    d_stokes_solver->setNullspace(false, d_nul_vecs);
-    d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec); // Error after 1 timestep with BLOCK
 
     // Set thn_cc_idx on the dense hierarchy.
     if (d_use_preconditioner && d_precond_type == PreconditionerType::MULTIGRID)
     {   
+        d_stokes_solver->setNullspace(false, d_nul_vecs);
+        d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
         Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
         if (d_thn_fcn)
         {

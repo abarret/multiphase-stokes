@@ -384,6 +384,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
         ghost_cell_fill.fillData(0.0);
     }
     // Setup any needed communication algorithms and scratch indices
+
+    // Indicate the operator is initialized.
+    d_is_initialized = true;
 }
 void
 MultiphaseStaggeredStokesBlockPreconditioner::updateVolumeFraction(const int thn_idx)
@@ -391,7 +394,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::updateVolumeFraction(const int thn
 #ifndef NDEBUG
     if (!d_is_initialized) TBOX_ERROR(d_object_name + " Error. Uninitialized");
 #endif
-    // Issue with this function
+    // Issue with this function(?)
     
     // Need ghost cells of thn to compute thn_ths_sq.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
@@ -461,6 +464,11 @@ MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
 
     d_coarsest_ln = IBTK::invalid_level_number;
     d_finest_ln = IBTK::invalid_level_number;
+
+    // Indicate that the operator is NOT initialized.
+    d_is_initialized = false;
+    
+    return;
 }
 
 } // namespace multiphase

@@ -340,6 +340,8 @@ main(int argc, char* argv[])
         Pointer<PETScKrylovLinearSolver> krylov_solver =
             new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
         krylov_solver->setOperator(stokes_op);
+        krylov_solver->setNullspace(false, null_vecs);
+        krylov_solver->initializeSolverState(u_vec, f_vec);
 
         bool use_precond = input_db->getBool("USE_PRECOND");
         const auto precond_type =
@@ -369,16 +371,16 @@ main(int argc, char* argv[])
                     "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"));
             precond->setThnIdx(thn_cc_idx);
             precond->setCAndDCoefficients(C, D);
-            precond->setNullspace(false, null_vecs);
+            //precond->setNullspace(false, null_vecs); // comment out. doesn't affect final results.
 
             krylov_solver->setPreconditioner(precond);
         }
 
-        krylov_solver->setNullspace(false, null_vecs);
-        krylov_solver->initializeSolverState(u_vec, f_vec);
 
         if (use_precond && precond_type == PreconditionerType::MULTIGRID)
-        {
+        {   
+            krylov_solver->setNullspace(false, null_vecs);
+            krylov_solver->initializeSolverState(u_vec, f_vec);
             Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
             // We need to set thn_cc_idx on the dense hierarchy.
             // TODO: find a better way to do this
