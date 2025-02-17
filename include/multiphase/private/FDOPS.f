@@ -208,7 +208,7 @@ c
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1))) 
           
           ddy_Thn_dx_vn = -(eta_n / dx_dy) *
-     &         (thn_data(i0,i1+1) * 
+     &         (thn_data(i0,i1) * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0,i1)) -
      &          thn_data(i0,i1-1) * 
      &              (un_data_0(i0+1,i1-1) - un_data_0(i0,i1-1))) 
@@ -240,7 +240,7 @@ c
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
           
           ddx_Ths_dy_vs = -(eta_s / dx_dy) *
-     &         (toThs(thn_data(i0,i1+1)) * 
+     &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
      &              (us_data_0(i0+1,i1-1) - us_data_0(i0,i1-1)))
@@ -452,7 +452,7 @@ c
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
           
           ddy_Thn_dx_vn = -(eta_n / dx_dy) *
-     &         (thn_data(i0,i1+1) * 
+     &         (thn_data(i0,i1) * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0,i1)) -
      &          thn_data(i0,i1-1) * 
      &              (un_data_0(i0+1,i1-1) - un_data_0(i0,i1-1)))
@@ -484,7 +484,7 @@ c
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
           
           ddx_Ths_dy_vs = -(eta_s / dx_dy) *
-     &         (toThs(thn_data(i0,i1+1)) * 
+     &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
      &              (us_data_0(i0+1,i1-1) - us_data_0(i0,i1-1)))
@@ -550,7 +550,7 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
 c      
       double precision xi_data_0(ilow0-xi_gcw:iup0+xi_gcw+1,  
      &          ilow1-xi_gcw:iup1+xi_gcw) 
-      double precision xi_data_1(ilow0-un_gcw:iup0+xi_gcw,  
+      double precision xi_data_1(ilow0-xi_gcw:iup0+xi_gcw,  
      &          ilow1-xi_gcw:iup1+xi_gcw+1) 
 c    
       double precision thn_data(ilow0-thn_gcw:iup0+thn_gcw,
@@ -700,7 +700,7 @@ c
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
           
           ddy_Thn_dx_vn = -(eta_n / dx_dy) *
-     &         (thn_data(i0,i1+1) * 
+     &         (thn_data(i0,i1) * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0,i1)) -
      &          thn_data(i0,i1-1) * 
      &              (un_data_0(i0+1,i1-1) - un_data_0(i0,i1-1)))
@@ -732,7 +732,7 @@ c
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
           
           ddx_Ths_dy_vs = -(eta_s / dx_dy) *
-     &         (toThs(thn_data(i0,i1+1)) * 
+     &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
      &              (us_data_0(i0+1,i1-1) - us_data_0(i0,i1-1)))

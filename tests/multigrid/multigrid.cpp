@@ -391,7 +391,6 @@ main(int argc, char* argv[])
             }
             thn_fcn.setDataOnPatchHierarchy(
                 thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
-            Krylov_precond->transferToDense(thn_cc_idx, true); // Added. Then MAX_MG_LEVEL=2 WITH MULTIGRID PC works. 
             
             // Also fill in theta ghost cells
             using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
