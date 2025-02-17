@@ -183,8 +183,8 @@ c
           thn_lower_y = 0.5d0*(thn_data(i0,i1)+thn_data(i0,i1-1))  ! thn(i,j-1/2)
 
           ! calculate thn at corners
-          thn_imh_jmh = 0.25d0*(thn_data(i0, i1) + thn_data(i0-1,i1)
-     &                   +thn_data(i0,i1-1) + thn_data(i0-1,i1-1))    ! thn(i-1/2, j-1/2)
+          thn_imh_jmh = 0.25d0*(thn_data(i0, i1) + thn_data(i0,i1-1)
+     &                   +thn_data(i0-1,i1) + thn_data(i0-1,i1-1))    ! thn(i-1/2, j-1/2)
           thn_iph_jmh = 0.25d0*(thn_data(i0, i1) + thn_data(i0,i1-1)
      &                   +thn_data(i0+1,i1) + thn_data(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
 
@@ -429,8 +429,8 @@ c
           thn_lower_y = thn_sc_data_1(i0,i1)  ! thn(i,j-1/2)
 
           ! calculate thn at corners
-          thn_imh_jmh = thn_nc_data(i0+1,i1)  ! Lower Right
-          thn_iph_jmh = thn_nc_data(i0,i1)    ! Lower Left
+          thn_imh_jmh = thn_nc_data(i0,i1)      ! Lower Left
+          thn_iph_jmh = thn_nc_data(i0+1,i1)    ! Lower Right
 
           ! components of second row (y-component of network vel) of network equation
           ddy_Thn_dy_un = (eta_n / dy_dy) *
@@ -675,8 +675,8 @@ c
           thn_lower_y = 0.5d0*(thn_data(i0,i1)+thn_data(i0,i1-1))  ! thn(i,j-1/2)
 
           ! calculate thn at corners
-          thn_imh_jmh = 0.25d0*(thn_data(i0, i1) + thn_data(i0-1,i1)
-     &                   +thn_data(i0,i1-1) + thn_data(i0-1,i1-1))    ! thn(i-1/2, j-1/2)
+          thn_imh_jmh = 0.25d0*(thn_data(i0, i1) + thn_data(i0,i1-1)
+     &                   +thn_data(i0-1,i1) + thn_data(i0-1,i1-1))    ! thn(i-1/2, j-1/2)
           thn_iph_jmh = 0.25d0*(thn_data(i0, i1) + thn_data(i0,i1-1)
      &                   +thn_data(i0+1,i1) + thn_data(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
 
