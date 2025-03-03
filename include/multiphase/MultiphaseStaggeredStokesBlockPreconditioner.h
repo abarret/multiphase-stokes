@@ -1,17 +1,18 @@
 #ifndef included_MultiphaseStaggeredStokesBlockPreconditioner
 #define included_MultiphaseStaggeredStokesBlockPreconditioner
 
-#include "Patch.h"
-
 #include <ibtk/LinearSolver.h>
 #include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/PoissonSolver.h>
 
+#include "Patch.h"
 #include <multiphase/FullFACPreconditioner.h>
 #include <multiphase/MultiphaseLSCSchurComplementSolver.h>
 #include <multiphase/MultiphaseParameters.h>
 #include <multiphase/MultiphaseStaggeredStokesBlockFACOperator.h>
 #include <multiphase/MultiphaseStokesBlockSolver.h>
+
+#include <memory>
 
 namespace multiphase
 {
@@ -24,6 +25,11 @@ public:
 
     virtual ~MultiphaseStaggeredStokesBlockPreconditioner();
 
+    /*!
+     * Set the volume fraction to be used in this class.
+     *
+     * This function returns an error if the solver is already initialized. See initializeSolverState().
+     */
     void setThnIdx(const int thn_idx);
 
     void setCAndDCoefficients(double C, double D);
@@ -44,14 +50,12 @@ public:
 
     /*!
      * Initialize the solver state. Setup the sub solvers, allocate patch data, and set up communication algorithms.
+     *
+     * Note that upon initialization, the pressure solver coefficients are set and can not be changed. If the volume
+     * fraction changes, the solver must be first deallocated, then reinitialized.
      */
     void initializeSolverState(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& x,
                                const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& b) override;
-
-    /*!
-     * Update solver and preconditioner ops to use the updated volume fraction, if needed.
-     */
-    void updateVolumeFraction(const int thn_idx);
 
     /*!
      * Deallocate all temporary data used to solve the linear system.
