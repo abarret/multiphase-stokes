@@ -1,5 +1,5 @@
 USE_PRECONDITIONER = TRUE
-PRECOND_TYPE = "MULTIGRID"
+PRECOND_TYPE = "BLOCK"
 RHO = 1.0
 N = 16
 MAX_MULTIGRID_LEVELS = 3
@@ -83,15 +83,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    }
 
    precond_db {
-      relaxation_parameter = W
-      cycle_type = "V_CYCLE"
-      num_pre_sweeps = 5
-      num_post_sweeps = 5
-      enable_logging = FALSE
-      max_multigrid_levels = MAX_MULTIGRID_LEVELS
-   }
-
-   BlockPreconditioner {
       stokes_solver_db {
          ksp_type = "fgmres"  
       }
@@ -171,7 +162,7 @@ CartesianGeometry {
 }
 
 GriddingAlgorithm {
-   max_levels = 2                 // Maximum number of levels in hierarchy.
+   max_levels = 1                 // Maximum number of levels in hierarchy.
 
    ratio_to_coarser {
       level_1 = 4, 4              // vector ratio to next coarser level

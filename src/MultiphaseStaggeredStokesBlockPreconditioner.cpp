@@ -21,22 +21,59 @@ MultiphaseStaggeredStokesBlockPreconditioner::MultiphaseStaggeredStokesBlockPrec
     const MultiphaseParameters& params,
     Pointer<Database> input_db)
     : d_params(params),
-      d_thn_ths_sq_var(new SideVariable<NDIM, double>(d_object_name + "::ThnThsSq")),
-      d_un_scr_var(new SideVariable<NDIM, double>(d_object_name + "::UN_SCR")),
-      d_us_scr_var(new SideVariable<NDIM, double>(d_object_name + "::US_SCR")),
-      d_fn_scr_var(new SideVariable<NDIM, double>(d_object_name + "::FN_SCR")),
-      d_fs_scr_var(new SideVariable<NDIM, double>(d_object_name + "::FS_SCR")),
-      d_p_scr_var(new CellVariable<NDIM, double>(d_object_name + "::P_SCR"))
+      d_thn_ths_sq_var(new SideVariable<NDIM, double>(object_name + "::ThnThsSq")),
+      d_un_scr_var(new SideVariable<NDIM, double>(object_name + "::UN_SCR")),
+      d_us_scr_var(new SideVariable<NDIM, double>(object_name + "::US_SCR")),
+      d_fn_scr_var(new SideVariable<NDIM, double>(object_name + "::FN_SCR")),
+      d_fs_scr_var(new SideVariable<NDIM, double>(object_name + "::FS_SCR")),
+      d_p_scr_var(new CellVariable<NDIM, double>(object_name + "::P_SCR"))
 {
     LinearSolver::init(std::move(object_name), d_homogeneous_bc);
     auto var_db = VariableDatabase<NDIM>::getDatabase();
-    d_thn_ths_sq_idx =
-        var_db->registerVariableAndContext(d_thn_ths_sq_var, var_db->getContext(d_object_name + "::CTX"));
-    d_un_scr_idx = var_db->registerVariableAndContext(d_un_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_us_scr_idx = var_db->registerVariableAndContext(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_fn_scr_idx = var_db->registerVariableAndContext(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_fs_scr_idx = var_db->registerVariableAndContext(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
-    d_p_scr_idx = var_db->registerVariableAndContext(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    
+    // Check if we've already made this variable
+    if (var_db->checkVariableExists(d_object_name + "::ThnThsSq")) {
+        d_thn_ths_sq_var = var_db->getVariable(d_object_name + "::ThnThsSq");
+        d_thn_ths_sq_idx = var_db->mapVariableAndContextToIndex(d_thn_ths_sq_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_thn_ths_sq_idx =
+            var_db->registerVariableAndContext(d_thn_ths_sq_var, var_db->getContext(d_object_name + "::CTX"));
+    }
+
+    if (var_db->checkVariableExists(d_object_name + "::UN_SCR")) {
+        d_un_scr_var = var_db->getVariable(d_object_name + "::UN_SCR");
+        d_un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_un_scr_idx = var_db->registerVariableAndContext(d_un_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
+       
+    if (var_db->checkVariableExists(d_object_name + "::US_SCR")) {
+        d_us_scr_var = var_db->getVariable(d_object_name + "::US_SCR");
+        d_us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_us_scr_idx = var_db->registerVariableAndContext(d_us_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }   
+    
+    if (var_db->checkVariableExists(d_object_name + "::FN_SCR")) {
+        d_fn_scr_var = var_db->getVariable(d_object_name + "::FN_SCR");
+        d_fn_scr_idx = var_db->mapVariableAndContextToIndex(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_fn_scr_idx = var_db->registerVariableAndContext(d_fn_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
+    
+    if (var_db->checkVariableExists(d_object_name + "::FS_SCR")) {
+        d_fs_scr_var = var_db->getVariable(d_object_name + "::FS_SCR");
+        d_fs_scr_idx = var_db->mapVariableAndContextToIndex(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_fs_scr_idx = var_db->registerVariableAndContext(d_fs_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
+       
+    if (var_db->checkVariableExists(d_object_name + "::P_SCR")) {
+        d_p_scr_var = var_db->getVariable(d_object_name + "::P_SCR");
+        d_p_scr_idx = var_db->mapVariableAndContextToIndex(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"));
+    } else {
+        d_p_scr_idx = var_db->registerVariableAndContext(d_p_scr_var, var_db->getContext(d_object_name + "::CTX"), 1);
+    }
 
     // Set up the solver databases
     d_stokes_solver_db = input_db->getDatabase("stokes_solver_db");
@@ -58,6 +95,10 @@ MultiphaseStaggeredStokesBlockPreconditioner::~MultiphaseStaggeredStokesBlockPre
 void
 MultiphaseStaggeredStokesBlockPreconditioner::setThnIdx(const int thn_idx)
 {
+#ifndef NDEBUG
+    if (d_is_initialized)
+        TBOX_ERROR(d_object_name + "::setThnIdx(). Solver must be uninitialized to set volume fraction!\n");
+#endif
     d_thn_idx = thn_idx;
 }
 
@@ -261,7 +302,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
                         d_coarsest_ln,
                         d_finest_ln);
 
-    // Note we need ghost cells of thn to compute thn_ths_sq.
+    // Need ghost cells of thn to compute thn_ths_sq.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp{ ITC(
         d_thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", false, d_thn_bc_coefs) };
@@ -269,7 +310,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     hier_ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, d_coarsest_ln, d_finest_ln);
     hier_ghost_fill.fillData(d_solution_time);
 
-    // Now compute thn_ths_sq.
+    // Compute thn_ths_sq.
     for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -346,7 +387,6 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
             ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
         ghost_cell_fill.fillData(0.0);
     }
-    // Setup any needed communication algorithms and scratch indices
 }
 
 void

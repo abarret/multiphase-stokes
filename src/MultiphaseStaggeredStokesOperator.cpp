@@ -380,14 +380,8 @@ MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
     // Allocate synchronization variable
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        if (!level->checkAllocated(d_os_idx)) level->allocatePatchData(d_os_idx);
-        if (!level->checkAllocated(d_sc_scr_idx)) level->allocatePatchData(d_sc_scr_idx);
-        if (!level->checkAllocated(d_nc_scr_idx)) level->allocatePatchData(d_nc_scr_idx);
-        if (!level->checkAllocated(d_cc_ndim_idx)) level->allocatePatchData(d_cc_ndim_idx);
-    }
+    allocate_patch_data(
+        { d_os_idx, d_sc_scr_idx, d_nc_scr_idx, d_cc_ndim_idx }, d_hierarchy, d_solution_time, coarsest_ln, finest_ln);
 
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
     d_os_coarsen_op = grid_geom->lookupCoarsenOperator(d_os_var, "CONSERVATIVE_COARSEN");
@@ -493,14 +487,7 @@ MultiphaseStaggeredStokesOperator::deallocateOperatorState()
     // Deallocate synchronization variable
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        if (level->checkAllocated(d_os_idx)) level->deallocatePatchData(d_os_idx);
-        if (level->checkAllocated(d_sc_scr_idx)) level->deallocatePatchData(d_sc_scr_idx);
-        if (level->checkAllocated(d_nc_scr_idx)) level->deallocatePatchData(d_nc_scr_idx);
-        if (level->checkAllocated(d_cc_ndim_idx)) level->deallocatePatchData(d_cc_ndim_idx);
-    }
+    deallocate_patch_data({ d_os_idx, d_sc_scr_idx, d_nc_scr_idx, d_cc_ndim_idx }, d_hierarchy, coarsest_ln, finest_ln);
     d_os_coarsen_scheds.clear();
     d_os_coarsen_alg = nullptr;
 

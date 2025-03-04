@@ -16,6 +16,7 @@ SET(MULTIPHASE_SRC
     src/MultiphaseStaggeredStokesBlockPreconditioner.cpp
     src/RBGS.f
     src/VRBGS.f
+    src/FDOPS.f
     )
 
 ADD_LIBRARY(MultiphaseLib)
