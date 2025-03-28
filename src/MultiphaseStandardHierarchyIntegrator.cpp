@@ -640,17 +640,21 @@ MultiphaseStandardHierarchyIntegrator::integrateHierarchySpecialized(const doubl
         pout << "Stokes solver " << (converged ? "converged" : "failed to converge") << " after "
              << d_stokes_solver->getNumIterations() << " iterations\n";
 
+    if (d_normalize_pressure)
+    {
+        for (const auto& nul_vec : d_nul_vecs)
+        {
+            const double sol_dot_nul = d_sol_vec->dot(nul_vec);
+            const double nul_L2_norm = std::sqrt(nul_vec->dot(nul_vec));
+            d_sol_vec->axpy(-sol_dot_nul / nul_L2_norm, nul_vec, d_sol_vec);
+        }
+    }
+
     // Reset the solve vector to copy the "scratch" data into the "new" data
     d_hier_sc_data_ops->copyData(un_new_idx, d_sol_vec->getComponentDescriptorIndex(0));
     d_hier_sc_data_ops->copyData(us_new_idx, d_sol_vec->getComponentDescriptorIndex(1));
     d_hier_cc_data_ops->copyData(p_new_idx, d_sol_vec->getComponentDescriptorIndex(2));
 
-    if (d_normalize_pressure)
-    {
-        const double int_p =
-            d_hier_cc_data_ops->integral(p_new_idx, d_hier_math_ops->getCellWeightPatchDescriptorIndex());
-        d_hier_cc_data_ops->addScalar(p_new_idx, p_new_idx, -int_p);
-    }
     // Reset the RHS
     d_rhs_vec->subtract(d_rhs_vec, f_vec);
 

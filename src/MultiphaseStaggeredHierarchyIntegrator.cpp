@@ -926,7 +926,17 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     allocatePatchData(us_scr_idx, 0.0, coarsest_ln, finest_ln);
 
     // Set thn if necessary
-    if (d_thn_fcn)
+    Pointer<ThnCartGridFunction> thn_cart_fcn = d_thn_fcn;
+    if (thn_cart_fcn)
+        thn_cart_fcn->setDataOnPatchHierarchy(thn_cur_idx,
+                                              d_thn_cc_var,
+                                              d_hierarchy,
+                                              d_integrator_time,
+                                              TimePoint::CURRENT_TIME,
+                                              false,
+                                              coarsest_ln,
+                                              finest_ln);
+    else if (d_thn_fcn)
         d_thn_fcn->setDataOnPatchHierarchy(
             thn_cur_idx, d_thn_cc_var, d_hierarchy, d_integrator_time, false, coarsest_ln, finest_ln);
     if (d_thn_integrator)
