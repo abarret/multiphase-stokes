@@ -1,6 +1,7 @@
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBlockFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesBlockOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesVelocitySolve.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -274,6 +275,13 @@ main(int argc, char* argv[])
         f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
         thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
 
+        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
+            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+
+        // hier_sc_data_ops.add(f_us_sc_idx, f_us_sc_idx, f_un_sc_idx);
+
         un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
 
@@ -299,6 +307,8 @@ main(int argc, char* argv[])
         
         Pointer<MultiphaseStaggeredStokesBlockOperator> stokes_op =
             new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, params);
+        // Pointer<MultiphaseStaggeredStokesVelocitySolve> stokes_op =  new
+        // MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, params);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
@@ -387,11 +397,6 @@ main(int argc, char* argv[])
         pout << "|e|_oo = " << e_vec.maxNorm() << "\n";
         pout << "|e|_2  = " << e_vec.L2Norm() << "\n";
         pout << "|e|_1  = " << e_vec.L1Norm() << "\n\n";
-
-        HierarchySideDataOpsReal<NDIM, double> hier_sc_data_ops(
-            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
-        HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
-            patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
 
         pout << "Error in u_n :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"
