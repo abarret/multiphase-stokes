@@ -38,7 +38,7 @@ class RobinBcCoefStrategy;
 namespace multiphase
 {
 /*!
- * \brief Class StaggeredStokesOperator is a concrete IBTK::LinearOperator which
+ * \brief Class MultiphaseStaggeredStokesVelocitySolve is a concrete IBTK::LinearOperator which
  * implements a staggered-grid (MAC) discretization of the incompressible Stokes
  * operator.
  *
@@ -46,10 +46,10 @@ namespace multiphase
  * incompressible flow solver.
  *
  * This class knows how to apply the following operator:
- * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths                ][un]
- * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   ][us]
+ * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths ][un]
+ * [ C*thn + A_n                         C*ths + A_s          ][us]
  * in which
- * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
+ * A_i = D*div(eta_i*thn*((grad+grad^T)-lambda_i*div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
  *   -- C: Constant, set via setCandDCoefficients().

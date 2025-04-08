@@ -1,19 +1,20 @@
 USING_VAR_XI = FALSE
 
 USE_PRECOND = TRUE
-PRECOND_TYPE = "BLOCK"
-USING_SYMMETRIC = TRUE
+PRECOND_TYPE = "MULTIGRID"
 w = 0.75
-C = 1.0
+C = 100.0
 D = -1.0
 IS_VEL_NULLSPACE = FALSE
 
 XI = 1.0
-ETAS = 1.0
 ETAN = 1.0
+LN = 0.25
+ETAS = 1.0
+LS = -0.4
 NU = 1.0
 
-MAX_MULTIGRID_LEVELS = 3
+MAX_MULTIGRID_LEVELS = 2  
 PRECONDITIONER_COARSENING_OP = "CONSERVATIVE_COARSEN"
 
 un {
@@ -37,8 +38,10 @@ f_un {
    etan = ETAN
    xi = XI
    etas = ETAS
-   function_0 = "(3*(2*c*nu-d*(16*etan*nu*PI^2+xi))*cos(2*PI*X_1)*sin(2*PI*X_0))/(8*nu)"
-   function_1 = "(3*(2*c*nu-d*(16*etan*nu*PI^2+xi))*cos(2*PI*X_0)*sin(2*PI*X_1))/(8*nu)"
+   ln = LN
+   ls = LS
+   function_0 = "(cos(2*PI*X_1)*(4*(c*nu-d*(16*etan*nu*PI^2-8*ln*nu*PI^2+xi))*sin(2*PI*X_0)+16*d*(etan-ln)*nu*PI^2*cos(2*PI*X_0)^2*sin(2*PI*X_1)+2*nu*(c+8*d*(-3*etan+ln)*PI^2)*sin(2*PI*X_0)^2*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^3*sin(2*PI*X_1)^2))/(8*nu)"
+   function_1 = "(cos(2*PI*X_0)*(16*d*(etan-ln)*nu*PI^2*cos(2*PI*X_1)^2*sin(2*PI*X_0)+sin(2*PI*X_1)*(4*c*nu-4*d*(16*etan*nu*PI^2-8*ln*nu*PI^2+xi)+2*nu*(c+8*d*(-3*etan+ln)*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)+d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)))/(8*nu)"
 }
 
 f_us {
@@ -48,26 +51,39 @@ f_us {
    etan = ETAN
    xi = XI
    etas = ETAS
-   function_0 = "((-2*c*nu+16*d*etas*nu*PI^2+3*d*xi)*cos(2*PI*X_1)*sin(2*PI*X_0))/(8*nu)"
-   function_1 = "((-2*c*nu+16*d*etas*nu*PI^2+3*d*xi)*cos(2*PI*X_0)*sin(2*PI*X_1))/(8*nu)"
+   ln = LN
+   ls = LS
+   function_0 = "(cos(2*PI*X_1)*(-4*(c*nu-d*(16*etas*nu*PI^2-8*ls*nu*PI^2+xi))*sin(2*PI*X_0)+16*d*(etas-ls)*nu*PI^2*cos(2*PI*X_0)^2*sin(2*PI*X_1)+2*nu*(c+8*d*(-3*etas+ls)*PI^2)*sin(2*PI*X_0)^2*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^3*sin(2*PI*X_1)^2))/(8*nu)"
+   function_1 = "(cos(2*PI*X_0)*(16*d*(etas-ls)*nu*PI^2*cos(2*PI*X_1)^2*sin(2*PI*X_0)+sin(2*PI*X_1)*(-4*c*nu+4*d*(16*etas*nu*PI^2-8*ls*nu*PI^2+xi)+2*nu*(c+8*d*(-3*etas+ls)*PI^2)*sin(2*PI*X_0)*sin(2*PI*X_1)-d*xi*sin(2*PI*X_0)^2*sin(2*PI*X_1)^2)))/(8*nu)"
 }
 
 f_p {
-   function = "2*PI*cos(2*PI*X_0)*cos(2*PI*X_1)"
+   function = "PI*sin(4*PI*X_0)*sin(4*PI*X_1)"
 }
 
 thn {
-   function = "0.75"
+   function = "0.5 + 0.25*sin(2.0*PI*X_0)*sin(2.0*PI*X_1)"
 }
 
 KrylovSolver {
-  ksp_type = "fgmres" // uses right PC by default 
+
+}
+
+KrylovPrecondStrategy {
+
+}
+
+KrylovPrecond {
+   cycle_type = "V_CYCLE"
+   num_pre_sweeps = 3
+   num_post_sweeps = 3
+   enable_logging = FALSE
+   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
 BlockPreconditioner {
-  using_symmetric = TRUE
   stokes_solver_db {
-    ksp_type = "fgmres"
+    ksp_type = "fgmres"  
   }
 
   stokes_precond_db {
@@ -100,14 +116,6 @@ BlockPreconditioner {
       enable_logging       = FALSE
     }
   }
-}
-
-KrylovPrecond {
-   cycle_type = "V_CYCLE"
-   num_pre_sweeps = 3
-   num_post_sweeps = 3
-   enable_logging = FALSE
-   max_multigrid_levels = MAX_MULTIGRID_LEVELS
 }
 
 Main {
