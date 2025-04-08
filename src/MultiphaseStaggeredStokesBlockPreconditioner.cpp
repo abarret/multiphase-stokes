@@ -4,6 +4,8 @@
 
 #include <multiphase/MultiphaseStaggeredStokesBlockOperator.h>
 #include <multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h>
+#include <multiphase/MultiphaseStaggeredStokesVelocityFACOperator.h>
+#include <multiphase/MultiphaseStaggeredStokesVelocitySolve.h>
 #include <multiphase/fd_operators.h>
 #include <multiphase/utility_functions.h>
 
@@ -84,6 +86,8 @@ MultiphaseStaggeredStokesBlockPreconditioner::MultiphaseStaggeredStokesBlockPrec
     d_pressure_solver_db = input_db->getDatabase("pressure_solver_db");
     d_pressure_precond_type = input_db->getStringWithDefault("pressure_precond_type", d_pressure_precond_type);
     d_pressure_precond_db = input_db->getDatabase("pressure_precond_db");
+
+    d_using_symmetric = input_db->getBool("using_symmetric");
 }
 
 MultiphaseStaggeredStokesBlockPreconditioner::~MultiphaseStaggeredStokesBlockPreconditioner()
@@ -248,7 +252,17 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     }
 
     // Now solve the velocity block
-    d_stokes_solver->solveSystem(u_vec, bu_vec);
+    if (d_using_symmetric)
+    {
+        d_stokes_solver->solveSystem(u_vec, bu_vec);
+    }
+    else
+    {
+        d_hier_sc_data_ops->add(bu_vec.getComponentDescriptorIndex(1),
+                                bu_vec.getComponentDescriptorIndex(1),
+                                bu_vec.getComponentDescriptorIndex(0));
+        d_stokes_solver->solveSystem(u_vec, bu_vec);
+    }
 
     // Remove contributions of nullspace
     const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
@@ -351,19 +365,47 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     d_pressure_solver->initializeSolverState(p_vec, bp_vec);
 
     // Create the velocity solver
-    Pointer<MultiphaseStaggeredStokesBlockOperator> stokes_op =
-        new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params);
+    Pointer<LinearOperator> stokes_op;
+    if (d_using_symmetric)
+    {
+        Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op =
+            new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params);
+        mp_stokes_op->setCandDCoefficients(d_C, d_D);
+        // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
+        mp_stokes_op->setThnIdx(d_thn_idx);
+        stokes_op = mp_stokes_op;
+    }
+    else
+    {
+        Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op =
+            new MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, d_params);
+        mp_stokes_op->setCandDCoefficients(d_C, d_D);
+        // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
+        mp_stokes_op->setThnIdx(d_thn_idx);
+        stokes_op = mp_stokes_op;
+    }
+
+    if (d_using_symmetric)
+    {
+        Pointer<MultiphaseStaggeredStokesBlockFACOperator> mp_fac_precondition_strategy =
+            new MultiphaseStaggeredStokesBlockFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
+        mp_fac_precondition_strategy->setThnIdx(d_thn_idx);
+        mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
+        d_stokes_precond_op = mp_fac_precondition_strategy;
+    }
+    else
+    {
+        Pointer<MultiphaseStaggeredStokesVelocityFACOperator> mp_fac_precondition_strategy =
+            new MultiphaseStaggeredStokesVelocityFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
+        mp_fac_precondition_strategy->setThnIdx(d_thn_idx);
+        mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
+        d_stokes_precond_op = mp_fac_precondition_strategy;
+    }
     d_stokes_solver =
         std::make_unique<PETScKrylovLinearSolver>("stokes_solver", d_stokes_solver_db, "stokes_velocity_");
     d_stokes_solver->setOperator(stokes_op);
-    d_stokes_precond_op =
-        new MultiphaseStaggeredStokesBlockFACOperator(d_object_name + "::stokes_precond_op", "", d_params);
     d_stokes_precond = new FullFACPreconditioner(
         "stokes_precond", d_stokes_precond_op, d_stokes_precond_db, d_object_name + "_stokes_pc_");
-    d_stokes_precond_op->setThnIdx(d_thn_idx);
-    stokes_op->setThnIdx(d_thn_idx);
-    stokes_op->setCandDCoefficients(d_C, d_D);
-    d_stokes_precond_op->setCandDCoefficients(d_C, d_D);
     d_stokes_solver->setPreconditioner(d_stokes_precond);
     d_stokes_solver->initializeSolverState(u_vec, bu_vec);
 

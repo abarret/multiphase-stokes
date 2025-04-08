@@ -154,11 +154,11 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
     if (input_db->keyExists("l_n"))
         d_params.lambda_n = input_db->getDouble("l_n");
     else
-        d_params.lambda_n = -d_params.eta_n;
+        d_params.lambda_n = d_params.eta_n;
     if (input_db->keyExists("l_s"))
         d_params.lambda_s = input_db->getDouble("l_s");
     else
-        d_params.lambda_s = -d_params.eta_s;
+        d_params.lambda_s = d_params.eta_s;
     if (input_db->keyExists("use_grad_tagging")) d_use_grad_tagging = input_db->getBool("use_grad_tagging");
     if (input_db->keyExists("grad_rel_thresh")) input_db->getArray("grad_rel_thresh", d_rel_grad_thresh);
     if (input_db->keyExists("grad_abs_thresh")) input_db->getArray("grad_abs_thresh", d_abs_grad_thresh);
@@ -301,7 +301,7 @@ MultiphaseStaggeredHierarchyIntegrator::registerAdvDiffHierarchyIntegrator(
 void
 MultiphaseStaggeredHierarchyIntegrator::setViscosityCoefficient(const double eta_n, const double eta_s)
 {
-    setViscosityCoefficient(eta_n, eta_s, -eta_n, -eta_s);
+    setViscosityCoefficient(eta_n, eta_s, eta_n, eta_s);
 }
 
 void

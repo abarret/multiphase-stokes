@@ -1,6 +1,7 @@
 #include "multiphase/FullFACPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBlockFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesBlockOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesVelocityFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesVelocitySolve.h"
 #include "multiphase/utility_functions.h"
 
@@ -280,8 +281,6 @@ main(int argc, char* argv[])
         HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
 
-        // hier_sc_data_ops.add(f_us_sc_idx, f_us_sc_idx, f_un_sc_idx);
-
         un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
 
@@ -302,32 +301,70 @@ main(int argc, char* argv[])
         }
         params.eta_n = input_db->getDouble("ETAN");
         params.eta_s = input_db->getDouble("ETAS");
-        params.lambda_n = -params.eta_n;
-        params.lambda_s = -params.eta_s;
-        
-        Pointer<MultiphaseStaggeredStokesBlockOperator> stokes_op =
-            new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, params);
-        // Pointer<MultiphaseStaggeredStokesVelocitySolve> stokes_op =  new
-        // MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, params);
+        if (input_db->keyExists("LN"))
+        {
+            params.lambda_n = input_db->getDouble("LN");
+            params.lambda_s = input_db->getDouble("LS");
+        }
+        else
+        {
+            params.lambda_n = params.eta_n;
+            params.lambda_s = params.eta_s;
+        }
+
+        bool using_symmetric = input_db->getBool("USING_SYMMETRIC");
+
+        if (!using_symmetric) hier_sc_data_ops.add(f_us_sc_idx, f_us_sc_idx, f_un_sc_idx);
+
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
-        stokes_op->setCandDCoefficients(C, D);
-
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
-        stokes_op->setPhysicalBoundaryHelper(bc_helper);
 
-        stokes_op->setThnIdx(thn_cc_idx);
+        Pointer<LinearOperator> stokes_op;
+        if (using_symmetric)
+        {
+            Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op =
+                new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, params);
+            mp_stokes_op->setCandDCoefficients(C, D);
+            mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
+            mp_stokes_op->setThnIdx(thn_cc_idx);
+            stokes_op = mp_stokes_op;
+        }
+        else
+        {
+            Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op =
+                new MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, params);
+            mp_stokes_op->setCandDCoefficients(C, D);
+            mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
+            mp_stokes_op->setThnIdx(thn_cc_idx);
+            stokes_op = mp_stokes_op;
+        }
 
         Pointer<PETScKrylovLinearSolver> krylov_solver =
             new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
         krylov_solver->setOperator(stokes_op);
 
         // Now create a preconditioner
-        Pointer<MultiphaseStaggeredStokesBlockFACOperator> fac_precondition_strategy =
-            new MultiphaseStaggeredStokesBlockFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
-        fac_precondition_strategy->setThnIdx(thn_cc_idx);
-        fac_precondition_strategy->setCandDCoefficients(C, D);
-        fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
+        Pointer<FACPreconditionerStrategy> fac_precondition_strategy;
+        if (using_symmetric)
+        {
+            Pointer<MultiphaseStaggeredStokesBlockFACOperator> mp_fac_precondition_strategy =
+                new MultiphaseStaggeredStokesBlockFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
+            mp_fac_precondition_strategy->setThnIdx(thn_cc_idx);
+            mp_fac_precondition_strategy->setCandDCoefficients(C, D);
+            mp_fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
+            fac_precondition_strategy = mp_fac_precondition_strategy;
+        }
+        else
+        {
+            Pointer<MultiphaseStaggeredStokesVelocityFACOperator> mp_fac_precondition_strategy =
+                new MultiphaseStaggeredStokesVelocityFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
+            mp_fac_precondition_strategy->setThnIdx(thn_cc_idx);
+            mp_fac_precondition_strategy->setCandDCoefficients(C, D);
+            mp_fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
+            fac_precondition_strategy = mp_fac_precondition_strategy;
+        }
+
         Pointer<FullFACPreconditioner> Krylov_precond =
             new FullFACPreconditioner("KrylovPrecond",
                                       fac_precondition_strategy,

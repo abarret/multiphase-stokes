@@ -30,6 +30,16 @@
 
 namespace multiphase
 {
+/**
+ * Concrete implementation of FACPreconditionerStrategy that solves the velocity system
+ * [A_n + xi   -xi]
+ * [A_n        A_s]
+ * using Gauss-Seidel as a smoother.
+ *
+ * Note that this currently doesn't do exactly Gauss-Seidel, but some combination of Gauss-Seidel and Jacobi. The
+ * coupling between the velocity operators in A_n and A_s make it difficult to efficiently apply Gauss-Seidel in a
+ * matrix free way.
+ */
 class MultiphaseStaggeredStokesVelocityFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:

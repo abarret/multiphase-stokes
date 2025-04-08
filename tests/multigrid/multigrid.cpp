@@ -326,8 +326,16 @@ main(int argc, char* argv[])
         }
         params.eta_n = input_db->getDouble("ETAN");
         params.eta_s = input_db->getDouble("ETAS");
-        params.lambda_n = -params.eta_n;
-        params.lambda_s = -params.eta_s;
+        if (input_db->keyExists("LN"))
+        {
+            params.lambda_n = input_db->getDouble("LN");
+            params.lambda_s = input_db->getDouble("LS");
+        }
+        else
+        {
+            params.lambda_n = params.eta_n;
+            params.lambda_s = params.eta_s;
+        }
 
         Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
             new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
@@ -445,6 +453,8 @@ main(int argc, char* argv[])
                 if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
             }
         }
+
+        input_db->printClassData(plog);
 
         // Compute error and print error norms.
         e_vec.subtract(Pointer<SAMRAIVectorReal<NDIM, double>>(&u_vec, false),  // numerical

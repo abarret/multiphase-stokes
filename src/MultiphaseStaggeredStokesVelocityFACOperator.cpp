@@ -62,11 +62,11 @@
 #include <vector>
 
 // Fortran Routines
-#define velocity_R_B_G_S IBTK_FC_FUNC_(velocity_rbgs, VRBGS)
+#define velocity_R_B_G_S IBTK_FC_FUNC_(velocity_rbgs_m2, VRBGS)
 
 extern "C"
 {
-    void velocity_rbgs_m2(const double*, // dx
+    void velocity_R_B_G_S(const double*, // dx
                           const int&,    // ilower0
                           const int&,    // iupper0
                           const int&,    // ilower1
@@ -526,8 +526,8 @@ MultiphaseStaggeredStokesVelocityFACOperator::smoothError(
                                  thn_gcw.min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
-                                 d_params.nu_n,
-                                 d_params.nu_s,
+                                 d_params.lambda_n,
+                                 d_params.lambda_s,
                                  d_params.xi,
                                  d_w,
                                  d_C,
@@ -628,8 +628,7 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
             //     //accumulateMomentumWithoutPressureOnPatchVariableDrag(
             //         //patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
             // else
-            accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
-                patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D);
+            computeVelocitySubBlockOnPatch(*patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D);
 
             for (int axis = 0; axis < NDIM; ++axis)
             {

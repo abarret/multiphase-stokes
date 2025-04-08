@@ -78,11 +78,13 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    tag_buffer = TAG_BUFFER
    regrid_interval = REGRID_INTERVAL
 
+
    solver_db {
       ksp_type = "fgmres"
    }
 
    precond_db {
+      using_symmetric = TRUE
       stokes_solver_db {
          ksp_type = "fgmres"  
       }

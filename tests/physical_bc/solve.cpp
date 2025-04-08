@@ -329,8 +329,8 @@ main(int argc, char* argv[])
         params.eta_n = input_db->getDouble("ETAN");
         params.eta_s = input_db->getDouble("ETAS");
         params.nu_n = params.nu_s = input_db->getDouble("NU");
-        params.lambda_n = -params.eta_n;
-        params.lambda_s = -params.eta_s;
+        params.lambda_n = params.eta_n;
+        params.lambda_s = params.eta_s;
         Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
             new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
         const double C = input_db->getDouble("C");
