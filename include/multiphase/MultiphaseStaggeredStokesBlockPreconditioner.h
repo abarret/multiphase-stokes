@@ -70,7 +70,7 @@ private:
     std::unique_ptr<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_solver_db;
     SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockFACOperator> d_stokes_precond_op;
+    SAMRAI::tbox::Pointer<IBTK::FACPreconditionerStrategy> d_stokes_precond_op;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_precond_db;
     MultiphaseParameters d_params;
 
@@ -103,6 +103,8 @@ private:
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index;
     int d_fn_scr_idx = IBTK::invalid_index, d_fs_scr_idx = IBTK::invalid_index;
     int d_p_scr_idx = IBTK::invalid_index;
+
+    bool d_using_symmetric = true;
 };
 } // namespace multiphase
 #endif

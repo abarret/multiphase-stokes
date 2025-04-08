@@ -11,6 +11,7 @@
 #include <CartesianPatchGeometry.h>
 #include <CellData.h>
 #include <SideData.h>
+
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -46,6 +47,8 @@ extern "C"
                      const int&,     // thn_gcw
                      const double&,  // eta_n
                      const double&,  // eta_s
+                     const double&,  // lambda_n
+                     const double&,  // lambda_s
                      const double&,  // nu_n
                      const double&,  // nu_s
                      const double&,  // xi
@@ -78,6 +81,8 @@ extern "C"
                                const int&,     // thn_sc_gcw
                                const double&,  // eta_n
                                const double&,  // eta_s
+                               const double&,  // lambda_n
+                               const double&,  // lambda_s
                                const double&,  // nu_n
                                const double&,  // nu_s
                                const double&,  // xi
@@ -105,8 +110,8 @@ extern "C"
                           const int&,     // thn_gcw
                           const double&,  // eta_n
                           const double&,  // eta_s
-                          const double&,  // nu_n
-                          const double&,  // nu_s
+                          const double&,  // lambda_n
+                          const double&,  // lambda_s
                           double* const,  // xi_data_0
                           double* const,  // xi_data_1
                           const int&,     // xi_gcw
@@ -134,10 +139,8 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
     TBOX_ASSERT(!params.isVariableDrag());
 #endif
 
-    accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch, 
-                                                                A_un_idx, A_us_idx, un_idx, us_idx, 
-                                                                thn_idx, thn_nc_idx, thn_sc_idx,
-                                                                params, C, D_u);
+    accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
+        patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, thn_nc_idx, thn_sc_idx, params, C, D_u);
 
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
@@ -148,7 +151,7 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
         patch->getPatchData(A_us_idx); // Forces on solvent
     SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-    
+
     // Now add the pressure force to the momentum forces computed from above.
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
     {
@@ -165,10 +168,10 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-        
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 1, (i,j-1/2)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
+
         double thn_lower = (*thn_sc_data)(idx);
         double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
         double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
@@ -192,40 +195,41 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
 {
 #ifndef NDEBUG
     TBOX_ASSERT(!params.isVariableDrag());
-#endif  
+#endif
 
-    accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, params, C, D_u);
-    
+    accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
+        patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, params, C, D_u);
+
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_un_data =
         patch->getPatchData(A_un_idx); // Forces on network
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_us_data =
-        patch->getPatchData(A_us_idx); // Forces on solvent
+        patch->getPatchData(A_us_idx);       // Forces on solvent
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
     SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
-    
+
     // Now add the pressure force to the momentum forces computed from above.
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-        
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 0, (i-1/2,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i-1,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
+
         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i-1/2,j)
         double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
         double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) += D_p * (pressure_n); 
+        (*A_un_data)(idx) += D_p * (pressure_n);
         (*A_us_data)(idx) += D_p * (pressure_s);
     }
 
     for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
     {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
-        
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 1, (i,j-1/2)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
+
         // components of second row (y-component of network vel) of network equation
         double thn_lower = 0.5 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up)); // thn(i,j-1/2)
         double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
@@ -251,15 +255,9 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
 #ifndef NDEBUG
     TBOX_ASSERT(params.isVariableDrag());
 #endif
-    accumulateMomentumWithoutPressureOnPatchVariableDrag(patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, params, C, D_u);
+    accumulateMomentumWithoutPressureOnPatchVariableDrag(
+        patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, params, C, D_u);
 
-
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> xi_data = patch->getPatchData(params.xi_idx);
-
-    const double eta_n = params.eta_n;
-    const double eta_s = params.eta_s;
-    const double lambda_n = params.lambda_n;
-    const double lambda_s = params.lambda_s;
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
@@ -347,6 +345,8 @@ accumulateMomentumWithoutPressureOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRA
 
     const double eta_n = params.eta_n;
     const double eta_s = params.eta_s;
+    const double lambda_n = params.lambda_n;
+    const double lambda_s = params.lambda_s;
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
     const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
@@ -403,10 +403,10 @@ accumulateMomentumWithoutPressureOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRA
                      f_us_gcw.min(),
                      thn_ptr_data,
                      thn_gcw.min(),
-                     params.eta_n,
-                     params.eta_s,
-                     params.nu_n,
-                     params.nu_s,
+                     eta_n,
+                     eta_s,
+                     lambda_n,
+                     lambda_s,
                      xi_data_0,
                      xi_data_1,
                      xi_gcw.min(),
@@ -502,14 +502,15 @@ accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointe
                           thn_gcw.min(), // TODO: assert that they're same for both dir
                           thn_nc_gcw.min(),
                           thn_sc_gcw.min(),
-                          params.eta_n,
-                          params.eta_s,
-                          params.nu_n,
-                          params.nu_s,
-                          params.xi,
+                          eta_n,
+                          eta_s,
+                          lambda_n,
+                          lambda_s,
+                          nu_n,
+                          nu_s,
+                          xi,
                           C,
                           D_u);
-
 }
 
 inline void
@@ -614,14 +615,15 @@ accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointe
                 f_us_gcw.min(),
                 thn_ptr_data,
                 thn_gcw.min(),
-                params.eta_n,
-                params.eta_s,
-                params.nu_n,
-                params.nu_s,
-                params.xi,
+                eta_n,
+                eta_s,
+                lambda_n,
+                lambda_s,
+                nu_n,
+                nu_s,
+                xi,
                 C,
                 D_u);
-
 }
 
 inline void
@@ -717,23 +719,30 @@ preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> p
     {
         const SAMRAI::pdat::CellIndex<NDIM>& idx = ci();
 
-        double uxx = ((*u_data)(idx-xp) - 2*(*u_data)(idx) + (*u_data)(idx+xp))/(dx[0]*dx[0]);
-        double uyy = ((*u_data)(idx-yp) - 2*(*u_data)(idx) + (*u_data)(idx+yp))/(dx[0]*dx[1]);
+        double uxx = ((*u_data)(idx - xp) - 2 * (*u_data)(idx) + (*u_data)(idx + xp)) / (dx[0] * dx[0]);
+        double uyy = ((*u_data)(idx - yp) - 2 * (*u_data)(idx) + (*u_data)(idx + yp)) / (dx[0] * dx[1]);
 
-        double ux = ((*u_data)(idx+xp) -(*u_data)(idx-xp))/dx[0];
-        double uy = ((*u_data)(idx+yp) -(*u_data)(idx-yp))/dx[1];
+        double ux = ((*u_data)(idx + xp) - (*u_data)(idx - xp)) / dx[0];
+        double uy = ((*u_data)(idx + yp) - (*u_data)(idx - yp)) / dx[1];
 
-        double thn_sq_ths_sq = (*thn_data)(idx)*(*thn_data)(idx) + convertToThs((*thn_data)(idx))*convertToThs((*thn_data)(idx));
+        double thn_sq_ths_sq =
+            (*thn_data)(idx) * (*thn_data)(idx) + convertToThs((*thn_data)(idx)) * convertToThs((*thn_data)(idx));
         double th_sq_uxx = thn_sq_ths_sq * uxx;
         double th_sq_uyy = thn_sq_ths_sq * uyy;
 
-        double ddx_th_sq = (((*thn_data)(idx+xp)*(*thn_data)(idx+xp) + convertToThs((*thn_data)(idx+xp))*convertToThs((*thn_data)(idx+xp)))
-                            - ((*thn_data)(idx-xp)*(*thn_data)(idx-xp) + convertToThs((*thn_data)(idx-xp))*convertToThs((*thn_data)(idx-xp))))/dx[0];
+        double ddx_th_sq = (((*thn_data)(idx + xp) * (*thn_data)(idx + xp) +
+                             convertToThs((*thn_data)(idx + xp)) * convertToThs((*thn_data)(idx + xp))) -
+                            ((*thn_data)(idx - xp) * (*thn_data)(idx - xp) +
+                             convertToThs((*thn_data)(idx - xp)) * convertToThs((*thn_data)(idx - xp)))) /
+                           dx[0];
 
-        double ddy_th_sq = (((*thn_data)(idx+yp)*(*thn_data)(idx+yp) + convertToThs((*thn_data)(idx+yp))*convertToThs((*thn_data)(idx+yp)))
-                            - ((*thn_data)(idx-yp)*(*thn_data)(idx-yp) + convertToThs((*thn_data)(idx-yp))*convertToThs((*thn_data)(idx-yp))))/dx[1];
+        double ddy_th_sq = (((*thn_data)(idx + yp) * (*thn_data)(idx + yp) +
+                             convertToThs((*thn_data)(idx + yp)) * convertToThs((*thn_data)(idx + yp))) -
+                            ((*thn_data)(idx - yp) * (*thn_data)(idx - yp) +
+                             convertToThs((*thn_data)(idx - yp)) * convertToThs((*thn_data)(idx - yp)))) /
+                           dx[1];
 
-        (*GtG_data)(idx) = D_div*D_p*(th_sq_uxx + th_sq_uyy + ddx_th_sq*ux + ddy_th_sq*uy);
+        (*GtG_data)(idx) = D_div * D_p * (th_sq_uxx + th_sq_uyy + ddx_th_sq * ux + ddy_th_sq * uy);
     }
 }
 
@@ -797,6 +806,303 @@ multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
                 (*Gus_data)(idx) = C * convertToThs(thn) * dp;
             }
         }
+    }
+}
+
+inline void
+computeVelocitySubBlockOnPatch(const SAMRAI::hier::Patch<NDIM>& patch,
+                               const int A_un_idx,
+                               const int A_us_idx,
+                               const int un_idx,
+                               const int us_idx,
+                               const int thn_idx,
+                               const int thn_nc_idx,
+                               const int thn_sc_idx,
+                               const MultiphaseParameters& params,
+                               const double C,
+                               const double D)
+{
+    const double eta_s = params.eta_s;
+    const double lambda_s = params.lambda_s;
+    const double eta_n = params.eta_n;
+    const double lambda_n = params.lambda_n;
+
+    const double xi = params.xi;
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_un_data = patch.getPatchData(A_un_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_us_data = patch.getPatchData(A_us_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> un_data = patch.getPatchData(un_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> us_data = patch.getPatchData(us_idx);
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeData<NDIM, double>> thn_nc_data = patch.getPatchData(thn_nc_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_sc_data = patch.getPatchData(thn_sc_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_cc_data = patch.getPatchData(thn_idx);
+
+    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch.getPatchGeometry();
+    const double* const dx = pgeom->getDx();
+
+    SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
+
+    for (SAMRAI::pdat::SideIterator<NDIM> si(patch.getBox(), 0); si; si++) // side-centers in x-dir
+    {
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
+
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
+        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
+
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_l(idx.toCell(1), NodeIndex<NDIM>::LowerLeft);
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_u(idx.toCell(1), NodeIndex<NDIM>::UpperLeft);
+        double thn_lower = (*thn_sc_data)(idx);
+        double thn_imhalf_jphalf = (*thn_nc_data)(idx_n_u);
+        double thn_imhalf_jmhalf = (*thn_nc_data)(idx_n_l);
+
+        // components of first row (x-component of network vel) of network equation
+        double ddx_Thn_dx_un = (2.0 * eta_n - lambda_n) / (dx[0] * dx[0]) *
+                               ((*thn_cc_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
+                                (*thn_cc_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
+        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+                               (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
+        double ddy_Thn_dx_vn = eta_n / (dx[1] * dx[0]) *
+                               (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
+        double ddx_Thn_dy_vn = -lambda_n / (dx[0] * dx[1]) *
+                               ((*thn_cc_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
+                                (*thn_cc_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
+        double drag_n = -xi * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+        const double A_un =
+            C * thn_lower * (*un_data)(idx) + D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn);
+        const double xi_un = D * drag_n;
+        (*A_un_data)(idx) = A_un + xi_un;
+
+        // solvent equation
+        double ddx_Ths_dx_us = (2.0 * eta_s - lambda_s) / (dx[0] * dx[0]) *
+                               (convertToThs((*thn_cc_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
+                                convertToThs((*thn_cc_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
+        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+                               (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
+        double ddy_Ths_dx_vs = eta_s / (dx[1] * dx[0]) *
+                               (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
+        double ddx_Ths_dy_vs =
+            -lambda_s / (dx[0] * dx[1]) *
+            (convertToThs((*thn_cc_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
+             convertToThs((*thn_cc_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
+
+        const double A_us = D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs) +
+                            C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) = A_un + A_us;
+    }
+
+    for (SAMRAI::pdat::SideIterator<NDIM> si(patch.getBox(), 1); si; si++) // side-centers in y-dir
+    {
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
+
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
+        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
+
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_l(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerLeft);
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_u(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerRight);
+        double thn_lower = (*thn_sc_data)(idx);
+        double thn_iphalf_jmhalf = (*thn_nc_data)(idx_n_u);
+        double thn_imhalf_jmhalf = (*thn_nc_data)(idx_n_l);
+
+        // components of second row (y-component of network vel) of network equation
+        double ddy_Thn_dy_un = (2.0 * eta_n - lambda_n) / (dx[1] * dx[1]) *
+                               ((*thn_cc_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
+                                (*thn_cc_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
+        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+                               (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
+        double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
+                               (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
+        double ddy_Thn_dx_vn = -lambda_n / (dx[0] * dx[1]) *
+                               ((*thn_cc_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
+                                (*thn_cc_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
+        double drag_n = -xi * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+
+        const double A_un =
+            D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn) + C * thn_lower * (*un_data)(idx);
+        const double xi_un = D * drag_n;
+        (*A_un_data)(idx) = A_un + xi_un;
+
+        // Solvent equation
+        double ddy_Ths_dy_us = (2.0 * eta_s - lambda_s) / (dx[1] * dx[1]) *
+                               (convertToThs((*thn_cc_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
+                                convertToThs((*thn_cc_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
+        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+                               (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
+        double ddx_Ths_dy_vs = eta_s / (dx[1] * dx[0]) *
+                               (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
+        double ddy_Ths_dx_vs =
+            -lambda_s / (dx[0] * dx[1]) *
+            (convertToThs((*thn_cc_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
+             convertToThs((*thn_cc_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
+        const double A_us = D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs) +
+                            C * convertToThs(thn_lower) * (*us_data)(idx);
+
+        (*A_us_data)(idx) = A_un + A_us;
+    }
+}
+
+inline void
+computeVelocitySubBlockOnPatch(const SAMRAI::hier::Patch<NDIM>& patch,
+                               const int A_un_idx,
+                               const int A_us_idx,
+                               const int un_idx,
+                               const int us_idx,
+                               const int thn_idx,
+                               const MultiphaseParameters& params,
+                               const double C,
+                               const double D)
+{
+    const double eta_s = params.eta_s;
+    const double lambda_s = params.lambda_s;
+    const double eta_n = params.eta_n;
+    const double lambda_n = params.lambda_n;
+
+    const double xi = params.xi;
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_un_data = patch.getPatchData(A_un_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_us_data = patch.getPatchData(A_us_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> un_data = patch.getPatchData(un_idx);
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> us_data = patch.getPatchData(us_idx);
+
+    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch.getPatchData(thn_idx);
+
+    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch.getPatchGeometry();
+    const double* const dx = pgeom->getDx();
+
+    SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
+
+    for (SAMRAI::pdat::SideIterator<NDIM> si(patch.getBox(), 0); si; si++) // side-centers in x-dir
+    {
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 0, (i-1/2,j)
+
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i-1,j)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx_c_up, 1, 0); // (i,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx_c_up, 1, 1); // (i,j+1/2)
+        SAMRAI::pdat::SideIndex<NDIM> l_y_idx(idx_c_low, 1, 0);    // (i-1,j-1/2)
+        SAMRAI::pdat::SideIndex<NDIM> u_y_idx(idx_c_low, 1, 1);    // (i-1,j+1/2)
+
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_l(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerLeft);
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_u(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::UpperLeft);
+        double thn_lower = 0.5 * ((*thn_data)(idx.toCell(0)) + (*thn_data)(idx.toCell(1)));
+
+        double thn_imhalf_jphalf = 0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up + yp) +
+                                           (*thn_data)(idx_c_low + yp)); // thn(i-1/2,j+1/2)
+        double thn_imhalf_jmhalf = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up - yp) +
+                                           (*thn_data)(idx_c_low - yp)); // thn(i-1/2,j-1/2)
+
+        // components of first row (x-component of network vel) of network equation
+        double ddx_Thn_dx_un = (2.0 * eta_n - lambda_n) / (dx[0] * dx[0]) *
+                               ((*thn_data)(idx_c_up) * ((*un_data)(idx + xp) - (*un_data)(idx)) -
+                                (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - xp)));
+        double ddy_Thn_dy_un = eta_n / (dx[1] * dx[1]) *
+                               (thn_imhalf_jphalf * ((*un_data)(idx + yp) - (*un_data)(idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - yp)));
+        double ddy_Thn_dx_vn = eta_n / (dx[1] * dx[0]) *
+                               (thn_imhalf_jphalf * ((*un_data)(upper_y_idx) - (*un_data)(u_y_idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(lower_y_idx) - (*un_data)(l_y_idx)));
+        double ddx_Thn_dy_vn = -lambda_n / (dx[0] * dx[1]) *
+                               ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
+                                (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
+        double drag_n = -xi * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+        const double A_un =
+            C * thn_lower * (*un_data)(idx) + D * (ddx_Thn_dx_un + ddy_Thn_dy_un + ddy_Thn_dx_vn + ddx_Thn_dy_vn);
+        const double xi_un = D * drag_n;
+        (*A_un_data)(idx) = A_un + xi_un;
+
+        // solvent equation
+        double ddx_Ths_dx_us = (2.0 * eta_s - lambda_s) / (dx[0] * dx[0]) *
+                               (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
+                                convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - xp)));
+        double ddy_Ths_dy_us = eta_s / (dx[1] * dx[1]) *
+                               (convertToThs(thn_imhalf_jphalf) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - yp)));
+        double ddy_Ths_dx_vs = eta_s / (dx[1] * dx[0]) *
+                               (convertToThs(thn_imhalf_jphalf) * ((*us_data)(upper_y_idx) - (*us_data)(u_y_idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_y_idx) - (*us_data)(l_y_idx)));
+        double ddx_Ths_dy_vs =
+            -lambda_s / (dx[0] * dx[1]) *
+            (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_y_idx) - (*us_data)(lower_y_idx)) -
+             convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_y_idx) - (*us_data)(l_y_idx)));
+
+        const double A_us = D * (ddx_Ths_dx_us + ddy_Ths_dy_us + ddy_Ths_dx_vs + ddx_Ths_dy_vs) +
+                            C * convertToThs(thn_lower) * (*us_data)(idx);
+        (*A_us_data)(idx) = A_un + A_us;
+    }
+
+    for (SAMRAI::pdat::SideIterator<NDIM> si(patch.getBox(), 1); si; si++) // side-centers in y-dir
+    {
+        const SAMRAI::pdat::SideIndex<NDIM>& idx = si(); // axis = 1, (i,j-1/2)
+
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0);   // (i,j-1)
+        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);    // (i,j)
+        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx_c_up, 0, 0); // (i-1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx_c_up, 0, 1); // (i+1/2,j)
+        SAMRAI::pdat::SideIndex<NDIM> l_x_idx(idx_c_low, 0, 0);    // (i-1/2,j-1)
+        SAMRAI::pdat::SideIndex<NDIM> u_x_idx(idx_c_low, 0, 1);    // (i+1/2,j-1)
+
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_l(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerLeft);
+        SAMRAI::pdat::NodeIndex<NDIM> idx_n_u(idx.toCell(1), SAMRAI::pdat::NodeIndex<NDIM>::LowerRight);
+        double thn_lower = 0.5 * ((*thn_data)(idx.toCell(0)) + (*thn_data)(idx.toCell(1)));
+        double thn_imhalf_jmhalf = 0.25 * ((*thn_data)(idx_c_low) + (*thn_data)(idx_c_up) + (*thn_data)(idx_c_up - xp) +
+                                           (*thn_data)(idx_c_low - xp)); // thn(i-1/2,j-1/2)
+        double thn_iphalf_jmhalf = 0.25 * ((*thn_data)(idx_c_up) + (*thn_data)(idx_c_low) + (*thn_data)(idx_c_up + xp) +
+                                           (*thn_data)(idx_c_low + xp)); // thn(i+1/2,j-1/2)
+
+        // components of second row (y-component of network vel) of network equation
+        double ddy_Thn_dy_un = (2.0 * eta_n - lambda_n) / (dx[1] * dx[1]) *
+                               ((*thn_data)(idx_c_up) * ((*un_data)(idx + yp) - (*un_data)(idx)) -
+                                (*thn_data)(idx_c_low) * ((*un_data)(idx) - (*un_data)(idx - yp)));
+        double ddx_Thn_dx_un = eta_n / (dx[0] * dx[0]) *
+                               (thn_iphalf_jmhalf * ((*un_data)(idx + xp) - (*un_data)(idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(idx) - (*un_data)(idx - xp)));
+        double ddx_Thn_dy_vn = eta_n / (dx[1] * dx[0]) *
+                               (thn_iphalf_jmhalf * ((*un_data)(upper_x_idx) - (*un_data)(u_x_idx)) -
+                                thn_imhalf_jmhalf * ((*un_data)(lower_x_idx) - (*un_data)(l_x_idx)));
+        double ddy_Thn_dx_vn = -lambda_n / (dx[0] * dx[1]) *
+                               ((*thn_data)(idx_c_up) * ((*un_data)(upper_x_idx) - (*un_data)(lower_x_idx)) -
+                                (*thn_data)(idx_c_low) * ((*un_data)(u_x_idx) - (*un_data)(l_x_idx)));
+        double drag_n = -xi * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
+
+        const double A_un =
+            D * (ddy_Thn_dy_un + ddx_Thn_dx_un + ddx_Thn_dy_vn + ddy_Thn_dx_vn) + C * thn_lower * (*un_data)(idx);
+        const double xi_un = D * drag_n;
+        (*A_un_data)(idx) = A_un + xi_un;
+
+        // Solvent equation
+        double ddy_Ths_dy_us = (2.0 * eta_s - lambda_s) / (dx[1] * dx[1]) *
+                               (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(idx + yp) - (*us_data)(idx)) -
+                                convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(idx) - (*us_data)(idx - yp)));
+        double ddx_Ths_dx_us = eta_s / (dx[0] * dx[0]) *
+                               (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(idx + xp) - (*us_data)(idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(idx) - (*us_data)(idx - xp)));
+        double ddx_Ths_dy_vs = eta_s / (dx[1] * dx[0]) *
+                               (convertToThs(thn_iphalf_jmhalf) * ((*us_data)(upper_x_idx) - (*us_data)(u_x_idx)) -
+                                convertToThs(thn_imhalf_jmhalf) * ((*us_data)(lower_x_idx) - (*us_data)(l_x_idx)));
+        double ddy_Ths_dx_vs =
+            -lambda_s / (dx[0] * dx[1]) *
+            (convertToThs((*thn_data)(idx_c_up)) * ((*us_data)(upper_x_idx) - (*us_data)(lower_x_idx)) -
+             convertToThs((*thn_data)(idx_c_low)) * ((*us_data)(u_x_idx) - (*us_data)(l_x_idx)));
+        const double A_us = D * (ddy_Ths_dy_us + ddx_Ths_dx_us + ddx_Ths_dy_vs + ddy_Ths_dx_vs) +
+                            C * convertToThs(thn_lower) * (*us_data)(idx);
+
+        (*A_us_data)(idx) = A_un + A_us;
     }
 }
 } // namespace multiphase
