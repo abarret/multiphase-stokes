@@ -263,6 +263,37 @@ void multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
                      double C,
                      bool do_accumulate = true);
 ///}
+
+/**
+ * Apply the operator
+ * [A_n + xi   -xi]
+ * [A_n        A_s]
+ * to the velocity variables in which
+ * A_i = C * thn + D_u*div(eta_i*thn*((grad+grad^T)-lambda_i*div*I))
+ */
+///{
+void computeVelocitySubBlockOnPatch(const SAMRAI::hier::Patch<NDIM>& patch,
+                                    const int A_un_idx,
+                                    const int A_us_idx,
+                                    const int un_idx,
+                                    const int us_idx,
+                                    const int thn_idx,
+                                    const int thn_nc_idx,
+                                    const int thn_sc_idx,
+                                    const MultiphaseParameters& params,
+                                    const double C,
+                                    const double D);
+
+void computeVelocitySubBlockOnPatch(const SAMRAI::hier::Patch<NDIM>& patch,
+                                    const int A_un_idx,
+                                    const int A_us_idx,
+                                    const int un_idx,
+                                    const int us_idx,
+                                    const int thn_idx,
+                                    const MultiphaseParameters& params,
+                                    const double C,
+                                    const double D);
+///}
 } // namespace multiphase
 
 #include "multiphase/private/fd_operators_inc.h"
