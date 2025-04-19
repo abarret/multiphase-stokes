@@ -212,15 +212,10 @@ main(int argc, char* argv[])
             ins_integrator->deallocatePatchData(EE_idx, coarsest_ln, finest_ln);
             next_viz_dump_time += viz_dump_time_interval;
         }
-        std::ofstream out("output");
+
         // Main time step loop
         while (!IBTK::rel_equal_eps(loop_time, time_end) && ins_integrator->stepsRemaining())
         {
-            out << "\n";
-            out << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-            out << "At beginning of timestep # " << iteration_num << "\n";
-            out << "Simulation time is " << loop_time << "\n";
-
             pout << "\n";
             pout << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
             pout << "At beginning of timestep # " << iteration_num << "\n";
@@ -235,13 +230,6 @@ main(int argc, char* argv[])
             pout << "Simulation time is " << loop_time << "\n";
             pout << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
             pout << "\n";
-
-            // ofstream output
-            out << "\n";
-            out << "At end       of timestep # " << iteration_num << "\n";
-            out << "Simulation time is " << loop_time << "\n";
-            out << "+++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-            out << "\n";
 
             iteration_num += 1;
             // At specified intervals, write visualization files

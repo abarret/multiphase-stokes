@@ -3,10 +3,7 @@ FluidSolver::initializePatchHierarchy(): tag_buffer = 1
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 0
 Simulation time is 0
-Conformation tensor is SPD
-Largest det:  1
-Smallest det: 1
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000481659
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000447129
 
 At end       of timestep # 0
 Simulation time is 0.0003125
@@ -16,10 +13,7 @@ Simulation time is 0.0003125
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 1
 Simulation time is 0.0003125
-Conformation tensor is SPD
-Largest det:  1.00018
-Smallest det: 1.00013
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000939465
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000864704
 
 At end       of timestep # 1
 Simulation time is 0.000625
@@ -29,10 +23,7 @@ Simulation time is 0.000625
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 2
 Simulation time is 0.000625
-Conformation tensor is SPD
-Largest det:  1.00041
-Smallest det: 1.0002
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00137499
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00124533
 
 At end       of timestep # 2
 Simulation time is 0.0009375
@@ -42,10 +33,7 @@ Simulation time is 0.0009375
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 3
 Simulation time is 0.0009375
-Conformation tensor is SPD
-Largest det:  1.00065
-Smallest det: 1.00029
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00178913
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00158903
 
 At end       of timestep # 3
 Simulation time is 0.00125
@@ -55,10 +43,7 @@ Simulation time is 0.00125
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 4
 Simulation time is 0.00125
-Conformation tensor is SPD
-Largest det:  1.0009
-Smallest det: 1.00034
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00218245
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00189826
 
 At end       of timestep # 4
 Simulation time is 0.0015625
