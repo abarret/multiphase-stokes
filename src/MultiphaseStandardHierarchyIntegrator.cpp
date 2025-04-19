@@ -194,9 +194,22 @@ MultiphaseStandardHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pat
     {
         d_Nn_old_var = new SideVariable<NDIM, double>(d_object_name + "::Nn");
         d_Ns_old_var = new SideVariable<NDIM, double>(d_object_name + "::Ns");
-        int Nn_idx, Ns_idx;
-        registerVariable(Nn_idx, d_Nn_old_var, 0, getCurrentContext());
-        registerVariable(Ns_idx, d_Ns_old_var, 0, getCurrentContext());
+        int Nn_old_cur_idx, Nn_old_new_idx, Nn_old_scr_idx;
+        int Ns_old_cur_idx, Ns_old_new_idx, Ns_old_scr_idx;
+        registerVariable(Nn_old_cur_idx,
+                         Nn_old_new_idx,
+                         Nn_old_scr_idx,
+                         d_Nn_old_var,
+                         1,
+                         "CONSERVATIVE_COARSEN",
+                         "CONSERVATIVE_LINEAR_REFINE");
+        registerVariable(Ns_old_cur_idx,
+                         Ns_old_new_idx,
+                         Ns_old_scr_idx,
+                         d_Ns_old_var,
+                         1,
+                         "CONSERVATIVE_COARSEN",
+                         "CONSERVATIVE_LINEAR_REFINE");
     }
 
     // We only register old velocity variables if we are using BDF2
@@ -206,11 +219,38 @@ MultiphaseStandardHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pat
         d_us_old_var = new SideVariable<NDIM, double>(d_object_name + "::us_old");
         d_fn_old_var = new SideVariable<NDIM, double>(d_object_name + "::fn_old");
         d_fs_old_var = new SideVariable<NDIM, double>(d_object_name + "::fs_old");
-        int un_old_idx, us_old_idx, fn_old_idx, fs_old_idx;
-        registerVariable(un_old_idx, d_un_old_var, 0, getCurrentContext());
-        registerVariable(us_old_idx, d_us_old_var, 0, getCurrentContext());
-        registerVariable(fn_old_idx, d_fn_old_var, 0, getCurrentContext());
-        registerVariable(fs_old_idx, d_fs_old_var, 0, getCurrentContext());
+        int un_old_cur_idx, un_old_new_idx, un_old_scr_idx;
+        int us_old_cur_idx, us_old_new_idx, us_old_scr_idx;
+        int fn_old_cur_idx, fn_old_new_idx, fn_old_scr_idx;
+        int fs_old_cur_idx, fs_old_new_idx, fs_old_scr_idx;
+        registerVariable(un_old_cur_idx,
+                         un_old_new_idx,
+                         un_old_scr_idx,
+                         d_un_old_var,
+                         1,
+                         "CONSERVATIVE_COARSEN",
+                         "CONSERVATIVE_LINEAR_REFINE");
+        registerVariable(us_old_cur_idx,
+                         us_old_new_idx,
+                         us_old_scr_idx,
+                         d_us_old_var,
+                         1,
+                         "CONSERVATIVE_COARSEN",
+                         "CONSERVATIVE_LINEAR_REFINE");
+        registerVariable(fn_old_cur_idx,
+                         fn_old_new_idx,
+                         fn_old_scr_idx,
+                         d_fn_old_var,
+                         1,
+                         "CONSERVATIVE_COARSEN",
+                         "CONSERVATIVE_LINEAR_REFINE");
+        registerVariable(fs_old_cur_idx,
+                         fs_old_new_idx,
+                         fs_old_scr_idx,
+                         d_fs_old_var,
+                         1,
+                         "CONSERVATIVE_COARSEN",
+                         "CONSERVATIVE_LINEAR_REFINE");
     }
 
     // Note that we MUST create the convective operators here because they require large ghost cell widths. The maximum
@@ -710,18 +750,18 @@ MultiphaseStandardHierarchyIntegrator::postprocessIntegrateHierarchy(const doubl
     if (!d_creeping_flow && is_multistep_time_stepping_type(d_convective_time_stepping_type))
     {
         auto var_db = VariableDatabase<NDIM>::getDatabase();
-        const int Nn_old_idx = var_db->mapVariableAndContextToIndex(d_Nn_old_var, getCurrentContext());
-        const int Ns_old_idx = var_db->mapVariableAndContextToIndex(d_Ns_old_var, getCurrentContext());
+        const int Nn_old_idx = var_db->mapVariableAndContextToIndex(d_Nn_old_var, getNewContext());
+        const int Ns_old_idx = var_db->mapVariableAndContextToIndex(d_Ns_old_var, getNewContext());
         d_convec_op->fillWithConvectiveOperator(Nn_old_idx, Ns_old_idx);
     }
 
     if (d_viscous_ts_type == TimeSteppingType::BDF2)
     {
         auto var_db = VariableDatabase<NDIM>::getDatabase();
-        const int un_old_idx = var_db->mapVariableAndContextToIndex(d_un_old_var, getCurrentContext());
-        const int us_old_idx = var_db->mapVariableAndContextToIndex(d_us_old_var, getCurrentContext());
-        const int fn_old_idx = var_db->mapVariableAndContextToIndex(d_fn_old_var, getCurrentContext());
-        const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getCurrentContext());
+        const int un_old_idx = var_db->mapVariableAndContextToIndex(d_un_old_var, getNewContext());
+        const int us_old_idx = var_db->mapVariableAndContextToIndex(d_us_old_var, getNewContext());
+        const int fn_old_idx = var_db->mapVariableAndContextToIndex(d_fn_old_var, getNewContext());
+        const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getNewContext());
         const int un_cur_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
         const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
         const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
