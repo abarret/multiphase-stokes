@@ -265,7 +265,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     }
 
     // Remove contributions of nullspace
-    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
+    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullSpaceBasisVectors();
     for (const auto& null_vec : null_vecs)
     {
         const double dot_prod = x.dot(null_vec);

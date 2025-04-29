@@ -371,7 +371,7 @@ main(int argc, char* argv[])
                                           fac_precondition_strategy,
                                           app_initializer->getComponentDatabase("KrylovPrecond"),
                                           "Krylov_precond_");
-            Krylov_precond->setNullspace(false, null_vecs);
+            Krylov_precond->setNullSpace(false, null_vecs);
             krylov_solver->setPreconditioner(Krylov_precond);
         }
         else if (use_precond && precond_type == PreconditionerType::BLOCK)
@@ -381,7 +381,7 @@ main(int argc, char* argv[])
                     "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"));
             precond->setThnIdx(thn_cc_idx);
             precond->setCAndDCoefficients(C, D);
-            precond->setNullspace(false, null_vecs);
+            precond->setNullSpace(false, null_vecs);
 
             krylov_solver->setPreconditioner(precond);
         }
@@ -467,6 +467,21 @@ main(int argc, char* argv[])
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
         HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(
             patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
+        std::vector<double> norms;
+        norms.push_back(hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx));
+        norms.push_back(hier_sc_data_ops.L2Norm(e_un_sc_idx, wgt_sc_idx));
+        norms.push_back(hier_sc_data_ops.maxNorm(e_un_sc_idx, wgt_sc_idx));
+        norms.push_back(hier_sc_data_ops.L1Norm(e_us_sc_idx, wgt_sc_idx));
+        norms.push_back(hier_sc_data_ops.L2Norm(e_us_sc_idx, wgt_sc_idx));
+        norms.push_back(hier_sc_data_ops.maxNorm(e_us_sc_idx, wgt_sc_idx));
+        norms.push_back(hier_cc_data_ops.L1Norm(e_cc_idx, wgt_cc_idx));
+        norms.push_back(hier_cc_data_ops.L2Norm(e_cc_idx, wgt_cc_idx));
+        norms.push_back(hier_cc_data_ops.maxNorm(e_cc_idx, wgt_cc_idx));
+        for (const auto& val : norms)
+        {
+            pout << val << " ";
+        }
+        pout << "\n";
 
         pout << "Error in u_n :\n"
              << "  L1-norm:  " << std::setprecision(10) << hier_sc_data_ops.L1Norm(e_un_sc_idx, wgt_sc_idx) << "\n"

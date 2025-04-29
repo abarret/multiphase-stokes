@@ -371,10 +371,10 @@ main(int argc, char* argv[])
                                       app_initializer->getComponentDatabase("KrylovPrecond"),
                                       "Krylov_precond_");
         bool use_precond = input_db->getBool("USE_PRECOND");
-        Krylov_precond->setNullspace(false, null_vecs);
+        Krylov_precond->setNullSpace(false, null_vecs);
         if (use_precond) krylov_solver->setPreconditioner(Krylov_precond);
 
-        krylov_solver->setNullspace(false, null_vecs);
+        krylov_solver->setNullSpace(false, null_vecs);
         krylov_solver->initializeSolverState(u_vec, f_vec);
         // We need to set thn_cc_idx on the dense hierarchy.
         // TODO: find a better way to do this
