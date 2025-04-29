@@ -469,7 +469,7 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
 
     d_stokes_solver->setSolutionTime(new_time);
     d_stokes_solver->setTimeInterval(current_time, new_time);
-    d_stokes_solver->setNullspace(false, d_nul_vecs);
+    d_stokes_solver->setNullSpace(false, d_nul_vecs);
     d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
 
     // Set thn_cc_idx on the dense hierarchy.
@@ -946,7 +946,7 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
         d_block_precond = new MultiphaseStaggeredStokesBlockPreconditioner("KrylovPrecondStrategy", params, input_db);
         d_block_precond->setThnIdx(thn_idx);
         d_block_precond->setCAndDCoefficients(C, D);
-        d_block_precond->setNullspace(false, null_vecs);
+        d_block_precond->setNullSpace(false, null_vecs);
         break;
     }
     case PreconditionerType::MULTIGRID:
@@ -958,7 +958,7 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
         d_fac_op->setCandDCoefficients(C, D);
         d_fac_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);
         d_fac_precond = new FullFACPreconditioner("KrylovPrecond", d_fac_op, input_db, "Krylov_precond_");
-        d_fac_precond->setNullspace(false, null_vecs);
+        d_fac_precond->setNullSpace(false, null_vecs);
         break;
     }
     default:
