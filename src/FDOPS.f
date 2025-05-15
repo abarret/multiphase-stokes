@@ -100,9 +100,9 @@ c
 c   
       integer i0, i1
 c
-      dx_dx = dx(0) * dx(0)
-      dy_dy = dx(1) * dx(1)
-      dx_dy = dx(0) * dx(1)
+      dx_dx = 1.d0 / (dx(0) * dx(0))
+      dy_dy = 1.d0 / (dx(1) * dx(1))
+      dx_dy = 1.d0 / (dx(0) * dx(1))
 
 c     Loop over side-centers in x-dir
       do i1 = ilow1, iup1 
@@ -118,22 +118,22 @@ c     Loop over side-centers in x-dir
      &                   +thn_data(i0,i1-1) + thn_data(i0-1,i1-1))   ! thn(i-1/2, j-1/2)
 
           ! components of first row (x-component of velocity) of network equation
-          ddx_Thn_dx_un = ((2.d0*eta_n-l_n) / dx_dx) *
+          ddx_Thn_dx_un = ((2.d0*eta_n-l_n) * dx_dx) *
      &        (thn_data(i0,i1) *
      &              (un_data_0(i0+1,i1)-un_data_0(i0,i1)) 
      &       -thn_data(i0-1,i1) *
      &              (un_data_0(i0,i1)-un_data_0(i0-1,i1)))
-          ddy_Thn_dy_un = (eta_n / dy_dy) *
+          ddy_Thn_dy_un = (eta_n * dy_dy) *
      &        (thn_imh_jph * 
      &              (un_data_0(i0,i1+1) - un_data_0(i0,i1))
      &       -thn_imh_jmh * 
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
-          ddy_Thn_dx_vn = (eta_n / dx_dy) *
+          ddy_Thn_dx_vn = (eta_n * dx_dy) *
      &        (thn_imh_jph *
      &              (un_data_1(i0,i1+1)-un_data_1(i0-1,i1+1))
      &       -thn_imh_jmh *
      &              (un_data_1(i0,i1)-un_data_1(i0-1,i1)))
-          ddx_Thn_dy_vn = -(l_n / dx_dy) *
+          ddx_Thn_dy_vn = -(l_n * dx_dy) *
      &        (thn_data(i0,i1) *
      &              (un_data_1(i0,i1+1)-un_data_1(i0,i1))
      &        -thn_data(i0-1,i1) *
@@ -146,22 +146,22 @@ c     Loop over side-centers in x-dir
      &              + C * thn_lower_x * un_data_0(i0,i1)
 
           ! Solvent equation
-          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) / dx_dx) *
+          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) * dx_dx) *
      &        (toThs(thn_data(i0,i1)) *
      &              (us_data_0(i0+1,i1)-us_data_0(i0,i1)) 
      &       - toThs(thn_data(i0-1,i1)) *
      &              (us_data_0(i0,i1)-us_data_0(i0-1,i1)))
-          ddy_Ths_dy_us = (eta_s / dy_dy) *
+          ddy_Ths_dy_us = (eta_s * dy_dy) *
      &        (toThs(thn_imh_jph) * 
      &              (us_data_0(i0,i1+1) - us_data_0(i0,i1))
      &       - toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
-          ddy_Ths_dx_vs = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s * dx_dy) *
      &        (toThs(thn_imh_jph) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0-1,i1+1))
      &       - toThs(thn_imh_jmh) *
      &              (us_data_1(i0,i1)-us_data_1(i0-1,i1)))
-          ddx_Ths_dy_vs = -(l_s / dx_dy) *
+          ddx_Ths_dy_vs = -(l_s * dx_dy) *
      &        (toThs(thn_data(i0,i1)) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0,i1))
      &       - toThs(thn_data(i0-1,i1)) *
@@ -190,25 +190,25 @@ c
      &                   +thn_data(i0+1,i1) + thn_data(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
 
           ! components of second row (y-component of network vel) of network equation
-          ddy_Thn_dy_un = ((2.d0*eta_n-l_n) / dy_dy) *
+          ddy_Thn_dy_un = ((2.d0*eta_n-l_n) * dy_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_1(i0,i1+1) - un_data_1(i0,i1)) -
      &          thn_data(i0,i1-1) * 
      &              (un_data_1(i0,i1) - un_data_1(i0,i1-1)))
 
-          ddx_Thn_dx_un = (eta_n / dx_dx) *
+          ddx_Thn_dx_un = (eta_n * dx_dx) *
      &         (thn_iph_jmh * 
      &              (un_data_1(i0+1,i1) - un_data_1(i0,i1)) -
      &          thn_imh_jmh * 
      &              (un_data_1(i0,i1) - un_data_1(i0-1,i1)))
 
-          ddx_Thn_dy_vn = (eta_n / dx_dy) *
+          ddx_Thn_dy_vn = (eta_n * dx_dy) *
      &         (thn_iph_jmh * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0+1,i1-1)) -
      &         thn_imh_jmh * 
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1))) 
           
-          ddy_Thn_dx_vn = -(l_n / dx_dy) *
+          ddy_Thn_dx_vn = -(l_n * dx_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0,i1)) -
      &          thn_data(i0,i1-1) * 
@@ -222,25 +222,25 @@ c
      &         + C * thn_lower_y * un_data_1(i0,i1) 
           
           ! Solvent equation
-          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) / dy_dy) *
+          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) * dy_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_1(i0,i1+1) - us_data_1(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
      &              (us_data_1(i0,i1) - us_data_1(i0,i1-1)))
 
-          ddy_Ths_dy_us = (eta_s / dx_dx) *
+          ddy_Ths_dy_us = (eta_s * dx_dx) *
      &         (toThs(thn_iph_jmh) * 
      &              (us_data_1(i0+1,i1) - us_data_1(i0,i1)) -
      &          toThs(thn_imh_jmh) * 
      &              (us_data_1(i0,i1) - us_data_1(i0-1,i1)))
 
-          ddy_Ths_dx_vs = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s * dx_dy) *
      &         (toThs(thn_iph_jmh) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0+1,i1-1)) -
      &         toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
           
-          ddx_Ths_dy_vs = -(l_s / dx_dy) *
+          ddx_Ths_dy_vs = -(l_s * dx_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
@@ -349,9 +349,9 @@ c
 c   
       integer i0, i1
 c
-      dx_dx = dx(0) * dx(0)
-      dy_dy = dx(1) * dx(1)
-      dx_dy = dx(0) * dx(1)
+      dx_dx = 1.d0 / (dx(0) * dx(0))
+      dy_dy = 1.d0 / (dx(1) * dx(1))
+      dx_dy = 1.d0 / (dx(0) * dx(1))
 
 c     Loop over side-centers in x-dir
       do i1 = ilow1, iup1 
@@ -365,22 +365,22 @@ c     Loop over side-centers in x-dir
           thn_imh_jmh = thn_nc_data(i0,i1)    ! Lower Left
 
           ! components of first row (x-component of velocity) of network equation
-          ddx_Thn_dx_un = ((2.d0*eta_n - l_n) / dx_dx) *
+          ddx_Thn_dx_un = ((2.d0*eta_n - l_n) * dx_dx) *
      &        (thn_data(i0,i1) *
      &              (un_data_0(i0+1,i1)-un_data_0(i0,i1)) 
      &       -thn_data(i0-1,i1) *
      &              (un_data_0(i0,i1)-un_data_0(i0-1,i1)))
-          ddy_Thn_dy_un = (eta_n / dy_dy) *
+          ddy_Thn_dy_un = (eta_n * dy_dy) *
      &        (thn_imh_jph * 
      &              (un_data_0(i0,i1+1) - un_data_0(i0,i1))
      &       -thn_imh_jmh * 
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
-          ddy_Thn_dx_vn = (eta_n / dx_dy) *
+          ddy_Thn_dx_vn = (eta_n * dx_dy) *
      &        (thn_imh_jph *
      &              (un_data_1(i0,i1+1)-un_data_1(i0-1,i1+1))
      &       -thn_imh_jmh *
      &              (un_data_1(i0,i1)-un_data_1(i0-1,i1)))
-          ddx_Thn_dy_vn = -(l_n / dx_dy) *
+          ddx_Thn_dy_vn = -(l_n * dx_dy) *
      &        (thn_data(i0,i1) *
      &              (un_data_1(i0,i1+1)-un_data_1(i0,i1))
      &        -thn_data(i0-1,i1) *
@@ -393,22 +393,22 @@ c     Loop over side-centers in x-dir
      &              + C * thn_lower_x * un_data_0(i0,i1)
 
           ! Solvent equation
-          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) / dx_dx) *
+          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) * dx_dx) *
      &        (toThs(thn_data(i0,i1)) *
      &              (us_data_0(i0+1,i1)-us_data_0(i0,i1)) 
      &       - toThs(thn_data(i0-1,i1)) *
      &              (us_data_0(i0,i1)-us_data_0(i0-1,i1)))
-          ddy_Ths_dy_us = (eta_s / dy_dy) *
+          ddy_Ths_dy_us = (eta_s * dy_dy) *
      &        (toThs(thn_imh_jph) * 
      &              (us_data_0(i0,i1+1) - us_data_0(i0,i1))
      &       - toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
-          ddy_Ths_dx_vs = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s * dx_dy) *
      &        (toThs(thn_imh_jph) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0-1,i1+1))
      &       - toThs(thn_imh_jmh) *
      &              (us_data_1(i0,i1)-us_data_1(i0-1,i1)))
-          ddx_Ths_dy_vs = -(l_s / dx_dy) *
+          ddx_Ths_dy_vs = -(l_s * dx_dy) *
      &        (toThs(thn_data(i0,i1)) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0,i1))
      &       - toThs(thn_data(i0-1,i1)) *
@@ -435,25 +435,25 @@ c
           thn_iph_jmh = thn_nc_data(i0+1,i1)    ! Lower Right
 
           ! components of second row (y-component of network vel) of network equation
-          ddy_Thn_dy_un = ((2.d0*eta_n-l_n) / dy_dy) *
+          ddy_Thn_dy_un = ((2.d0*eta_n-l_n) * dy_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_1(i0,i1+1) - un_data_1(i0,i1)) -
      &          thn_data(i0,i1-1) * 
      &              (un_data_1(i0,i1) - un_data_1(i0,i1-1)))
 
-          ddx_Thn_dx_un = (eta_n / dx_dx) *
+          ddx_Thn_dx_un = (eta_n * dx_dx) *
      &         (thn_iph_jmh * 
      &              (un_data_1(i0+1,i1) - un_data_1(i0,i1)) -
      &          thn_imh_jmh * 
      &              (un_data_1(i0,i1) - un_data_1(i0-1,i1)))
 
-          ddx_Thn_dy_vn = (eta_n / dx_dy) *
+          ddx_Thn_dy_vn = (eta_n * dx_dy) *
      &         (thn_iph_jmh * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0+1,i1-1)) -
      &         thn_imh_jmh * 
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
           
-          ddy_Thn_dx_vn = -(l_n / dx_dy) *
+          ddy_Thn_dx_vn = -(l_n * dx_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0,i1)) -
      &          thn_data(i0,i1-1) * 
@@ -467,25 +467,25 @@ c
      &         + C * thn_lower_y * un_data_1(i0,i1)
           
           ! Solvent equation
-          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) / dy_dy) *
+          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) * dy_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_1(i0,i1+1) - us_data_1(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
      &              (us_data_1(i0,i1) - us_data_1(i0,i1-1)))
 
-          ddy_Ths_dy_us = (eta_s / dx_dx) *
+          ddy_Ths_dy_us = (eta_s * dx_dx) *
      &         (toThs(thn_iph_jmh) * 
      &              (us_data_1(i0+1,i1) - us_data_1(i0,i1)) -
      &          toThs(thn_imh_jmh) * 
      &              (us_data_1(i0,i1) - us_data_1(i0-1,i1)))
 
-          ddy_Ths_dx_vs = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s * dx_dy) *
      &         (toThs(thn_iph_jmh) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0+1,i1-1)) -
      &         toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
           
-          ddx_Ths_dy_vs = -(l_s / dx_dy) *
+          ddx_Ths_dy_vs = -(l_s * dx_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
@@ -594,9 +594,9 @@ c
 c   
       integer i0, i1
 c
-      dx_dx = dx(0) * dx(0)
-      dy_dy = dx(1) * dx(1)
-      dx_dy = dx(0) * dx(1)
+      dx_dx = 1.d0 / (dx(0) * dx(0))
+      dy_dy = 1.d0 / (dx(1) * dx(1))
+      dx_dy = 1.d0 / (dx(0) * dx(1))
 
 c     Loop over side-centers in x-dir
       do i1 = ilow1, iup1 
@@ -612,22 +612,22 @@ c     Loop over side-centers in x-dir
      &                   +thn_data(i0,i1-1) + thn_data(i0-1,i1-1))   ! thn(i-1/2, j-1/2)
 
           ! components of first row (x-component of velocity) of network equation
-          ddx_Thn_dx_un = ((2.d0*eta_n-l_n) / dx_dx) *
+          ddx_Thn_dx_un = ((2.d0*eta_n-l_n) * dx_dx) *
      &        (thn_data(i0,i1) *
      &              (un_data_0(i0+1,i1)-un_data_0(i0,i1)) 
      &       -thn_data(i0-1,i1) *
      &              (un_data_0(i0,i1)-un_data_0(i0-1,i1)))
-          ddy_Thn_dy_un = (eta_n / dy_dy) *
+          ddy_Thn_dy_un = (eta_n * dy_dy) *
      &        (thn_imh_jph * 
      &              (un_data_0(i0,i1+1) - un_data_0(i0,i1))
      &       -thn_imh_jmh * 
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
-          ddy_Thn_dx_vn = (eta_n / dx_dy) *
+          ddy_Thn_dx_vn = (eta_n * dx_dy) *
      &        (thn_imh_jph *
      &              (un_data_1(i0,i1+1)-un_data_1(i0-1,i1+1))
      &       -thn_imh_jmh *
      &              (un_data_1(i0,i1)-un_data_1(i0-1,i1)))
-          ddx_Thn_dy_vn = -(l_n / dx_dy) *
+          ddx_Thn_dy_vn = -(l_n * dx_dy) *
      &        (thn_data(i0,i1) *
      &              (un_data_1(i0,i1+1)-un_data_1(i0,i1))
      &        -thn_data(i0-1,i1) *
@@ -641,22 +641,22 @@ c     Loop over side-centers in x-dir
      &              + C * thn_lower_x * un_data_0(i0,i1)
 
           ! Solvent equation
-          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) / dx_dx) *
+          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) * dx_dx) *
      &        (toThs(thn_data(i0,i1)) *
      &              (us_data_0(i0+1,i1)-us_data_0(i0,i1)) 
      &       - toThs(thn_data(i0-1,i1)) *
      &              (us_data_0(i0,i1)-us_data_0(i0-1,i1)))
-          ddy_Ths_dy_us = (eta_s / dy_dy) *
+          ddy_Ths_dy_us = (eta_s * dy_dy) *
      &        (toThs(thn_imh_jph) * 
      &              (us_data_0(i0,i1+1) - us_data_0(i0,i1))
      &       - toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
-          ddy_Ths_dx_vs = (eta_s / dx_dy) *
+          ddy_Ths_dx_vs = (eta_s * dx_dy) *
      &        (toThs(thn_imh_jph) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0-1,i1+1))
      &       - toThs(thn_imh_jmh) *
      &              (us_data_1(i0,i1)-us_data_1(i0-1,i1)))
-          ddx_Ths_dy_vs = -(l_s / dx_dy) *
+          ddx_Ths_dy_vs = -(l_s * dx_dy) *
      &        (toThs(thn_data(i0,i1)) *
      &              (us_data_1(i0,i1+1)-us_data_1(i0,i1))
      &       - toThs(thn_data(i0-1,i1)) *
@@ -685,25 +685,25 @@ c
      &                   +thn_data(i0+1,i1) + thn_data(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
 
           ! components of second row (y-component of network vel) of network equation
-          ddy_Thn_dy_un = (2.d0*eta_n-l_n) / dx_dx *
+          ddy_Thn_dy_un = (2.d0*eta_n-l_n) * dx_dx *
      &         (thn_data(i0,i1) * 
      &              (un_data_1(i0,i1+1) - un_data_1(i0,i1)) -
      &          thn_data(i0,i1-1) * 
      &              (un_data_1(i0,i1) - un_data_1(i0,i1-1)))
 
-          ddx_Thn_dx_un = (eta_n / dy_dy) *
+          ddx_Thn_dx_un = (eta_n * dy_dy) *
      &         (thn_iph_jmh * 
      &              (un_data_1(i0+1,i1) - un_data_1(i0,i1)) -
      &          thn_imh_jmh * 
      &              (un_data_1(i0,i1) - un_data_1(i0-1,i1)))
 
-          ddx_Thn_dy_vn = (eta_n / dx_dy) *
+          ddx_Thn_dy_vn = (eta_n * dx_dy) *
      &         (thn_iph_jmh * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0+1,i1-1)) -
      &         thn_imh_jmh * 
      &              (un_data_0(i0,i1) - un_data_0(i0,i1-1)))
           
-          ddy_Thn_dx_vn = -(l_n / dx_dy) *
+          ddy_Thn_dx_vn = -(l_n * dx_dy) *
      &         (thn_data(i0,i1) * 
      &              (un_data_0(i0+1,i1) - un_data_0(i0,i1)) -
      &          thn_data(i0,i1-1) * 
@@ -717,25 +717,25 @@ c
      &         + C * thn_lower_y * un_data_1(i0,i1) 
           
           ! Solvent equation
-          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) / dy_dy) *
+          ddx_Ths_dx_us = ((2.d0*eta_s-l_s) * dy_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_1(i0,i1+1) - us_data_1(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
      &              (us_data_1(i0,i1) - us_data_1(i0,i1-1)))
 
-          ddy_Ths_dy_us = (eta_s / dx_dx) *
+          ddy_Ths_dy_us = (eta_s * dx_dx) *
      &         (toThs(thn_iph_jmh) * 
      &              (us_data_1(i0+1,i1) - us_data_1(i0,i1)) -
      &          toThs(thn_imh_jmh) * 
      &              (us_data_1(i0,i1) - us_data_1(i0-1,i1)))
 
-          ddx_Ths_dy_vs = (eta_s / dx_dy) *
+          ddx_Ths_dy_vs = (eta_s * dx_dy) *
      &         (toThs(thn_iph_jmh) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0+1,i1-1)) -
      &         toThs(thn_imh_jmh) * 
      &              (us_data_0(i0,i1) - us_data_0(i0,i1-1)))
           
-          ddy_Ths_dx_vs = -(l_s / dx_dy) *
+          ddy_Ths_dx_vs = -(l_s * dx_dy) *
      &         (toThs(thn_data(i0,i1)) * 
      &              (us_data_0(i0+1,i1) - us_data_0(i0,i1)) -
      &          toThs(thn_data(i0,i1-1)) * 
