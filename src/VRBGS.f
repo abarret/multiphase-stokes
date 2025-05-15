@@ -80,9 +80,9 @@ c
 c
       integer i0, i1
 c
-      dx_dx = dx(0) * dx(0)
-      dy_dy = dx(1) * dx(1)
-      dx_dy = dx(0) * dx(1)
+      dx_dx = 1.d0 / (dx(0) * dx(0))
+      dy_dy = 1.d0 / (dx(1) * dx(1))
+      dx_dy = 1.d0 / (dx(0) * dx(1))
 c
 c     Loop over side-centers in x-dir
       do i1 = ilow1, iup1 
@@ -101,23 +101,23 @@ c
 
           ! solve for network velocities
           un_imhalf_j = f_un_data_0(i0,i1) - (D * eta_n * 
-     &      ((thn_imh_jph-thn_data(i0,i1))/(dx_dy) * un_data_1(i0,i1+1) 
-     &      + (thn_data(i0-1,i1))/(dx_dx) * un_data_0(i0-1,i1) 
-     &      + (thn_data(i0,i1)/dx_dx * un_data_0(i0+1,i1)) 
-     &      + (thn_imh_jph/dy_dy * un_data_0(i0,i1+1)) 
-     &      + (thn_imh_jmh/dy_dy * un_data_0(i0,i1-1))
-     &      + (thn_data(i0-1,i1) - thn_imh_jph)/(dx_dy) 
+     &      ((thn_imh_jph-thn_data(i0,i1)) * dx_dy * un_data_1(i0,i1+1) 
+     &      + (thn_data(i0-1,i1)) * dx_dx * un_data_0(i0-1,i1) 
+     &      + (thn_data(i0,i1) * dx_dx * un_data_0(i0+1,i1)) 
+     &      + (thn_imh_jph * dy_dy * un_data_0(i0,i1+1)) 
+     &      + (thn_imh_jmh * dy_dy * un_data_0(i0,i1-1))
+     &      + (thn_data(i0-1,i1) - thn_imh_jph) * dx_dy
      &             * un_data_1(i0-1,i1+1)
-     &      + (thn_imh_jmh - thn_data(i0-1,i1))/(dx_dy) 
+     &      + (thn_imh_jmh - thn_data(i0-1,i1)) * dx_dy
      &             * un_data_1(i0-1,i1)
-     &      + (thn_data(i0,i1)-thn_imh_jmh)/(dx_dy)
+     &      + (thn_data(i0,i1)-thn_imh_jmh) * dx_dy
      &             * un_data_1(i0,i1)) 
      &      + D * xi * us_data_0(i0,i1)
      &             * thn_lower_x * toThs(thn_lower_x))
 
           un_imhalf_j = un_imhalf_j/ (D * eta_n * 
-     &      (-(thn_data(i0,i1) + thn_data(i0-1,i1)) / (dx_dx) 
-     &      - (thn_imh_jph + thn_imh_jmh) / (dy_dy)) 
+     &      (-(thn_data(i0,i1) + thn_data(i0-1,i1)) * dx_dx
+     &      - (thn_imh_jph + thn_imh_jmh) * dy_dy)
      &      - D * xi * thn_lower_x * toThs(thn_lower_x)
      &      + C * thn_lower_x)
 
@@ -126,23 +126,23 @@ c
           ! solve for solvent velocities
           us_imhalf_j = f_us_data_0(i0,i1) 
      &     - (D * eta_s * (us_data_1(i0,i1+1) *
-     &      (toThs(thn_imh_jph) - toThs(thn_data(i0,i1))) / (dx_dy)
-     &      + (toThs(thn_data(i0-1,i1)))/(dx_dx) * us_data_0(i0-1,i1) 
-     &      + (toThs(thn_data(i0,i1))/dx_dx * us_data_0(i0+1,i1)) 
-     &      + (toThs(thn_imh_jph)/dy_dy * us_data_0(i0,i1+1)) 
-     &      + (toThs(thn_imh_jmh)/dy_dy * us_data_0(i0,i1-1))
-     &      + (toThs(thn_data(i0-1,i1))-toThs(thn_imh_jph))/(dx_dy)
+     &      (toThs(thn_imh_jph) - toThs(thn_data(i0,i1))) * dx_dy
+     &      + (toThs(thn_data(i0-1,i1))) * dx_dx * us_data_0(i0-1,i1) 
+     &      + (toThs(thn_data(i0,i1)) * dx_dx * us_data_0(i0+1,i1)) 
+     &      + (toThs(thn_imh_jph) * dy_dy * us_data_0(i0,i1+1)) 
+     &      + (toThs(thn_imh_jmh) * dy_dy * us_data_0(i0,i1-1))
+     &      + (toThs(thn_data(i0-1,i1))-toThs(thn_imh_jph)) * dx_dy
      &             * us_data_1(i0-1,i1+1)
-     &      + (toThs(thn_imh_jmh)-toThs(thn_data(i0-1,i1)))/(dx_dy) 
+     &      + (toThs(thn_imh_jmh)-toThs(thn_data(i0-1,i1))) * dx_dy
      &             * us_data_1(i0-1,i1)
-     &      + (toThs(thn_data(i0,i1))-toThs(thn_imh_jmh))/(dx_dy) 
+     &      + (toThs(thn_data(i0,i1))-toThs(thn_imh_jmh)) * dx_dy
      &             * us_data_1(i0,i1)) 
      &      + D * xi * un_data_0(i0,i1) * thn_lower_x
      &             * toThs(thn_lower_x))
 
           us_imhalf_j = us_imhalf_j/(D * eta_s * 
-     &      (-(toThs(thn_data(i0,i1))+toThs(thn_data(i0-1,i1)))/(dx_dx) 
-     &       - (toThs(thn_imh_jph) + toThs(thn_imh_jmh)) / (dy_dy)) 
+     &      (-(toThs(thn_data(i0,i1))+toThs(thn_data(i0-1,i1))) * dx_dx
+     &       - (toThs(thn_imh_jph) + toThs(thn_imh_jmh)) * dy_dy) 
      &       - D * xi * thn_lower_x * toThs(thn_lower_x)
      &       + C * toThs(thn_lower_x))
 
@@ -167,24 +167,24 @@ c
 
           ! solve for network velocities
           un_i_jmhalf = f_un_data_1(i0,i1) - (D * eta_n 
-     &       * ((thn_imh_jmh/dx_dx) * un_data_1(i0-1,i1)
-     &       + (thn_iph_jmh/dx_dx) * un_data_1(i0+1,i1)
-     &       + (thn_data(i0,i1)/dy_dy) * un_data_1(i0,i1+1)
-     &       + (thn_data(i0,i1-1)/dy_dy) * un_data_1(i0,i1-1)
-     &       + (thn_imh_jmh - thn_data(i0,i1-1))/(dx_dy) 
+     &       * ((thn_imh_jmh*dx_dx) * un_data_1(i0-1,i1)
+     &       + (thn_iph_jmh*dx_dx) * un_data_1(i0+1,i1)
+     &       + (thn_data(i0,i1) * dy_dy) * un_data_1(i0,i1+1)
+     &       + (thn_data(i0,i1-1) * dy_dy) * un_data_1(i0,i1-1)
+     &       + (thn_imh_jmh - thn_data(i0,i1-1)) * dx_dy
      &             * un_data_0(i0,i1-1)
-     &       + (thn_data(i0,i1-1) - thn_iph_jmh)/(dx_dy) 
+     &       + (thn_data(i0,i1-1) - thn_iph_jmh) * dx_dy
      &             * un_data_0(i0+1,i1-1)
-     &       + (thn_data(i0,i1) - thn_imh_jmh)/(dx_dy)
+     &       + (thn_data(i0,i1) - thn_imh_jmh) * dx_dy
      &             * un_data_0(i0,i1)
-     &       + (thn_iph_jmh - thn_data(i0,i1))/(dx_dy) 
+     &       + (thn_iph_jmh - thn_data(i0,i1)) * dx_dy
      &             * un_data_0(i0+1,i1)) 
      &       + D * xi * us_data_1(i0,i1)
      &            * thn_lower_y * toThs(thn_lower_y))
 
           un_i_jmhalf = un_i_jmhalf/ (D * eta_n *
-     &       (-(thn_data(i0,i1) + thn_data(i0,i1-1)) / (dy_dy) 
-     &       - (thn_iph_jmh + thn_imh_jmh) / (dx_dx)) 
+     &       (-(thn_data(i0,i1) + thn_data(i0,i1-1)) * dy_dy
+     &       - (thn_iph_jmh + thn_imh_jmh)  * dx_dx)
      &       - D * xi * thn_lower_y * toThs(thn_lower_y)
      &       + C * thn_lower_y)
 
@@ -192,24 +192,24 @@ c
 
           ! solve for solvent velocities
           us_i_jmhalf = f_us_data_1(i0,i1) - (D * eta_s 
-     &       * ((toThs(thn_imh_jmh)/dx_dx) * us_data_1(i0-1,i1)
-     &       + (toThs(thn_iph_jmh)/dx_dx) * us_data_1(i0+1,i1)
-     &       + (toThs(thn_data(i0,i1))/dy_dy) * us_data_1(i0,i1+1)
-     &       + (toThs(thn_data(i0,i1-1))/dy_dy) * us_data_1(i0,i1-1)
-     &       + (toThs(thn_imh_jmh) - toThs(thn_data(i0,i1-1)))/(dx_dy) 
+     &       * ((toThs(thn_imh_jmh) * dx_dx) * us_data_1(i0-1,i1)
+     &       + (toThs(thn_iph_jmh) * dx_dx) * us_data_1(i0+1,i1)
+     &       + (toThs(thn_data(i0,i1)) * dy_dy) * us_data_1(i0,i1+1)
+     &       + (toThs(thn_data(i0,i1-1)) * dy_dy) * us_data_1(i0,i1-1)
+     &       + (toThs(thn_imh_jmh) - toThs(thn_data(i0,i1-1))) * dx_dy
      &             * us_data_0(i0,i1-1)
-     &       + (toThs(thn_data(i0,i1-1)) - toThs(thn_iph_jmh))/(dx_dy) 
+     &       + (toThs(thn_data(i0,i1-1)) - toThs(thn_iph_jmh)) * dx_dy
      &             * us_data_0(i0+1,i1-1)
-     &       + (toThs(thn_data(i0,i1)) - toThs(thn_imh_jmh))/(dx_dy)
+     &       + (toThs(thn_data(i0,i1)) - toThs(thn_imh_jmh)) * dx_dy
      &             * us_data_0(i0,i1)
-     &       + (toThs(thn_iph_jmh) - toThs(thn_data(i0,i1)))/(dx_dy) 
+     &       + (toThs(thn_iph_jmh) - toThs(thn_data(i0,i1))) * dx_dy
      &             * us_data_0(i0+1,i1)) 
      &       + D * xi * un_data_1(i0,i1)
      &            * thn_lower_y * toThs(thn_lower_y))
 
           us_i_jmhalf = us_i_jmhalf/ (D * eta_s * (
-     &       - (toThs(thn_data(i0,i1))+toThs(thn_data(i0,i1-1)))/dy_dy
-     &       - (toThs(thn_iph_jmh) + toThs(thn_imh_jmh)) / dx_dx)
+     &       - (toThs(thn_data(i0,i1))+toThs(thn_data(i0,i1-1)))*dy_dy
+     &       - (toThs(thn_iph_jmh) + toThs(thn_imh_jmh)) * dx_dx)
      &       - D * xi * thn_lower_y * toThs(thn_lower_y)
      &       + C * toThs(thn_lower_y))
 
@@ -281,9 +281,9 @@ c
       double precision ddy_Ths_dx_vs, ddx_Ths_dy_vs
       integer i0, i1
 c
-      dx_dx = dx(0) * dx(0)
-      dy_dy = dx(1) * dx(1)
-      dx_dy = dx(0) * dx(1)
+      dx_dx = 1.d0/(dx(0) * dx(0))
+      dy_dy = 1.d0/(dx(1) * dx(1))
+      dx_dy = 1.d0/(dx(0) * dx(1))
 c
 c     Loop over side-centers in x-dir
       do i1 = ilow1, iup1 
@@ -307,39 +307,39 @@ c
           ! solve for network velocities
            un_imhalf_j = f_un_0(i0,i1) - D*((2.d0*eta_n-l_n)
      &       * (thn(i0,i1) * un_0(i0+1,i1)
-     &         + thn(i0-1,i1) * un_0(i0-1,i1)) / dx_dx
+     &         + thn(i0-1,i1) * un_0(i0-1,i1)) * dx_dx
      &       + eta_n*(thn_imh_jph*un_0(i0,i1+1)
-     &         + thn_imh_jmh * un_0(i0,i1-1)) / dy_dy
+     &         + thn_imh_jmh * un_0(i0,i1-1)) * dy_dy
      &       + eta_n*(thn_imh_jph*(un_1(i0,i1+1)-un_1(i0-1,i1+1))
      &         - thn_imh_jmh*(un_1(i0,i1)-un_1(i0-1,i1))
-     &         ) / dx_dy
+     &         ) * dx_dy
      &       - l_n*(thn(i0,i1)*(un_1(i0,i1+1)-un_1(i0,i1))
      &         - thn(i0-1,i1)*(un_1(i0-1,i1+1)-un_1(i0-1,i1))
-     &         ) / dx_dy
+     &         ) * dx_dy
      &       + xi * us_0(i0,i1) * thn_lower_x * ths_lower_x)
            un_imhalf_j = un_imhalf_j / (C * thn_lower_x - D*(
-     &       (2.d0*eta_n-l_n) * (thn(i0,i1) + thn(i0-1,i1)) / dx_dx
-     &       +eta_n*(thn_imh_jph + thn_imh_jmh) / dy_dy
+     &       (2.d0*eta_n-l_n) * (thn(i0,i1) + thn(i0-1,i1)) * dx_dx
+     &       +eta_n*(thn_imh_jph + thn_imh_jmh) * dy_dy
      &       +xi*thn_lower_x * ths_lower_x))
      
            un_0(i0,i1) = (1.d0-w)*un_0(i0,i1) + w*un_imhalf_j
 
-           ddx_Thn_dx_un = ((2.d0*eta_n-l_n) / dx_dx) *
+           ddx_Thn_dx_un = ((2.d0*eta_n-l_n) * dx_dx) *
      &       (thn(i0,i1) *
      &          (un_0(i0+1,i1)-un_0(i0,i1)) 
      &       -thn(i0-1,i1) *
      &          (un_0(i0,i1)-un_0(i0-1,i1)))
-           ddy_Thn_dy_un = (eta_n / dy_dy) *
+           ddy_Thn_dy_un = (eta_n * dy_dy) *
      &       (thn_imh_jph * 
      &          (un_0(i0,i1+1) - un_0(i0,i1))
      &       -thn_imh_jmh * 
      &          (un_0(i0,i1) - un_0(i0,i1-1)))
-           ddy_Thn_dx_vn = (eta_n / dx_dy) *
+           ddy_Thn_dx_vn = (eta_n * dx_dy) *
      &       (thn_imh_jph *
      &          (un_1(i0,i1+1)-un_1(i0-1,i1+1))
      &       -thn_imh_jmh *
      &          (un_1(i0,i1)-un_1(i0-1,i1)))
-           ddx_Thn_dy_vn = -(l_n / dx_dy) *
+           ddx_Thn_dy_vn = -(l_n * dx_dy) *
      &       (thn(i0,i1) *
      &          (un_1(i0,i1+1)-un_1(i0,i1))
      &       -thn(i0-1,i1) *
@@ -351,18 +351,18 @@ c
 
            us_imhalf_j = f_us_0(i0,i1) - us_imhalf_j - D * (
      &       (2.d0*eta_s-l_s)*(toThs(thn(i0,i1))*us_0(i0+1,i1)
-     &       +toThs(thn(i0-1,i1))*us_0(i0-1,i1)) / dx_dx
+     &       +toThs(thn(i0-1,i1))*us_0(i0-1,i1)) * dx_dx
      &       + eta_s*(ths_imh_jph*us_0(i0,i1+1)
-     &          +ths_imh_jmh*us_0(i0,i1-1)) / dy_dy
+     &          +ths_imh_jmh*us_0(i0,i1-1)) * dy_dy
      &       + eta_s*(ths_imh_jph*(us_1(i0,i1+1)-us_1(i0-1,i1+1))
-     &         -ths_imh_jmh*(us_1(i0,i1)-us_1(i0-1,i1)))/dx_dy)
+     &         -ths_imh_jmh*(us_1(i0,i1)-us_1(i0-1,i1)))*dx_dy)
      &       - l_s*(toThs(thn(i0,i1))*(us_1(i0,i1+1)-us_1(i0,i1))
      &         -toThs(thn(i0-1,i1))*(us_1(i0-1,i1+1)-us_1(i0-1,i1))
-     &         ) / dx_dy
+     &         ) * dx_dy
      
            us_imhalf_j = us_imhalf_j / (C*ths_lower_x - D * (
      &       (2*eta_s-l_s)*(toThs(thn(i0,i1))+toThs(thn(i0-1,i1)))
-     &        / dx_dx + eta_s*(ths_imh_jph + ths_imh_jmh) / dy_dy))
+     &        * dx_dx + eta_s*(ths_imh_jph + ths_imh_jmh) * dy_dy))
 
            us_0(i0,i1) = (1.d0-w)*us_0(i0,i1) + w*us_imhalf_j
           end if
@@ -389,43 +389,43 @@ c
            ! solve for network velocities
            un_i_jmhalf = f_un_1(i0,i1) - D * (
      &       (2.d0*eta_n-l_n)*(thn(i0,i1)*un_1(i0,i1+1)
-     &          +thn(i0,i1-1)*un_1(i0,i1-1))/dy_dy               
+     &          +thn(i0,i1-1)*un_1(i0,i1-1))*dy_dy               
      &       + eta_n * (thn_iph_jmh*un_1(i0+1,i1) 
-     &          + thn_imh_jmh*un_1(i0-1,i1)) / dx_dx
+     &          + thn_imh_jmh*un_1(i0-1,i1)) * dx_dx
      &       + eta_n * (thn_iph_jmh*(un_0(i0+1,i1)-un_0(i0+1,i1-1))
-     &          - thn_imh_jmh*(un_0(i0,i1)-un_0(i0,i1-1))) / dx_dy
+     &          - thn_imh_jmh*(un_0(i0,i1)-un_0(i0,i1-1))) * dx_dy
      &       - l_n * (thn(i0,i1)*(un_0(i0+1,i1)-un_0(i0,i1))
      &          - thn(i0,i1-1)*(un_0(i0+1,i1-1)-un_0(i0,i1-1))
-     &          ) / dx_dy
+     &          ) * dx_dy
      &       + xi*un_1(i0,i1)*thn_lower_y*ths_lower_y)
 
            un_i_jmhalf = un_i_jmhalf / (C * thn_lower_y - D*(
-     &       eta_n*(thn_iph_jmh + thn_imh_jmh) / dx_dx
-     &       + (2.d0 * eta_n - l_n)*(thn(i0,i1)+thn(i0,i1-1)) / dy_dy
+     &       eta_n*(thn_iph_jmh + thn_imh_jmh) * dx_dx
+     &       + (2.d0 * eta_n - l_n)*(thn(i0,i1)+thn(i0,i1-1)) * dy_dy
      &       + xi*thn_lower_y*ths_lower_y))
      
            un_1(i0,i1) = (1.d0-w)*un_1(i0,i1) + w*un_i_jmhalf
 
            ! Solvent 
-           ddy_Thn_dy_un = ((2.d0*eta_n-l_n) / dy_dy) *
+           ddy_Thn_dy_un = ((2.d0*eta_n-l_n) * dy_dy) *
      &       (thn(i0,i1) * 
      &          (un_1(i0,i1+1) - un_1(i0,i1)) -
      &       thn(i0,i1-1) * 
      &          (un_1(i0,i1) - un_1(i0,i1-1)))
       
-           ddx_Thn_dx_un = (eta_n / dx_dx) *
+           ddx_Thn_dx_un = (eta_n * dx_dx) *
      &       (thn_iph_jmh * 
      &          (un_1(i0+1,i1) - un_1(i0,i1)) -
      &       thn_imh_jmh * 
      &          (un_1(i0,i1) - un_1(i0-1,i1)))
       
-           ddx_Thn_dy_vn = (eta_n / dx_dy) *
+           ddx_Thn_dy_vn = (eta_n * dx_dy) *
      &       (thn_iph_jmh * 
      &          (un_0(i0+1,i1) - un_0(i0+1,i1-1)) -
      &       thn_imh_jmh * 
      &          (un_0(i0,i1) - un_0(i0,i1-1))) 
                 
-           ddy_Thn_dx_vn = -(l_n / dx_dy) *
+           ddy_Thn_dx_vn = -(l_n * dx_dy) *
      &       (thn(i0,i1) * 
      &          (un_0(i0+1,i1) - un_0(i0,i1)) -
      &       thn(i0,i1-1) * 
@@ -437,20 +437,20 @@ c
 
            us_i_jmhalf = f_us_1(i0,i1) - us_i_jmhalf - D * (
      &       (2.d0*eta_s-l_s) * (toThs(thn(i0,i1))*us_1(i0,i1+1)
-     &         + toThs(thn(i0,i1-1))*us_1(i0,i1-1)) / dy_dy
+     &         + toThs(thn(i0,i1-1))*us_1(i0,i1-1)) * dy_dy
      &       + eta_s * (ths_iph_jmh*us_1(i0+1,i1) 
-     &         + ths_imh_jmh*us_1(i0-1,i1)) / dx_dx
+     &         + ths_imh_jmh*us_1(i0-1,i1)) * dx_dx
      &       + eta_s * (ths_iph_jmh * (us_0(i0+1,i1)-us_0(i0+1,i1-1))
-     &         - ths_imh_jmh*(us_0(i0,i1)-us_0(i0,i1-1)))/dx_dy
+     &         - ths_imh_jmh*(us_0(i0,i1)-us_0(i0,i1-1)))*dx_dy
      &       - l_s * (toThs(thn(i0,i1))*(us_0(i0+1,i1)-us_0(i0,i1))
      &         - toThs(thn(i0,i1-1))*(us_0(i0+1,i1-1)-us_0(i0,i1-1))
-     &         ) / dx_dy)
+     &         ) * dx_dy)
 
 
            us_i_jmhalf = us_i_jmhalf / (C*ths_lower_y - D * (
-     &       eta_s * (ths_iph_jmh + ths_imh_jmh) / dx_dx
+     &       eta_s * (ths_iph_jmh + ths_imh_jmh) * dx_dx
      &       + (2.d0*eta_s-l_s)
-     &         * (toThs(thn(i0,i1)) + toThs(thn(i0,i1-1))) / dy_dy))
+     &         * (toThs(thn(i0,i1)) + toThs(thn(i0,i1-1))) * dy_dy))
      
            us_1(i0,i1) = (1.d0-w)*us_1(i0,i1) + w*us_i_jmhalf
           end if
