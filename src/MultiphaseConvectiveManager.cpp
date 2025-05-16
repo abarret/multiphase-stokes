@@ -1,5 +1,3 @@
-
-// Local includes
 #include "multiphase/MultiphaseConvectiveManager.h"
 #include "multiphase/utility_functions.h"
 
@@ -212,19 +210,6 @@ get_limiter_gcw(IBAMR::LimiterType limiter)
     }
     // Should not reach this statement.
     return -1;
-}
-
-template <typename VarType>
-Pointer<VarType>
-get_var(const std::string& var_name)
-{
-    auto var_db = VariableDatabase<NDIM>::getDatabase();
-    Pointer<VarType> var;
-    if (var_db->checkVariableExists(var_name))
-        var = var_db->getVariable(var_name);
-    else
-        var = new VarType(var_name);
-    return var;
 }
 
 MultiphaseConvectiveManager::MultiphaseConvectiveManager(std::string object_name,

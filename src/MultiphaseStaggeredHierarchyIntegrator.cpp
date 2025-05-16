@@ -567,6 +567,10 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
     d_hierarchy = hierarchy;
     d_gridding_alg = gridding_alg;
 
+    // Set the correct boundary conditions. If we advect the volume fraction, then we overwrite this class's bc's with
+    // the integrators.
+    if (d_thn_integrator) d_thn_bc_coef = d_thn_integrator->getPhysicalBcCoefs(d_thn_cc_var)[0];
+
     // Here we do all we need to ensure that calls to advanceHierarchy() or integrateHierarchy() are valid.
     // NOTE: This function is called before the patch hierarchy has valid patch levels.
     // To set initial data, we should do this in initializeLevelDataSpecialized().
@@ -609,15 +613,32 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
                      "CONSERVATIVE_LINEAR_REFINE",
                      d_p_init_fcn);
 
+    // Setup the volume fraction managers
+    d_thn_cur_manager = std::make_unique<VolumeFractionDataManager>(
+        d_object_name + "::ThnCurManager", d_thn_cc_var, getCurrentContext(), d_thn_bc_coef, d_regularize_thn);
+    d_thn_scr_manager = std::make_unique<VolumeFractionDataManager>(
+        d_object_name + "::ThnScrManager", d_thn_cc_var, getScratchContext(), d_thn_bc_coef, d_regularize_thn);
+    d_thn_new_manager = std::make_unique<VolumeFractionDataManager>(
+        d_object_name + "::ThnNewManager", d_thn_cc_var, getNewContext(), d_thn_bc_coef, d_regularize_thn);
+
+    // Make sure the current data is maintained after regridding
+    const int thn_cur_idx = d_thn_cur_manager->getCellIndex();
+    Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
+    Pointer<RefineOperator<NDIM>> thn_refine_op =
+        grid_geom->lookupRefineOperator(d_thn_cur_manager->getCellVariable(), "CONSERVATIVE_LINEAR_REFINE");
+    d_fill_after_regrid_bc_idxs.setFlag(thn_cur_idx);
+    d_fill_after_regrid_prolong_alg.registerRefine(thn_cur_idx, thn_cur_idx, thn_cur_idx, thn_refine_op);
+
+    // Set the scratch and new indices according to be allocated with the corresponding context
+    d_scratch_data.setFlag(d_thn_scr_manager->getCellIndex());
+    d_new_data.setFlag(d_thn_new_manager->getCellIndex());
+
     // Everything else only gets a scratch context, which is deallocated at the end of each time step.
     // Note the forces need ghost cells for modifying the RHS to account for non-homogenous boundary conditions.
-    int thn_cur_idx, thn_scr_idx, thn_new_idx, f_p_idx, f_un_idx, f_us_idx, un_rhs_idx, us_rhs_idx, p_rhs_idx, xi_idx;
+    int f_p_idx, f_un_idx, f_us_idx, un_rhs_idx, us_rhs_idx, p_rhs_idx, xi_idx;
     registerVariable(f_p_idx, d_f_cc_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(f_un_idx, d_f_un_sc_var, IntVector<NDIM>(1), getCurrentContext());
     registerVariable(f_us_idx, d_f_us_sc_var, IntVector<NDIM>(1), getCurrentContext());
-    registerVariable(thn_cur_idx, d_thn_cc_var, IntVector<NDIM>(1), getCurrentContext());
-    registerVariable(thn_scr_idx, d_thn_cc_var, IntVector<NDIM>(1), getScratchContext());
-    registerVariable(thn_new_idx, d_thn_cc_var, IntVector<NDIM>(1), getNewContext());
     registerVariable(un_rhs_idx, d_un_rhs_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(us_rhs_idx, d_us_rhs_var, IntVector<NDIM>(1), getScratchContext());
     registerVariable(p_rhs_idx, d_p_rhs_var, IntVector<NDIM>(1), getScratchContext());
@@ -680,12 +701,9 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
 
         // Only need to plot this variable if we aren't advecting it.
         // If we do advect theta, the advection integrator will plot it.
-        if (d_thn_fcn) d_visit_writer->registerPlotQuantity("Thn", "SCALAR", thn_cur_idx, 0, 1.0, "CELL");
+        if (d_thn_fcn)
+            d_visit_writer->registerPlotQuantity("Thn", "SCALAR", d_thn_cur_manager->getCellIndex(), 0, 1.0, "CELL");
     }
-
-    // Set the correct boundary conditions. If we advect the volume fraction, then we overwrite this class's bc's with
-    // the integrators.
-    if (d_thn_integrator) d_thn_bc_coef = d_thn_integrator->getPhysicalBcCoefs(d_thn_cc_var)[0];
 
     // Create the hierarchy data operations
     auto hier_ops_manager = HierarchyDataOpsManager<NDIM>::getManager();
@@ -724,22 +742,27 @@ MultiphaseStaggeredHierarchyIntegrator::initializeLevelDataSpecialized(Pointer<B
 
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         const int grad_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_thn_var, getCurrentContext());
-        const int thn_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+        const int thn_cur_idx = d_thn_cur_manager->getCellIndex();
+        new_level->allocatePatchData(thn_cur_idx, init_data_time);
+        Pointer<CellVariable<NDIM, double>> thn_cur_var = d_thn_cur_manager->getCellVariable();
 
         // Fill in with initial conditions.
-        d_thn_init_fcn->setDataOnPatchLevel(thn_idx, d_thn_cc_var, new_level, init_data_time, initial_time);
+        // NOTE: We cannot use the VolumeFractionDataManager here because it can't set values on a given level.
+        d_thn_init_fcn->setDataOnPatchLevel(thn_cur_idx, thn_cur_var, new_level, init_data_time, initial_time);
 
         // Now fill in ghost cells
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
         std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
+        ghost_cell_comp[0] =
+            ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
 
         Pointer<HierarchyGhostCellInterpolation> ghost_cell_fill = new HierarchyGhostCellInterpolation();
         // Note: when we create a new level, the coarser levels should already be created. So we can use that data to
         // fill ghost cells.
         ghost_cell_fill->initializeOperatorState(ghost_cell_comp, hierarchy, 0, level_number);
         HierarchyMathOps hier_math_ops("HierMathOps", hierarchy, 0, level_number);
-        hier_math_ops.grad(grad_thn_idx, d_grad_thn_var, 1.0, thn_idx, d_thn_cc_var, ghost_cell_fill, init_data_time);
+        hier_math_ops.grad(
+            grad_thn_idx, d_grad_thn_var, 1.0, thn_cur_idx, thn_cur_var, ghost_cell_fill, init_data_time);
         // TODO: Replace this with a max over the L2 norm.
         d_max_grad_thn = hier_cc_data_ops->maxNorm(grad_thn_idx, IBTK::invalid_index);
 
@@ -865,7 +888,8 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
     // Calculate gradient of thn for grid cell tagging.
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int grad_thn_idx = var_db->mapVariableAndContextToIndex(d_grad_thn_var, getCurrentContext());
-    const int thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
+    const int thn_new_idx = d_thn_new_manager->getCellIndex();
+    Pointer<CellVariable<NDIM, double>> thn_new_var = d_thn_new_manager->getCellVariable();
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp(1);
     ghost_cell_comp[0] = ITC(thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
@@ -876,7 +900,7 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
                           d_grad_thn_var,
                           1.0 /*alpha*/,
                           thn_new_idx,
-                          d_thn_cc_var,
+                          thn_new_var,
                           Pointer<HierarchyGhostCellInterpolation>(&hier_ghost_fill, false),
                           new_time);
     // TODO: Replace this with a max over the L2 norm.
@@ -917,7 +941,7 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     const int fs_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
     const int un_scr_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getScratchContext());
     const int us_scr_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getScratchContext());
-    const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+    const int thn_cur_idx = d_thn_cur_manager->getCellIndex();
 
     static const bool synch_cf_interface = true;
     const int coarsest_ln = 0;
@@ -928,25 +952,16 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     allocatePatchData(us_scr_idx, 0.0, coarsest_ln, finest_ln);
 
     // Set thn if necessary
-    Pointer<ThnCartGridFunction> thn_cart_fcn = d_thn_fcn;
-    if (thn_cart_fcn)
-        thn_cart_fcn->setDataOnPatchHierarchy(thn_cur_idx,
-                                              d_thn_cc_var,
-                                              d_hierarchy,
-                                              d_integrator_time,
-                                              TimePoint::CURRENT_TIME,
-                                              false,
-                                              coarsest_ln,
-                                              finest_ln);
-    else if (d_thn_fcn)
-        d_thn_fcn->setDataOnPatchHierarchy(
-            thn_cur_idx, d_thn_cc_var, d_hierarchy, d_integrator_time, false, coarsest_ln, finest_ln);
-    if (d_thn_integrator)
+    if (d_thn_fcn)
     {
-        // Copy thn if necessary.
+        d_thn_cur_manager->updateVolumeFraction(
+            d_thn_fcn, *d_hierarchy, d_integrator_time, TimePoint::CURRENT_TIME, false);
+    }
+    else
+    {
         const int thn_adv_cur_idx =
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
-        d_hier_cc_data_ops->copyData(thn_cur_idx, thn_adv_cur_idx);
+        d_thn_cur_manager->updateVolumeFraction(thn_adv_cur_idx, *d_hierarchy, d_integrator_time);
     }
 
     // We need ghost cells to interpolate to nodes.
@@ -1018,9 +1033,11 @@ MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
                                                      const bool start_of_ts)
 {
     auto var_db = VariableDatabase<NDIM>::getDatabase();
-    thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
-    thn_new_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getNewContext());
-    thn_scr_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getScratchContext());
+    thn_cur_idx = d_thn_cur_manager->getCellIndex();
+    thn_new_idx = d_thn_new_manager->getCellIndex();
+    thn_scr_idx = d_thn_scr_manager->getCellIndex();
+
+    const double half_time = 0.5 * (current_time + new_time);
 
     if (d_thn_integrator)
     {
@@ -1029,79 +1046,18 @@ MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
         const int thn_evolve_new_idx =
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
-        d_hier_cc_data_ops->copyData(thn_cur_idx, thn_evolve_cur_idx);
-        // We set the "new" data to the best approximation we have, which if we are at the beginning of the time step,
-        // is the current data.
-        d_hier_cc_data_ops->copyData(thn_new_idx, start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx);
+        d_thn_cur_manager->updateVolumeFraction(thn_evolve_cur_idx, *d_hierarchy, current_time);
+        d_thn_new_manager->updateVolumeFraction(
+            start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx, *d_hierarchy, new_time);
         d_hier_cc_data_ops->linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
+        d_thn_scr_manager->updateVolumeFraction(thn_scr_idx, *d_hierarchy, half_time);
     }
     else
     {
         // Otherwise set the values with the function
-#ifndef NDEBUG
-        TBOX_ASSERT(d_thn_fcn);
-#endif
-        Pointer<ThnCartGridFunction> thn_cart_fcn = d_thn_fcn;
-        if (thn_cart_fcn)
-        {
-            thn_cart_fcn->setDataOnPatchHierarchy(
-                thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time, TimePoint::CURRENT_TIME);
-            thn_cart_fcn->setDataOnPatchHierarchy(
-                thn_new_idx, d_thn_cc_var, d_hierarchy, new_time, TimePoint::NEW_TIME);
-            double half_time = 0.5 * (current_time + new_time);
-            thn_cart_fcn->setDataOnPatchHierarchy(
-                thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time, TimePoint::HALF_TIME);
-        }
-        else
-        {
-            d_thn_fcn->setDataOnPatchHierarchy(thn_cur_idx, d_thn_cc_var, d_hierarchy, current_time);
-            d_thn_fcn->setDataOnPatchHierarchy(thn_new_idx, d_thn_cc_var, d_hierarchy, new_time);
-            double half_time = 0.5 * (current_time + new_time);
-            d_thn_fcn->setDataOnPatchHierarchy(thn_scr_idx, d_thn_cc_var, d_hierarchy, half_time);
-        }
-    }
-
-    // Set ghost cells and synchronize volume fraction
-    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    {
-        HierarchyGhostCellInterpolation hier_ghost_fill;
-        std::vector<ITC> ghost_cell_comps = { ITC(
-            thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
-        hier_ghost_fill.initializeOperatorState(ghost_cell_comps, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        hier_ghost_fill.fillData(current_time);
-
-        ghost_cell_comps = { ITC(
-            thn_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
-        hier_ghost_fill.resetTransactionComponents(ghost_cell_comps);
-        hier_ghost_fill.fillData(0.5 * (current_time + new_time));
-
-        ghost_cell_comps = { ITC(
-            thn_new_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", true, d_thn_bc_coef) };
-        hier_ghost_fill.resetTransactionComponents(ghost_cell_comps);
-        hier_ghost_fill.fillData(new_time);
-    }
-
-    // Normalize volume fraction (+ ghost cells!)
-    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> thn_scr_data = patch->getPatchData(thn_scr_idx);
-            Pointer<CellData<NDIM, double>> thn_cur_data = patch->getPatchData(thn_cur_idx);
-            Pointer<CellData<NDIM, double>> thn_new_data = patch->getPatchData(thn_new_idx);
-            for (CellIterator<NDIM> ci(thn_scr_data->getGhostBox()); ci; ci++)
-            {
-                const CellIndex<NDIM>& idx = ci();
-                (*thn_scr_data)(idx) = std::max((*thn_scr_data)(idx), d_regularize_thn);
-                (*thn_scr_data)(idx) = std::min((*thn_scr_data)(idx), 1.0 - d_regularize_thn);
-                (*thn_cur_data)(idx) = std::max((*thn_cur_data)(idx), d_regularize_thn);
-                (*thn_cur_data)(idx) = std::min((*thn_cur_data)(idx), 1.0 - d_regularize_thn);
-                (*thn_new_data)(idx) = std::max((*thn_new_data)(idx), d_regularize_thn);
-                (*thn_new_data)(idx) = std::min((*thn_new_data)(idx), 1.0 - d_regularize_thn);
-            }
-        }
+        d_thn_cur_manager->updateVolumeFraction(d_thn_fcn, *d_hierarchy, current_time, TimePoint::CURRENT_TIME);
+        d_thn_scr_manager->updateVolumeFraction(d_thn_fcn, *d_hierarchy, half_time, TimePoint::HALF_TIME);
+        d_thn_new_manager->updateVolumeFraction(d_thn_fcn, *d_hierarchy, new_time, TimePoint::NEW_TIME);
     }
     return;
 }
