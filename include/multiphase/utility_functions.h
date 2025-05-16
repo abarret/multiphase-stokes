@@ -200,6 +200,21 @@ void allocate_patch_data(const int idx,
                          double time,
                          int coarsest_ln,
                          int finest_ln);
+void allocate_patch_data(const SAMRAI::hier::ComponentSelector& comp,
+                         const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         double time,
+                         int coarsest_ln,
+                         int finest_ln);
+void allocate_patch_data(const std::set<int>& idxs,
+                         const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         double time,
+                         int coarsest_ln,
+                         int finest_ln);
+void allocate_patch_data(const int idx,
+                         const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         double time,
+                         int coarsest_ln,
+                         int finest_ln);
 //\}
 
 /*!
@@ -216,6 +231,18 @@ void deallocate_patch_data(const std::set<int>& idxs,
                            int finest_ln);
 void deallocate_patch_data(const int idx,
                            const SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln);
+void deallocate_patch_data(const SAMRAI::hier::ComponentSelector& comp,
+                           const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln);
+void deallocate_patch_data(const std::set<int>& idxs,
+                           const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln);
+void deallocate_patch_data(const int idx,
+                           const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
                            int coarsest_ln,
                            int finest_ln);
 //\}
@@ -302,6 +329,9 @@ enum_to_string<PreconditionerType>(PreconditionerType val)
     if (val == PreconditionerType::BLOCK) return "BLOCK";
     return "UNKNOWN_TYPE";
 }
+
+template <typename VarType>
+SAMRAI::tbox::Pointer<VarType> get_var(const std::string& var_name, int depth = 1);
 
 } // namespace multiphase
 

@@ -442,16 +442,6 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
         d_hier_sc_data_ops->scale(rhs_un_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), un_old_idx);
         d_hier_sc_data_ops->scale(rhs_us_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), us_old_idx);
 
-        // Set Thn boundary conditions
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] =
-            ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
-        HierarchyGhostCellInterpolation hier_ghost_fill;
-        hier_ghost_fill.initializeOperatorState(
-            ghost_cell_comp, d_hierarchy, 0 /*coarsest_ln*/, d_hierarchy->getFinestLevelNumber());
-        hier_ghost_fill.fillData(current_time);
-
         multiply_sc_and_thn(d_fn_scr_idx, un_cur_idx, thn_cur_idx, d_hierarchy);
         multiply_sc_and_ths(d_fs_scr_idx, us_cur_idx, thn_cur_idx, d_hierarchy);
 
@@ -592,12 +582,13 @@ MultiphaseStandardHierarchyIntegrator::integrateHierarchySpecialized(const doubl
     // Determine new values of volume fraction.
     int thn_cur_idx, thn_new_idx, thn_scr_idx;
     setThnAtHalf(thn_cur_idx, thn_new_idx, thn_scr_idx, current_time, new_time, /*start_of_ts*/ !d_use_new_thn);
+    Pointer<CellVariable<NDIM, double>> thn_new_var = d_thn_new_manager->getCellVariable();
 
     // Update the preconditioner with new volume fraction
     if (d_precond)
     {
         bool needs_reallocation =
-            d_precond->updateVolumeFraction(thn_new_idx, d_thn_cc_var, new_time, nullptr, d_thn_bc_coef);
+            d_precond->updateVolumeFraction(thn_new_idx, thn_new_var, new_time, nullptr, d_thn_bc_coef);
         if (isVariableDrag())
         {
             const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
@@ -743,7 +734,7 @@ MultiphaseStandardHierarchyIntegrator::postprocessIntegrateHierarchy(const doubl
         const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getNewContext());
         const int un_cur_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
         const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
-        const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+        const int thn_cur_idx = d_thn_cur_manager->getCellIndex();
         const int fn_cur_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
         const int fs_cur_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
 
@@ -890,15 +881,7 @@ MultiphaseStandardHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<ND
         d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
     }
 
-    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
-    {
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp = { ITC(
-            thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_fill.fillData(eval_time);
-    }
+    // Now account for scaled forces. Note volume fractions should always have ghost cells filled
     if (d_f_un_thn_fcn)
     {
         d_f_un_thn_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
