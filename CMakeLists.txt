@@ -26,6 +26,7 @@ SET(MULTIPHASE_SRC
     src/RBGS.f
     src/VRBGS.f
     src/FDOPS.f
+    src/VolumeFractionDataManager.cpp
     )
 
 ADD_LIBRARY(MultiphaseLib)
