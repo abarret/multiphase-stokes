@@ -410,16 +410,14 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
     }
     else
     {
-        MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
+        MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params, d_thn_cur_manager);
         RHS_op.setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
-        RHS_op.setRegularizeThn(true, d_regularize_thn);
-        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
+        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef);
         RHS_op.setSolutionTime(current_time);
         RHS_op.setTimeInterval(current_time, new_time);
         // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions
         // in the RHS.
         RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
-        RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
 
         // Store results of applying stokes operator in rhs_vec
         RHS_op.initializeOperatorState(*d_sol_vec, *d_rhs_vec);
@@ -427,11 +425,9 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
     }
 
     // Set up the operators and solvers needed to solve the linear system.
-    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params);
-    d_stokes_op->setRegularizeThn(true, d_regularize_thn);
-    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
+    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params, d_thn_new_manager);
+    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
-    d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
     d_stokes_op->setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
     d_stokes_op->setSolutionTime(new_time);
     d_stokes_op->setTimeInterval(current_time, new_time);

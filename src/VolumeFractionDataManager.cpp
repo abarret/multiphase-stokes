@@ -25,8 +25,8 @@ VolumeFractionDataManager::VolumeFractionDataManager(std::string object_name,
     IntVector<NDIM> one_gcw = 1;
     IntVector<NDIM> zero_gcw = 0;
     d_thn_cc_idx = var_db->registerVariableAndContext(d_thn_cc_var, d_ctx, one_gcw);
-    d_thn_sc_idx = var_db->registerVariableAndContext(d_thn_sc_var, d_ctx, one_gcw);
-    d_thn_nc_idx = var_db->registerVariableAndContext(d_thn_nc_var, d_ctx, one_gcw);
+    d_thn_sc_idx = var_db->registerVariableAndContext(d_thn_sc_var, d_ctx, zero_gcw);
+    d_thn_nc_idx = var_db->registerVariableAndContext(d_thn_nc_var, d_ctx, zero_gcw);
     d_cc_ndim_idx = var_db->registerVariableAndContext(d_cc_ndim_var, d_ctx, one_gcw);
 }
 
@@ -48,8 +48,8 @@ VolumeFractionDataManager::VolumeFractionDataManager(std::string object_name,
     IntVector<NDIM> one_gcw = 1;
     IntVector<NDIM> zero_gcw = 0;
     d_thn_cc_idx = var_db->registerVariableAndContext(d_thn_cc_var, d_ctx, one_gcw);
-    d_thn_sc_idx = var_db->registerVariableAndContext(d_thn_sc_var, d_ctx, one_gcw);
-    d_thn_nc_idx = var_db->registerVariableAndContext(d_thn_nc_var, d_ctx, one_gcw);
+    d_thn_sc_idx = var_db->registerVariableAndContext(d_thn_sc_var, d_ctx, zero_gcw);
+    d_thn_nc_idx = var_db->registerVariableAndContext(d_thn_nc_var, d_ctx, zero_gcw);
     d_cc_ndim_idx = var_db->registerVariableAndContext(d_cc_ndim_var, d_ctx, one_gcw);
 }
 
@@ -81,15 +81,12 @@ VolumeFractionDataManager::updateVolumeFraction(const int thn_cc_idx,
 }
 
 void
-VolumeFractionDataManager::updateVolumeFraction(Pointer<CartGridFunction>& thn_fcn,
+VolumeFractionDataManager::updateVolumeFraction(CartGridFunction& thn_fcn,
                                                 PatchHierarchy<NDIM>& hierarchy,
                                                 double time,
                                                 TimePoint time_pt,
                                                 bool initial_time)
 {
-#ifndef NDEBUG
-    TBOX_ASSERT(thn_fcn);
-#endif
     Pointer<PatchHierarchy<NDIM>> hierarchy_ptr(&hierarchy, false);
     const int coarsest_ln = 0;
     const int finest_ln = hierarchy.getFinestLevelNumber();
@@ -99,13 +96,11 @@ VolumeFractionDataManager::updateVolumeFraction(Pointer<CartGridFunction>& thn_f
 
     // Use the provided function to fill in cell data
     // Check if this is a special CartGridFunction
-    Pointer<ThnCartGridFunction> thn_cart_fcn = thn_fcn;
-    if (thn_cart_fcn)
+    if (auto thn_cart_fcn = dynamic_cast<ThnCartGridFunction*>(&thn_fcn))
         thn_cart_fcn->setDataOnPatchHierarchy(
             d_thn_cc_idx, d_thn_cc_var, hierarchy_ptr, time, time_pt, false, coarsest_ln, finest_ln);
     else
-        thn_fcn->setDataOnPatchHierarchy(
-            d_thn_cc_idx, d_thn_cc_var, hierarchy_ptr, time, false, coarsest_ln, finest_ln);
+        thn_fcn.setDataOnPatchHierarchy(d_thn_cc_idx, d_thn_cc_var, hierarchy_ptr, time, false, coarsest_ln, finest_ln);
 
     updateVolumeFractionPrivate(hierarchy, coarsest_ln, finest_ln, time);
 }
@@ -113,9 +108,9 @@ VolumeFractionDataManager::updateVolumeFraction(Pointer<CartGridFunction>& thn_f
 bool
 VolumeFractionDataManager::isAllocated(PatchHierarchy<NDIM>& hierarchy) const
 {
-    const auto& it = d_hierarchies.find(&hierarchy);
-    if (it != d_hierarchies.end())
-        return true;
+    const auto& it = d_hierarchy_allocated_map.find(&hierarchy);
+    if (it != d_hierarchy_allocated_map.end())
+        return it->second;
     else
         return false;
 }
@@ -125,15 +120,15 @@ VolumeFractionDataManager::deallocateData(PatchHierarchy<NDIM>& hierarchy)
 {
     deallocate_patch_data(
         { d_thn_cc_idx, d_thn_nc_idx, d_thn_sc_idx, d_cc_ndim_idx }, hierarchy, 0, hierarchy.getFinestLevelNumber());
-    d_hierarchies.erase(&hierarchy);
+    d_hierarchy_allocated_map.at(&hierarchy) = false;
 }
 
 void
 VolumeFractionDataManager::deallocateData()
 {
-    for (const auto& hierarchy : d_hierarchies)
+    for (const auto& hierarchy_allocated_pair : d_hierarchy_allocated_map)
     {
-        deallocateData(*hierarchy);
+        deallocateData(*(hierarchy_allocated_pair.first));
     }
 }
 
@@ -145,7 +140,7 @@ VolumeFractionDataManager::allocatePatchData(PatchHierarchy<NDIM>& hierarchy,
 {
     allocate_patch_data(
         { d_thn_cc_idx, d_thn_nc_idx, d_thn_sc_idx, d_cc_ndim_idx }, hierarchy, time, coarsest_ln, finest_ln);
-    d_hierarchies.insert(&hierarchy);
+    d_hierarchy_allocated_map[&hierarchy] = true;
 }
 void
 VolumeFractionDataManager::fillNodeAndSideData(PatchHierarchy<NDIM>& hierarchy, double time)
@@ -174,7 +169,7 @@ VolumeFractionDataManager::updateVolumeFractionPrivate(PatchHierarchy<NDIM>& hie
                      finest_ln,
                      time,
                      "CONSERVATIVE_LINEAR_REFINE",
-                     false,
+                     true,
                      "NONE",
                      "LINEAR",
                      true,

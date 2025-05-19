@@ -955,7 +955,7 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     if (d_thn_fcn)
     {
         d_thn_cur_manager->updateVolumeFraction(
-            d_thn_fcn, *d_hierarchy, d_integrator_time, TimePoint::CURRENT_TIME, false);
+            *d_thn_fcn, *d_hierarchy, d_integrator_time, TimePoint::CURRENT_TIME, false);
     }
     else
     {
@@ -1055,9 +1055,9 @@ MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
     else
     {
         // Otherwise set the values with the function
-        d_thn_cur_manager->updateVolumeFraction(d_thn_fcn, *d_hierarchy, current_time, TimePoint::CURRENT_TIME);
-        d_thn_scr_manager->updateVolumeFraction(d_thn_fcn, *d_hierarchy, half_time, TimePoint::HALF_TIME);
-        d_thn_new_manager->updateVolumeFraction(d_thn_fcn, *d_hierarchy, new_time, TimePoint::NEW_TIME);
+        d_thn_cur_manager->updateVolumeFraction(*d_thn_fcn, *d_hierarchy, current_time, TimePoint::CURRENT_TIME);
+        d_thn_scr_manager->updateVolumeFraction(*d_thn_fcn, *d_hierarchy, half_time, TimePoint::HALF_TIME);
+        d_thn_new_manager->updateVolumeFraction(*d_thn_fcn, *d_hierarchy, new_time, TimePoint::NEW_TIME);
     }
     return;
 }
