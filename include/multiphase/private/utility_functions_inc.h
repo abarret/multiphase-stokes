@@ -73,7 +73,8 @@ allocate_patch_data(const int idx,
                     const int coarsest_ln,
                     const int finest_ln)
 {
-    allocate_patch_data({ idx }, hierarchy, time, coarsest_ln, finest_ln);
+    std::set<int> idxs{ idx };
+    allocate_patch_data(idxs, hierarchy, time, coarsest_ln, finest_ln);
 }
 
 inline void
