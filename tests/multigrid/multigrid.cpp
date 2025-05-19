@@ -74,6 +74,8 @@ main(int argc, char* argv[])
                                         box_generator,
                                         load_balancer);
 
+        RobinBcCoefStrategy<NDIM>* thn_bc_coef = nullptr;
+
         // Create variables and register them with the variable database.
         VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
         Pointer<VariableContext> ctx = var_db->getContext("context");
@@ -99,12 +101,14 @@ main(int argc, char* argv[])
         Pointer<SideVariable<NDIM, double>> e_us_sc_var = new SideVariable<NDIM, double>("e_us_sc");
         Pointer<CellVariable<NDIM, double>> e_cc_var = new CellVariable<NDIM, double>("e_cc");
 
+        // Create volume fraction manager
+        auto thn_manager = std::make_unique<VolumeFractionDataManager>(
+            "ThnManager", thn_cc_var, ctx, thn_bc_coef, 1.0e-5 /*regularize_thn*/);
+
         // Register patch data indices...
         const int un_sc_idx = var_db->registerVariableAndContext(un_sc_var, ctx, IntVector<NDIM>(1));
         const int us_sc_idx = var_db->registerVariableAndContext(us_sc_var, ctx, IntVector<NDIM>(1));
         const int p_cc_idx = var_db->registerVariableAndContext(p_cc_var, ctx, IntVector<NDIM>(1));
-        const int thn_cc_idx =
-            var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1)); // 1 layer of ghost cells
         const int xi_idx = var_db->registerVariableAndContext(xi_var, ctx);
         const int f_cc_idx = var_db->registerVariableAndContext(f_cc_var, ctx, IntVector<NDIM>(1));
         const int f_un_sc_idx = var_db->registerVariableAndContext(f_un_sc_var, ctx, IntVector<NDIM>(1));
@@ -136,7 +140,7 @@ main(int argc, char* argv[])
         TBOX_ASSERT(visit_data_writer);
 
         visit_data_writer->registerPlotQuantity("Pressure", "SCALAR", p_cc_idx);
-        visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_cc_idx);
+        visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_manager->getCellIndex());
         visit_data_writer->registerPlotQuantity("RHS_P", "SCALAR", f_cc_idx);
         visit_data_writer->registerPlotQuantity("error_p", "SCALAR", e_cc_idx);
         visit_data_writer->registerPlotQuantity("Div", "SCALAR", draw_div_idx);
@@ -199,7 +203,6 @@ main(int argc, char* argv[])
             level->allocatePatchData(e_un_sc_idx, 0.0);
             level->allocatePatchData(e_us_sc_idx, 0.0);
             level->allocatePatchData(p_cc_idx, 0.0);
-            level->allocatePatchData(thn_cc_idx, 0.0);
             level->allocatePatchData(xi_idx, 0.0);
             level->allocatePatchData(f_cc_idx, 0.0);
             level->allocatePatchData(e_cc_idx, 0.0);
@@ -303,7 +306,7 @@ main(int argc, char* argv[])
         f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, patch_hierarchy, 0.0);
         f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
         f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
-        thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
+        thn_manager->updateVolumeFraction(thn_fcn, *patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
         un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
@@ -338,7 +341,7 @@ main(int argc, char* argv[])
         }
 
         Pointer<MultiphaseStaggeredStokesOperator> stokes_op =
-            new MultiphaseStaggeredStokesOperator("stokes_op", true, params);
+            new MultiphaseStaggeredStokesOperator("stokes_op", true, params, thn_manager);
         const double C = input_db->getDouble("C");
         const double D = input_db->getDouble("D");
         stokes_op->setCandDCoefficients(C, D);
@@ -346,8 +349,6 @@ main(int argc, char* argv[])
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_un_helper = new StaggeredStokesPhysicalBoundaryHelper();
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_us_helper = new StaggeredStokesPhysicalBoundaryHelper();
         stokes_op->setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
-
-        stokes_op->setThnIdx(thn_cc_idx);
 
         Pointer<PETScKrylovLinearSolver> krylov_solver =
             new PETScKrylovLinearSolver("solver", app_initializer->getComponentDatabase("KrylovSolver"), "solver_");
@@ -363,7 +364,7 @@ main(int argc, char* argv[])
             Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
                 new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
                     "KrylovPrecondStrategy", "Krylov_precond_", params);
-            fac_precondition_strategy->setThnIdx(thn_cc_idx);
+            fac_precondition_strategy->setThnIdx(thn_manager->getCellIndex());
             fac_precondition_strategy->setCandDCoefficients(C, D);
             fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
             Pointer<FullFACPreconditioner> Krylov_precond =
@@ -379,7 +380,7 @@ main(int argc, char* argv[])
             Pointer<MultiphaseStaggeredStokesBlockPreconditioner> precond =
                 new MultiphaseStaggeredStokesBlockPreconditioner(
                     "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"));
-            precond->setThnIdx(thn_cc_idx);
+            precond->setThnIdx(thn_manager->getCellIndex());
             precond->setCAndDCoefficients(C, D);
             precond->setNullSpace(false, null_vecs);
 
@@ -396,6 +397,7 @@ main(int argc, char* argv[])
             // TODO: find a better way to do this
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
             // Allocate data
+            int thn_cc_idx = thn_manager->getCellIndex();
             for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
@@ -447,6 +449,7 @@ main(int argc, char* argv[])
         {
             Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
+            int thn_cc_idx = thn_manager->getCellIndex();
             for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
@@ -531,17 +534,11 @@ main(int argc, char* argv[])
         hier_math_ops.interp(draw_es_idx, draw_es_var, e_us_sc_idx, e_us_sc_var, nullptr, 0.0, synch_cf_interface);
 
         // Compute discrete divergence.
-        // Fill ghost cells for theta
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_fill_specs = { ITC(
-            thn_cc_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN", "LINEAR") };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_fill_specs, patch_hierarchy);
-        ghost_fill.fillData(0.0);
-        pre_div_interp(un_sc_idx, thn_cc_idx, un_sc_idx, us_sc_idx, patch_hierarchy);
+        pre_div_interp(un_sc_idx, thn_manager->getCellIndex(), un_sc_idx, us_sc_idx, patch_hierarchy);
         hier_math_ops.div(draw_div_idx, draw_div_var, 1.0, un_sc_idx, un_sc_var, nullptr, 0.0, true);
-        ghost_fill_specs = { ITC(draw_div_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
-        ghost_fill.deallocateOperatorState();
+        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+        std::vector<ITC> ghost_fill_specs = { ITC(draw_div_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
+        HierarchyGhostCellInterpolation ghost_fill;
         ghost_fill.initializeOperatorState(ghost_fill_specs, patch_hierarchy);
         ghost_fill.fillData(0.0);
 
@@ -558,7 +555,6 @@ main(int argc, char* argv[])
             level->deallocatePatchData(e_un_sc_idx);
             level->deallocatePatchData(e_us_sc_idx);
             level->deallocatePatchData(p_cc_idx);
-            level->deallocatePatchData(thn_cc_idx);
             level->deallocatePatchData(xi_idx);
             level->deallocatePatchData(f_cc_idx);
             level->deallocatePatchData(e_cc_idx);
