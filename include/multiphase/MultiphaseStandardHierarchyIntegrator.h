@@ -153,22 +153,17 @@ private:
             const MultiphaseParameters& params,
             double C,
             double D,
-            int thn_idx,
+            const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
             const std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>>& null_vecs,
             const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
             const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_bc_coef,
-            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_bc_coef);
 
         /*!
          * Updates the volume fraction in the preconditioner. Returns true if the solver must be reallocated after this
          * call.
          */
-        bool updateVolumeFraction(int thn_idx,
-                                  SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>>& thn_var,
-                                  double time,
-                                  IBTK::CartGridFunction* thn_fcn,
-                                  SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+        bool updateVolumeFraction(const std::unique_ptr<VolumeFractionDataManager>& thn_manager, double time);
 
         /*!
          * Updates the drag coefficient in the preconditioner. Returns true if the solver must be reallocated after this

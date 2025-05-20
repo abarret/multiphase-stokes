@@ -4,6 +4,7 @@
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/ibtk_enums.h>
 
+#include <multiphase/utility_functions.h>
 #include <tbox/Pointer.h>
 
 #include <CellVariable.h>
@@ -67,14 +68,16 @@ public:
     /*!
      * Update the volume fraction by copying the provided cell centered quantity.
      */
-    void updateVolumeFraction(int thn_cc_idx, SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, double time);
+    void updateVolumeFraction(int thn_cc_idx,
+                              SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy,
+                              double time);
 
     /*!
      * Update the volume fraction using the provided function. This will first attempt to cast the function to a
      * ThnCartGridFunction before calling setDataOnPatchHierarchy
      */
     void updateVolumeFraction(IBTK::CartGridFunction& thn_fcn,
-                              SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                              SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy,
                               double time,
                               IBTK::TimePoint time_pt,
                               bool initial_time = false);
@@ -83,12 +86,12 @@ public:
     /*!
      * Returns true if the provided hierarchy has data allocated by this class.
      */
-    bool isAllocated(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy) const;
+    bool isAllocated(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy) const;
 
     /*!
      * Deallocates data owned by this class on the provided patch hierarchy.
      */
-    void deallocateData(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy);
+    void deallocateData(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy);
 
     /*!
      * Deallocate data owned by this class on all patch hierarchies.
@@ -154,12 +157,20 @@ public:
     }
 
 private:
-    void allocatePatchData(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, int coarsest_ln, int finest_ln, double time);
-    void fillNodeAndSideData(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, double time);
-    void updateVolumeFractionPrivate(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+    void allocatePatchData(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln,
+                           double time);
+    void fillNodeAndSideData(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy, double time);
+    void updateVolumeFractionPrivate(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy,
                                      int coarsest_ln,
                                      int finest_ln,
                                      double time);
+
+    using set_type = std::set<SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>,
+                              PtrCompare<SAMRAI::hier::PatchHierarchy<NDIM>>>;
+    using iterator = set_type::iterator;
+    iterator deallocateDataPrivate(const iterator& it);
 
     std::string d_object_name;
 
@@ -172,7 +183,7 @@ private:
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_ctx;
 
-    std::unordered_map<SAMRAI::hier::PatchHierarchy<NDIM>*, bool> d_hierarchy_allocated_map;
+    set_type d_hierarchies;
 
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
 

@@ -306,7 +306,7 @@ main(int argc, char* argv[])
         f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, patch_hierarchy, 0.0);
         f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
         f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
-        thn_manager->updateVolumeFraction(thn_fcn, *patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
+        thn_manager->updateVolumeFraction(thn_fcn, patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
         un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
@@ -363,8 +363,7 @@ main(int argc, char* argv[])
             // Now create a preconditioner
             Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
                 new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
-                    "KrylovPrecondStrategy", "Krylov_precond_", params);
-            fac_precondition_strategy->setThnIdx(thn_manager->getCellIndex());
+                    "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
             fac_precondition_strategy->setCandDCoefficients(C, D);
             fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
             Pointer<FullFACPreconditioner> Krylov_precond =
@@ -379,8 +378,7 @@ main(int argc, char* argv[])
         {
             Pointer<MultiphaseStaggeredStokesBlockPreconditioner> precond =
                 new MultiphaseStaggeredStokesBlockPreconditioner(
-                    "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"));
-            precond->setThnIdx(thn_manager->getCellIndex());
+                    "BlockPrecond", params, input_db->getDatabase("BlockPreconditioner"), thn_manager);
             precond->setCAndDCoefficients(C, D);
             precond->setNullSpace(false, null_vecs);
 
@@ -396,30 +394,7 @@ main(int argc, char* argv[])
             // We need to set thn_cc_idx on the dense hierarchy.
             // TODO: find a better way to do this
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-            // Allocate data
-            int thn_cc_idx = thn_manager->getCellIndex();
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
-            }
-            thn_fcn.setDataOnPatchHierarchy(
-                thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
-            
-            // Also fill in theta ghost cells
-            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-            std::vector<ITC> ghost_cell_comp(1);
-            ghost_cell_comp[0] = ITC(thn_cc_idx,
-                                     "CONSERVATIVE_LINEAR_REFINE",
-                                     false,
-                                     "NONE",
-                                     "LINEAR",
-                                     true,
-                                     nullptr); // defaults to fill corner
-            HierarchyGhostCellInterpolation ghost_cell_fill;
-            ghost_cell_fill.initializeOperatorState(
-                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-            ghost_cell_fill.fillData(0.0);
+            thn_manager->updateVolumeFraction(thn_fcn, dense_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
             if (using_var_xi)
                 Krylov_precond->transferToDense(params.xi_idx, true);
@@ -444,17 +419,10 @@ main(int argc, char* argv[])
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
         krylov_solver->solveSystem(u_vec, f_vec);
 
-        // Deallocate data
         if (use_precond && precond_type == PreconditionerType::MULTIGRID)
         {
             Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
-            Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-            int thn_cc_idx = thn_manager->getCellIndex();
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
-            }
+            thn_manager->deallocateData(Krylov_precond->getDenseHierarchy());
         }
 
         input_db->printClassData(plog);
