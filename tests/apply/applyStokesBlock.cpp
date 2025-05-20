@@ -85,11 +85,12 @@ main(int argc, char* argv[])
         Pointer<SideVariable<NDIM, double>> e_un_sc_var = new SideVariable<NDIM, double>("e_un_sc");
         Pointer<SideVariable<NDIM, double>> e_us_sc_var = new SideVariable<NDIM, double>("e_us_sc");
 
+        auto thn_manager = std::make_unique<VolumeFractionDataManager>(
+            "ThnManager", thn_cc_var, ctx, thn_bc_coef, 1.0e-5 /*regularize_thn*/);
+
         // Register patch data indices...
         const int un_sc_idx = var_db->registerVariableAndContext(un_sc_var, ctx, IntVector<NDIM>(1));
         const int us_sc_idx = var_db->registerVariableAndContext(us_sc_var, ctx, IntVector<NDIM>(1));
-        const int thn_cc_idx =
-            var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1)); // 1 layer of ghost cells
         const int xi_idx = var_db->registerVariableAndContext(xi_var, ctx, IntVector<NDIM>(1));
         const int f_un_sc_idx = var_db->registerVariableAndContext(f_un_sc_var, ctx, IntVector<NDIM>(1));
         const int f_us_sc_idx = var_db->registerVariableAndContext(f_us_sc_var, ctx, IntVector<NDIM>(1));
@@ -120,7 +121,7 @@ main(int argc, char* argv[])
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
         TBOX_ASSERT(visit_data_writer);
 
-        visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_cc_idx);
+        visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_manager->getCellIndex());
 
         visit_data_writer->registerPlotQuantity("Un", "VECTOR", draw_un_idx);
         for (unsigned int d = 0; d < NDIM; ++d)
@@ -187,7 +188,6 @@ main(int argc, char* argv[])
             level->allocatePatchData(f_us_sc_idx, 0.0);
             level->allocatePatchData(e_un_sc_idx, 0.0);
             level->allocatePatchData(e_us_sc_idx, 0.0);
-            level->allocatePatchData(thn_cc_idx, 0.0);
             level->allocatePatchData(xi_idx, 0.0);
             level->allocatePatchData(draw_un_idx, 0.0);
             level->allocatePatchData(draw_fn_idx, 0.0);
@@ -234,7 +234,7 @@ main(int argc, char* argv[])
 
         un_fcn.setDataOnPatchHierarchy(un_sc_idx, un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(us_sc_idx, us_sc_var, patch_hierarchy, 0.0);
-        thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
+        thn_manager->updateVolumeFraction(thn_fcn, patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
         f_un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         f_us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
@@ -261,14 +261,13 @@ main(int argc, char* argv[])
         params.lambda_n = params.eta_n;
         params.lambda_s = params.eta_s;
 
-        MultiphaseStaggeredStokesBlockOperator stokes_op("stokes_op", true, params);
+        MultiphaseStaggeredStokesBlockOperator stokes_op("stokes_op", true, params, thn_manager);
         stokes_op.setCandDCoefficients(C, D);
-        stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, thn_bc_coef);
+        stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs);
 
         Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper = new StaggeredStokesPhysicalBoundaryHelper();
         stokes_op.setPhysicalBoundaryHelper(bc_helper);
 
-        stokes_op.setThnIdx(thn_cc_idx);
         stokes_op.initializeOperatorState(u_vec, f_vec);
 
         // Apply the operator
@@ -342,7 +341,6 @@ main(int argc, char* argv[])
             level->deallocatePatchData(f_us_sc_idx);
             level->deallocatePatchData(e_un_sc_idx);
             level->deallocatePatchData(e_us_sc_idx);
-            level->deallocatePatchData(thn_cc_idx);
             level->deallocatePatchData(xi_idx);
             level->deallocatePatchData(draw_un_idx);
             level->deallocatePatchData(draw_fn_idx);

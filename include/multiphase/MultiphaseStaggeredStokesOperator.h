@@ -82,6 +82,11 @@ public:
      */
     ~MultiphaseStaggeredStokesOperator();
 
+    const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
+    {
+        return d_thn_manager;
+    }
+
     /*!
      * \brief Set the PoissonSpecifications object used to specify the C and D values for the momentum equations
      *

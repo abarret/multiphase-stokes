@@ -318,7 +318,7 @@ main(int argc, char* argv[])
         f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, patch_hierarchy, 0.0);
         f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
         f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
-        thn_manager->updateVolumeFraction(thn_fcn, *patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
+        thn_manager->updateVolumeFraction(thn_fcn, patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
         un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);
@@ -349,9 +349,9 @@ main(int argc, char* argv[])
 
         // Now create a preconditioner
         Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> fac_precondition_strategy =
-            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
-        fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);
-        fac_precondition_strategy->setThnIdx(thn_manager->getCellIndex());
+            new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
+                "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
+        fac_precondition_strategy->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef);
         fac_precondition_strategy->setCandDCoefficients(C, D);
         fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
         Pointer<FullFACPreconditioner> Krylov_precond =
@@ -370,29 +370,7 @@ main(int argc, char* argv[])
         if (use_precond)
         {
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-            const int thn_cc_idx = thn_manager->getCellIndex();
-            // Allocate data
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (!level->checkAllocated(thn_cc_idx)) level->allocatePatchData(thn_cc_idx, 0.0);
-            }
-            thn_fcn.setDataOnPatchHierarchy(
-                thn_cc_idx, thn_cc_var, dense_hierarchy, 0.0, false, 0, dense_hierarchy->getFinestLevelNumber());
-            // Also fill in theta ghost cells
-            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-            std::vector<ITC> ghost_cell_comp(1);
-            ghost_cell_comp[0] = ITC(thn_cc_idx,
-                                     "CONSERVATIVE_LINEAR_REFINE",
-                                     false,
-                                     "NONE",
-                                     "LINEAR",
-                                     true,
-                                     nullptr); // defaults to fill corner
-            HierarchyGhostCellInterpolation ghost_cell_fill;
-            ghost_cell_fill.initializeOperatorState(
-                ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-            ghost_cell_fill.fillData(0.0);
+            thn_manager->updateVolumeFraction(thn_fcn, dense_hierarchy, 0.0, TimePoint::CURRENT_TIME);
         }
         hier_math_ops.setPatchHierarchy(patch_hierarchy);
         hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
@@ -424,12 +402,7 @@ main(int argc, char* argv[])
         if (use_precond)
         {
             Pointer<PatchHierarchy<NDIM>> dense_hierarchy = Krylov_precond->getDenseHierarchy();
-            const int thn_cc_idx = thn_manager->getCellIndex();
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
-            {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (level->checkAllocated(thn_cc_idx)) level->deallocatePatchData(thn_cc_idx);
-            }
+            thn_manager->deallocateData(dense_hierarchy);
         }
 
         // Compute error and print error norms.

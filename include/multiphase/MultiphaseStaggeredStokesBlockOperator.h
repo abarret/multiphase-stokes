@@ -6,6 +6,7 @@
 #include <ibamr/config.h>
 
 #include "multiphase/MultiphaseParameters.h"
+#include "multiphase/VolumeFractionDataManager.h"
 
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
 
@@ -73,12 +74,18 @@ public:
      */
     MultiphaseStaggeredStokesBlockOperator(const std::string& object_name,
                                            bool homogeneous_bc,
-                                           const MultiphaseParameters& params);
+                                           const MultiphaseParameters& params,
+                                           const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
 
     /*!
      * \brief Destructor.
      */
     ~MultiphaseStaggeredStokesBlockOperator();
+
+    const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
+    {
+        return d_thn_manager;
+    }
 
     /*!
      * \brief Set the PoissonSpecifications object used to specify the C and D values for the momentum equations
@@ -94,11 +101,6 @@ public:
     void setCandDCoefficients(double C, double D_u);
 
     /*!
-     * \brief Set the cell centered patch index for the volume fraction.
-     */
-    void setThnIdx(int thn_idx);
-
-    /*!
      * \brief Set the SAMRAI::solv::RobinBcCoefStrategy objects used to specify
      * physical boundary conditions.
      *
@@ -112,13 +114,9 @@ public:
 
      * \param us_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
      *condition coefficients for the network velocity.
-
-     * \param thn_bc_coef   Pointer to object that can set the Robin boundary condition
-     *coefficients for the volume fraction.
      */
     virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-                                    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+                                    const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs);
 
     /*!
      * \brief Set the physical boundary condition helper object.
@@ -223,8 +221,6 @@ protected:
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_us_bc_coef;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_thn_bc_coef;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
@@ -242,34 +238,13 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
 
 private:
-    void applySpecialized(int A_un_idx, int A_us_idx, int un_idx, int us_idx, int thn_idx);
-
-    /*!
-     * \brief Default constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     */
-    MultiphaseStaggeredStokesBlockOperator() = delete;
-
-    /*!
-     * \brief Copy constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     *
-     * \param from The value to copy to this object.
-     */
-    MultiphaseStaggeredStokesBlockOperator(const MultiphaseStaggeredStokesBlockOperator& from) = delete;
-
-    /*!
-     * \brief Assignment operator.
-     *
-     * \note This operator is not implemented and should not be used.
-     *
-     * \param that The value to assign to this object.
-     *
-     * \return A reference to this object.
-     */
-    MultiphaseStaggeredStokesBlockOperator& operator=(const MultiphaseStaggeredStokesBlockOperator& that) = delete;
+    void applySpecialized(int A_un_idx,
+                          int A_us_idx,
+                          int un_idx,
+                          int us_idx,
+                          int thn_cc_idx,
+                          int thn_nc_idx,
+                          int thn_sc_idx);
 
     // Synchronization variable
     SAMRAI::tbox::Pointer<SAMRAI::pdat::OutersideVariable<NDIM, double>> d_os_var;
@@ -280,17 +255,8 @@ private:
 
     /// Parameters
     double d_C = 0.0, d_D_u = -1.0;
-    int d_thn_idx = IBTK::invalid_index;
     const MultiphaseParameters& d_params;
-
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_nc_scr_var;
-    int d_nc_scr_idx = IBTK::invalid_index;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_cc_ndim_var;
-    int d_cc_ndim_idx = IBTK::invalid_index;
-
-    // Volume averaged velocity
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_sc_scr_var;
-    int d_sc_scr_idx = IBTK::invalid_index;
+    const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager;
 };
 } // namespace multiphase
 
