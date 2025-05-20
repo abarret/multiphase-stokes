@@ -275,7 +275,7 @@ main(int argc, char* argv[])
         un_fcn.setDataOnPatchHierarchy(un_sc_idx, un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(us_sc_idx, us_sc_var, patch_hierarchy, 0.0);
         p_fcn.setDataOnPatchHierarchy(p_cc_idx, p_cc_var, patch_hierarchy, 0.0);
-        thn_manager->updateVolumeFraction(thn_fcn, *patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
+        thn_manager->updateVolumeFraction(thn_fcn, patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
         f_un_fcn.setDataOnPatchHierarchy(e_un_sc_idx, e_un_sc_var, patch_hierarchy, 0.0);
         f_us_fcn.setDataOnPatchHierarchy(e_us_sc_idx, e_us_sc_var, patch_hierarchy, 0.0);

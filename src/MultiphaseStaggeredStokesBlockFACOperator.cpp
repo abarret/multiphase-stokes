@@ -137,7 +137,8 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOperator(
     const std::string& object_name,
     const std::string& default_options_prefix,
-    const MultiphaseParameters& params)
+    const MultiphaseParameters& params,
+    const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
     : FACPreconditionerStrategy(object_name),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
@@ -145,11 +146,9 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_us_bc_coef", Pointer<Database>(nullptr))),
       d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
-      d_default_thn_bc_coef(
-          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
-      d_thn_bc_coef(d_default_thn_bc_coef.get()),
       d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
-      d_params(params)
+      d_params(params),
+      d_thn_manager(thn_manager)
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -162,9 +161,6 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
         p_default_un_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
         p_default_us_bc_coef->setBoundaryValue(2 * d, 0.0);
         p_default_us_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
-        auto p_default_thn_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_thn_bc_coef.get());
-        p_default_thn_bc_coef->setBoundarySlope(2 * d, 0.0);
-        p_default_thn_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
     }
     // Create variables and register them with the variable database.
     VariableDatabase<NDIM>* var_db = VariableDatabase<NDIM>::getDatabase();
@@ -212,8 +208,7 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
 void
 MultiphaseStaggeredStokesBlockFACOperator::setPhysicalBcCoefs(
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+    const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs)
 {
 #ifndef NDEBUG
     TBOX_ASSERT(un_bc_coefs.size() == NDIM);
@@ -231,25 +226,12 @@ MultiphaseStaggeredStokesBlockFACOperator::setPhysicalBcCoefs(
         else
             d_us_bc_coefs[d] = d_default_us_bc_coef.get();
     }
-    if (thn_bc_coef)
-        d_thn_bc_coef = thn_bc_coef;
-    else
-        d_thn_bc_coef = d_default_thn_bc_coef.get();
 }
 
 MultiphaseStaggeredStokesBlockFACOperator::~MultiphaseStaggeredStokesBlockFACOperator()
 {
     // Dallocate operator state first
     deallocateOperatorState();
-    return;
-}
-
-// create another member function to set-up Thn
-// Thn is defined in the input file and read in using muParserCartGridFunction
-void
-MultiphaseStaggeredStokesBlockFACOperator::setThnIdx(int thn_idx)
-{
-    d_thn_idx = thn_idx;
     return;
 }
 
@@ -359,7 +341,7 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
     // Get the vector components. These pull out patch data indices
     const int un_idx = error.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = error.getComponentDescriptorIndex(1); // solvent velocity, Us
-    const int thn_idx = d_thn_idx;
+    const int thn_cc_idx = d_thn_manager->getCellIndex();
     const int f_un_idx = residual.getComponentDescriptorIndex(0); // RHS_Un
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
 
@@ -454,7 +436,7 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
             double dx_dx = (dx[0] * dx[0]);
             double dy_dy = (dx[1] * dx[1]);
             double dx_dy = (dx[0] * dx[1]);
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
@@ -571,7 +553,7 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
     const int rhs_us_idx = rhs.getComponentDescriptorIndex(1);  // RHS Us
     const int res_un_idx = residual.getComponentDescriptorIndex(0);
     const int res_us_idx = residual.getComponentDescriptorIndex(1);
-    const int thn_idx = d_thn_idx;
+    const int thn_cc_idx = d_thn_manager->getCellIndex();
 
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
@@ -613,7 +595,7 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
             const double* const xlow =
                 pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
             const hier::Index<NDIM>& idx_low = patch->getBox().lower();
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_idx);
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> rhs_un_data =
                 patch->getPatchData(rhs_un_idx); // result of applying operator (eqn 1)
@@ -629,7 +611,7 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
             //         //patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
             // else
             accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
-                patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D);
+                patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_cc_idx, d_params, d_C, d_D);
 
             for (int axis = 0; axis < NDIM; ++axis)
             {

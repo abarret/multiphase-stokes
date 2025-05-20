@@ -165,7 +165,7 @@ public:
 
     //\}
 
-    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> getDenseHierarchy()
+    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& getDenseHierarchy()
     {
         return d_dense_hierarchy;
     }

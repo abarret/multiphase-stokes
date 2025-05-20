@@ -333,6 +333,15 @@ enum_to_string<PreconditionerType>(PreconditionerType val)
 template <typename VarType>
 SAMRAI::tbox::Pointer<VarType> get_var(const std::string& var_name, int depth = 1);
 
+template <typename T>
+struct PtrCompare
+{
+    bool operator()(const SAMRAI::tbox::Pointer<T>& a, const SAMRAI::tbox::Pointer<T>& b) const
+    {
+        return a.getPointer() < b.getPointer();
+    }
+};
+
 } // namespace multiphase
 
 #include "multiphase/private/utility_functions_inc.h"

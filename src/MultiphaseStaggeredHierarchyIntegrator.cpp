@@ -963,13 +963,13 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     if (d_thn_fcn)
     {
         d_thn_cur_manager->updateVolumeFraction(
-            *d_thn_fcn, *d_hierarchy, d_integrator_time, TimePoint::CURRENT_TIME, false);
+            *d_thn_fcn, d_hierarchy, d_integrator_time, TimePoint::CURRENT_TIME, false);
     }
     else
     {
         const int thn_adv_cur_idx =
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
-        d_thn_cur_manager->updateVolumeFraction(thn_adv_cur_idx, *d_hierarchy, d_integrator_time);
+        d_thn_cur_manager->updateVolumeFraction(thn_adv_cur_idx, d_hierarchy, d_integrator_time);
     }
 
     // We need ghost cells to interpolate to nodes.
@@ -1058,18 +1058,18 @@ MultiphaseStaggeredHierarchyIntegrator::setThnAtHalf(int& thn_cur_idx,
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getCurrentContext());
         const int thn_evolve_new_idx =
             var_db->mapVariableAndContextToIndex(d_thn_cc_var, d_thn_integrator->getNewContext());
-        d_thn_cur_manager->updateVolumeFraction(thn_evolve_cur_idx, *d_hierarchy, current_time);
+        d_thn_cur_manager->updateVolumeFraction(thn_evolve_cur_idx, d_hierarchy, current_time);
         d_thn_new_manager->updateVolumeFraction(
-            start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx, *d_hierarchy, new_time);
+            start_of_ts ? thn_evolve_cur_idx : thn_evolve_new_idx, d_hierarchy, new_time);
         d_hier_cc_data_ops->linearSum(thn_scr_idx, 0.5, thn_cur_idx, 0.5, thn_new_idx);
-        d_thn_scr_manager->updateVolumeFraction(thn_scr_idx, *d_hierarchy, half_time);
+        d_thn_scr_manager->updateVolumeFraction(thn_scr_idx, d_hierarchy, half_time);
     }
     else
     {
         // Otherwise set the values with the function
-        d_thn_cur_manager->updateVolumeFraction(*d_thn_fcn, *d_hierarchy, current_time, TimePoint::CURRENT_TIME);
-        d_thn_scr_manager->updateVolumeFraction(*d_thn_fcn, *d_hierarchy, half_time, TimePoint::HALF_TIME);
-        d_thn_new_manager->updateVolumeFraction(*d_thn_fcn, *d_hierarchy, new_time, TimePoint::NEW_TIME);
+        d_thn_cur_manager->updateVolumeFraction(*d_thn_fcn, d_hierarchy, current_time, TimePoint::CURRENT_TIME);
+        d_thn_scr_manager->updateVolumeFraction(*d_thn_fcn, d_hierarchy, half_time, TimePoint::HALF_TIME);
+        d_thn_new_manager->updateVolumeFraction(*d_thn_fcn, d_hierarchy, new_time, TimePoint::NEW_TIME);
     }
     return;
 }
