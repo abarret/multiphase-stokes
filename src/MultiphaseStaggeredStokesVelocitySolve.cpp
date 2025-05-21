@@ -203,8 +203,6 @@ MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x,
     const int us_idx = x.getComponentDescriptorIndex(1); // solvent velocity, Us
     const int A_un_idx = y.getComponentDescriptorIndex(0);
     const int A_us_idx = y.getComponentDescriptorIndex(1);
-    const int un_scratch_idx = d_x->getComponentDescriptorIndex(0);
-    const int us_scratch_idx = d_x->getComponentDescriptorIndex(1);
     const int thn_cc_idx = d_thn_manager->getCellIndex();
     const int thn_nc_idx = d_thn_manager->getNodeIndex();
     const int thn_sc_idx = d_thn_manager->getSideIndex();
@@ -212,16 +210,14 @@ MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x,
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(2);
-    transaction_comps[0] = InterpolationTransactionComponent(un_scratch_idx,
-                                                             un_idx,
+    transaction_comps[0] = InterpolationTransactionComponent(un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_un_bc_coefs);
-    transaction_comps[1] = InterpolationTransactionComponent(us_scratch_idx,
-                                                             us_idx,
+    transaction_comps[1] = InterpolationTransactionComponent(us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
@@ -234,12 +230,12 @@ MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x,
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
     d_hier_bdry_fill->resetTransactionComponents(d_transaction_comps);
 
-    applySpecialized(A_un_idx, A_us_idx, un_scratch_idx, us_scratch_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx);
+    applySpecialized(A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx);
 
     if (d_bc_helper)
     {
-        d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
-        d_bc_helper->copyDataAtDirichletBoundaries(A_us_idx, us_scratch_idx);
+        d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_idx);
+        d_bc_helper->copyDataAtDirichletBoundaries(A_us_idx, us_idx);
     }
 
     {
@@ -287,15 +283,8 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
     // Deallocate the operator state if the operator is already initialized.
     if (d_is_initialized) deallocateOperatorState();
 
-    // Setup solution and rhs vectors.
-    d_x = in.cloneVector(in.getName());
-    d_b = out.cloneVector(out.getName());
-
     // Setup operator state.
     d_hierarchy = in.getPatchHierarchy();
-
-    // Allocate scratch data.
-    d_x->allocateVectorData();
 
     // Allocate synchronization variable
     const int coarsest_ln = 0;
@@ -309,7 +298,7 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
     d_os_coarsen_op = grid_geom->lookupCoarsenOperator(d_os_var, "CONSERVATIVE_COARSEN");
     d_os_coarsen_alg = new CoarsenAlgorithm<NDIM>();
-    d_os_coarsen_alg->registerCoarsen(d_b->getComponentDescriptorIndex(0), d_os_idx, d_os_coarsen_op);
+    d_os_coarsen_alg->registerCoarsen(out.getComponentDescriptorIndex(0), d_os_idx, d_os_coarsen_op);
     d_os_coarsen_scheds.resize(finest_ln - coarsest_ln);
     for (int dst_ln = coarsest_ln; dst_ln < finest_ln; ++dst_ln)
     {
@@ -321,16 +310,14 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
     // Setup the interpolation transaction information.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     d_transaction_comps.resize(2);
-    d_transaction_comps[0] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(0),
-                                                               in.getComponentDescriptorIndex(0),
+    d_transaction_comps[0] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(0),
                                                                SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_un_bc_coefs);
-    d_transaction_comps[1] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(1),
-                                                               in.getComponentDescriptorIndex(1),
+    d_transaction_comps[1] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(1),
                                                                SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
@@ -340,7 +327,7 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
 
     // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
-    d_hier_bdry_fill->initializeOperatorState(d_transaction_comps, d_x->getPatchHierarchy());
+    d_hier_bdry_fill->initializeOperatorState(d_transaction_comps, in.getPatchHierarchy());
 
     // Initialize hierarchy math ops object.
     if (!d_hier_math_ops_external)
@@ -383,22 +370,6 @@ MultiphaseStaggeredStokesVelocitySolve::deallocateOperatorState()
     d_un_fill_pattern.setNull();
     d_us_fill_pattern.setNull();
     d_P_fill_pattern.setNull();
-
-    // Deallocate scratch data.
-    d_x->deallocateVectorData();
-    d_b->deallocateVectorData();
-
-    // Delete the solution and rhs vectors.
-    d_x->resetLevels(d_x->getCoarsestLevelNumber(),
-                     std::min(d_x->getFinestLevelNumber(), d_x->getPatchHierarchy()->getFinestLevelNumber()));
-    d_x->freeVectorComponents();
-
-    d_b->resetLevels(d_b->getCoarsestLevelNumber(),
-                     std::min(d_b->getFinestLevelNumber(), d_b->getPatchHierarchy()->getFinestLevelNumber()));
-    d_b->freeVectorComponents();
-
-    d_x.setNull();
-    d_b.setNull();
 
     // Deallocate synchronization variable
     const int coarsest_ln = 0;
