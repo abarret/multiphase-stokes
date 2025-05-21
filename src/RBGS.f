@@ -34,7 +34,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        p, p_gcw, f_p, f_p_gcw,
      &        f_un_0, f_un_1, f_un_gcw,
      &        f_us_0, f_us_1, f_us_gcw,
-     &        thn, thn_gcw, eta_n, eta_s, l_n, l_s,
+     &        thn, thn_gcw, thn_nc, thn_nc_gcw,
+     &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s, l_n, l_s,
      &        nu_n, nu_s, xi, w, C, D, red_or_black)
 c
         use my_subs
@@ -44,11 +45,20 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow0,  iup0
         integer ilow1,  iup1
         integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
-        integer f_p_gcw, thn_gcw, red_or_black
+        integer f_p_gcw, red_or_black
         double precision eta_n, eta_s, l_n, l_s, nu_n, nu_s, xi, w, C, D
 c
-        double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
+      integer thn_gcw
+      double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
      &            ilow1-thn_gcw:iup1+thn_gcw)
+      integer thn_nc_gcw
+      double precision thn_nc(ilow0-thn_nc_gcw:iup0+thn_nc_gcw+1,
+     &            ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)
+      integer thn_sc_gcw
+      double precision thn_sc_0(ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw)
+      double precision thn_sc_1(ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1)
 c
         double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,
      &            ilow1-un_gcw:iup1+un_gcw)
@@ -99,10 +109,10 @@ c
 c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
 
-              thn_lower_x = 0.5d0*(thn(i0,i1)+thn(i0-1,i1))
-              thn_upper_x = 0.5d0*(thn(i0,i1)+thn(i0+1,i1))
-              thn_lower_y = 0.5d0*(thn(i0,i1)+thn(i0,i1-1))
-              thn_upper_y = 0.5d0*(thn(i0,i1)+thn(i0,i1+1))
+              thn_lower_x = thn_sc_0(i0,i1)
+              thn_upper_x = thn_sc_0(i0+1,i1)
+              thn_lower_y = thn_sc_1(i0,i1)
+              thn_upper_y = thn_sc_1(i0,i1+1)
 
               ths_lower_x = toThs(thn_lower_x)
               ths_upper_x = toThs(thn_upper_x)
@@ -110,14 +120,10 @@ c
               ths_upper_y = toThs(thn_upper_y)
 
               ! calculate thn at corners
-              thn_imhalf_jphalf = 0.25d0*(thn(i0-1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0-1,i1+1))
-              thn_imhalf_jmhalf = 0.25d0*(thn(i0,i1)+thn(i0-1,i1)
-     &                               +thn(i0,i1-1)+thn(i0-1,i1-1))
-              thn_iphalf_jphalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0+1,i1+1))
-              thn_iphalf_jmhalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1-1)+thn(i0+1,i1-1))
+              thn_imhalf_jphalf = thn_nc(i0,i1+1)
+              thn_imhalf_jmhalf = thn_nc(i0,i1)
+              thn_iphalf_jphalf = thn_nc(i0+1,i1+1)
+              thn_iphalf_jmhalf = thn_nc(i0+1,i1)
 
               ths_imhalf_jphalf = toThs(thn_imhalf_jphalf)
               ths_imhalf_jmhalf = toThs(thn_imhalf_jmhalf)
@@ -449,7 +455,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        p, p_gcw, f_p, f_p_gcw,
      &        f_un_0, f_un_1, f_un_gcw,
      &        f_us_0, f_us_1, f_us_gcw,
-     &        thn, thn_gcw, eta_n, eta_s, l_n, l_s,
+     &        thn, thn_gcw, thn_nc, thn_nc_gcw,
+     &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s, l_n, l_s,
      &        nu_n, nu_s, xi, w, C, D, red_or_black,
      &        mask_0, mask_1, mask_gcw)
 c
@@ -460,11 +467,20 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow0,  iup0
         integer ilow1,  iup1
         integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
-        integer f_p_gcw, thn_gcw, red_or_black
+        integer f_p_gcw, red_or_black
         double precision eta_n, eta_s, l_n, l_s, nu_n, nu_s, xi, w, C, D
 c
-        double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
+      integer thn_gcw
+      double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
      &            ilow1-thn_gcw:iup1+thn_gcw)
+      integer thn_nc_gcw
+      double precision thn_nc(ilow0-thn_nc_gcw:iup0+thn_nc_gcw+1,
+     &            ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)
+      integer thn_sc_gcw
+      double precision thn_sc_0(ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw)
+      double precision thn_sc_1(ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1)
 c
         double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,
      &            ilow1-un_gcw:iup1+un_gcw)
@@ -521,10 +537,10 @@ c
 c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
 
-              thn_lower_x = 0.5d0*(thn(i0,i1)+thn(i0-1,i1))
-              thn_upper_x = 0.5d0*(thn(i0,i1)+thn(i0+1,i1))
-              thn_lower_y = 0.5d0*(thn(i0,i1)+thn(i0,i1-1))
-              thn_upper_y = 0.5d0*(thn(i0,i1)+thn(i0,i1+1))
+              thn_lower_x = thn_sc_0(i0,i1)
+              thn_upper_x = thn_sc_0(i0+1,i1)
+              thn_lower_y = thn_sc_1(i0,i1)
+              thn_upper_y = thn_sc_1(i0,i1+1)
 
               ths_lower_x = toThs(thn_lower_x)
               ths_upper_x = toThs(thn_upper_x)
@@ -532,14 +548,10 @@ c
               ths_upper_y = toThs(thn_upper_y)
 
               ! calculate thn at corners
-              thn_imhalf_jphalf = 0.25d0*(thn(i0-1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0-1,i1+1))
-              thn_imhalf_jmhalf = 0.25d0*(thn(i0,i1)+thn(i0-1,i1)
-     &                               +thn(i0,i1-1)+thn(i0-1,i1-1))
-              thn_iphalf_jphalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0+1,i1+1))
-              thn_iphalf_jmhalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1-1)+thn(i0+1,i1-1))
+              thn_imhalf_jphalf = thn_nc(i0,i1+1)
+              thn_imhalf_jmhalf = thn_nc(i0,i1)
+              thn_iphalf_jphalf = thn_nc(i0+1,i1+1)
+              thn_iphalf_jmhalf = thn_nc(i0+1,i1)
 
               ths_imhalf_jphalf = toThs(thn_imhalf_jphalf)
               ths_imhalf_jmhalf = toThs(thn_imhalf_jmhalf)
@@ -977,7 +989,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        p, p_gcw, f_p, f_p_gcw,
      &        f_un_0, f_un_1, f_un_gcw,
      &        f_us_0, f_us_1, f_us_gcw,
-     &        thn, thn_gcw, eta_n, eta_s, l_n, l_s,
+     &        thn, thn_gcw, thn_nc, thn_nc_gcw,
+     &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s, l_n, l_s,
      &        xi_0, xi_1, xi_gcw,
      &        w, C, D, red_or_black)
 c
@@ -988,11 +1001,20 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow0,  iup0
         integer ilow1,  iup1
         integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
-        integer f_p_gcw, thn_gcw, red_or_black
+        integer f_p_gcw, red_or_black
         double precision eta_n, eta_s, l_n, l_s, w, C, D
 c
-        double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
+      integer thn_gcw
+      double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
      &            ilow1-thn_gcw:iup1+thn_gcw)
+      integer thn_nc_gcw
+      double precision thn_nc(ilow0-thn_nc_gcw:iup0+thn_nc_gcw+1,
+     &            ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)
+      integer thn_sc_gcw
+      double precision thn_sc_0(ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw)
+      double precision thn_sc_1(ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1)
 c
         double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,
      &            ilow1-un_gcw:iup1+un_gcw)
@@ -1049,10 +1071,10 @@ c
 c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
 
-              thn_lower_x = 0.5d0*(thn(i0,i1)+thn(i0-1,i1))
-              thn_upper_x = 0.5d0*(thn(i0,i1)+thn(i0+1,i1))
-              thn_lower_y = 0.5d0*(thn(i0,i1)+thn(i0,i1-1))
-              thn_upper_y = 0.5d0*(thn(i0,i1)+thn(i0,i1+1))
+              thn_lower_x = thn_sc_0(i0,i1)
+              thn_upper_x = thn_sc_0(i0+1,i1)
+              thn_lower_y = thn_sc_1(i0,i1)
+              thn_upper_y = thn_sc_1(i0,i1+1)
 
               ths_lower_x = toThs(thn_lower_x)
               ths_upper_x = toThs(thn_upper_x)
@@ -1060,14 +1082,10 @@ c
               ths_upper_y = toThs(thn_upper_y)
 
               ! calculate thn at corners
-              thn_imhalf_jphalf = 0.25d0*(thn(i0-1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0-1,i1+1))
-              thn_imhalf_jmhalf = 0.25d0*(thn(i0,i1)+thn(i0-1,i1)
-     &                               +thn(i0,i1-1)+thn(i0-1,i1-1))
-              thn_iphalf_jphalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0+1,i1+1))
-              thn_iphalf_jmhalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1-1)+thn(i0+1,i1-1))
+              thn_imhalf_jphalf = thn_nc(i0,i1+1)
+              thn_imhalf_jmhalf = thn_nc(i0,i1)
+              thn_iphalf_jphalf = thn_nc(i0+1,i1+1)
+              thn_iphalf_jmhalf = thn_nc(i0+1,i1)
 
               ths_imhalf_jphalf = toThs(thn_imhalf_jphalf)
               ths_imhalf_jmhalf = toThs(thn_imhalf_jmhalf)
@@ -1399,7 +1417,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        p, p_gcw, f_p, f_p_gcw,
      &        f_un_0, f_un_1, f_un_gcw,
      &        f_us_0, f_us_1, f_us_gcw,
-     &        thn, thn_gcw, eta_n, eta_s, l_n, l_s,
+     &        thn, thn_gcw, thn_nc, thn_nc_gcw,
+     &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s, l_n, l_s,
      &        xi_0, xi_1, xi_gcw,
      &        w, C, D, red_or_black,
      &        mask_0, mask_1, mask_gcw)
@@ -1411,11 +1430,20 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow0,  iup0
         integer ilow1,  iup1
         integer un_gcw, us_gcw, p_gcw, f_un_gcw, f_us_gcw
-        integer f_p_gcw, thn_gcw, red_or_black
+        integer f_p_gcw, red_or_black
         double precision eta_n, eta_s, l_n, l_s, w, C, D
 c
-        double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
+      integer thn_gcw
+      double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
      &            ilow1-thn_gcw:iup1+thn_gcw)
+      integer thn_nc_gcw
+      double precision thn_nc(ilow0-thn_nc_gcw:iup0+thn_nc_gcw+1,
+     &            ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)
+      integer thn_sc_gcw
+      double precision thn_sc_0(ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw)
+      double precision thn_sc_1(ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1)
 c
         double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,
      &            ilow1-un_gcw:iup1+un_gcw)
@@ -1478,10 +1506,10 @@ c
 c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
 
-              thn_lower_x = 0.5d0*(thn(i0,i1)+thn(i0-1,i1))
-              thn_upper_x = 0.5d0*(thn(i0,i1)+thn(i0+1,i1))
-              thn_lower_y = 0.5d0*(thn(i0,i1)+thn(i0,i1-1))
-              thn_upper_y = 0.5d0*(thn(i0,i1)+thn(i0,i1+1))
+              thn_lower_x = thn_sc_0(i0,i1)
+              thn_upper_x = thn_sc_0(i0+1,i1)
+              thn_lower_y = thn_sc_1(i0,i1)
+              thn_upper_y = thn_sc_1(i0,i1+1)
 
               ths_lower_x = toThs(thn_lower_x)
               ths_upper_x = toThs(thn_upper_x)
@@ -1489,14 +1517,10 @@ c
               ths_upper_y = toThs(thn_upper_y)
 
               ! calculate thn at corners
-              thn_imhalf_jphalf = 0.25d0*(thn(i0-1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0-1,i1+1))
-              thn_imhalf_jmhalf = 0.25d0*(thn(i0,i1)+thn(i0-1,i1)
-     &                               +thn(i0,i1-1)+thn(i0-1,i1-1))
-              thn_iphalf_jphalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1+1)+thn(i0+1,i1+1))
-              thn_iphalf_jmhalf = 0.25d0*(thn(i0+1,i1)+thn(i0,i1)
-     &                               +thn(i0,i1-1)+thn(i0+1,i1-1))
+              thn_imhalf_jphalf = thn_nc(i0,i1+1)
+              thn_imhalf_jmhalf = thn_nc(i0,i1)
+              thn_iphalf_jphalf = thn_nc(i0+1,i1+1)
+              thn_iphalf_jmhalf = thn_nc(i0+1,i1)
 
               ths_imhalf_jphalf = toThs(thn_imhalf_jphalf)
               ths_imhalf_jmhalf = toThs(thn_imhalf_jmhalf)
