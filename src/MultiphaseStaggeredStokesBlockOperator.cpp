@@ -490,8 +490,17 @@ MultiphaseStaggeredStokesBlockOperator::applySpecialized(const int A_un_idx,
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             if (d_params.isVariableDrag())
-                accumulateMomentumWithoutPressureOnPatchVariableDrag(
-                    patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, d_params, d_C, d_D_u);
+                accumulateMomentumWithoutPressureOnPatchVariableDrag(patch,
+                                                                     A_un_idx,
+                                                                     A_us_idx,
+                                                                     un_idx,
+                                                                     us_idx,
+                                                                     thn_cc_idx,
+                                                                     thn_nc_idx,
+                                                                     thn_sc_idx,
+                                                                     d_params,
+                                                                     d_C,
+                                                                     d_D_u);
             else
                 accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch,
                                                                             A_un_idx,

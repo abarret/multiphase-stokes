@@ -85,6 +85,11 @@ extern "C"
                           const int&,    // f_us_gcw
                           double* const, // thn_data
                           const int&,    // thn_gcw
+                          double* const, // thn_nc_data
+                          const int&,
+                          double* const, // thn_sc_0
+                          double* const, // thn_sc_1
+                          const int&,
                           const double&, // eta_n
                           const double&, // eta_s
                           const double&, // l_n
@@ -343,6 +348,8 @@ MultiphaseStaggeredStokesVelocityFACOperator::smoothError(
     const int un_idx = error.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = error.getComponentDescriptorIndex(1); // solvent velocity, Us
     const int thn_cc_idx = d_thn_manager->getCellIndex();
+    const int thn_nc_idx = d_thn_manager->getNodeIndex();
+    const int thn_sc_idx = d_thn_manager->getSideIndex();
     const int f_un_idx = residual.getComponentDescriptorIndex(0); // RHS_Un
     const int f_us_idx = residual.getComponentDescriptorIndex(1); // RHS_Us
 
@@ -437,6 +444,8 @@ MultiphaseStaggeredStokesVelocityFACOperator::smoothError(
             double dy_dy = (dx[1] * dx[1]);
             double dx_dy = (dx[0] * dx[1]);
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
+            Pointer<NodeData<NDIM, double>> thn_nc_data = patch->getPatchData(thn_nc_idx);
+            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(thn_sc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
@@ -453,27 +462,9 @@ MultiphaseStaggeredStokesVelocityFACOperator::smoothError(
                 d_bc_us_helper->copyDataAtDirichletBoundaries(us_data, f_us_data, patch);
             }
 
-            double* const un_data_0 = un_data->getPointer(0);
-            double* const un_data_1 = un_data->getPointer(1);
-            double* const us_data_0 = us_data->getPointer(0);
-            double* const us_data_1 = us_data->getPointer(1);
-            double* const thn_ptr_data = thn_data->getPointer(0);
-            double* const f_un_data_0 = f_un_data->getPointer(0);
-            double* const f_un_data_1 = f_un_data->getPointer(1);
-            double* const f_us_data_0 = f_us_data->getPointer(0);
-            double* const f_us_data_1 = f_us_data->getPointer(1);
-
             const Box<NDIM>& patch_box = patch->getBox();
-            const IntVector<NDIM>& patch_lower =
-                patch_box.lower(); // patch_lower(0), patch_lower(1) are min indices in x and y-dir
-            const IntVector<NDIM>& patch_upper =
-                patch_box.upper(); // patch_upper(0), patch_upper(1) are max indices in x and y-dir
-
-            const IntVector<NDIM>& thn_gcw = thn_data->getGhostCellWidth();
-            const IntVector<NDIM>& un_gcw = un_data->getGhostCellWidth();
-            const IntVector<NDIM>& us_gcw = us_data->getGhostCellWidth();
-            const IntVector<NDIM>& f_un_gcw = f_un_data->getGhostCellWidth();
-            const IntVector<NDIM>& f_us_gcw = f_us_data->getGhostCellWidth();
+            const IntVector<NDIM>& patch_lower = patch_box.lower();
+            const IntVector<NDIM>& patch_upper = patch_box.upper();
             int red_or_black = sweep % 2; // red = 0 and black = 1
             // if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
             //     d_bc_us_helper->patchTouchesDirichletBoundary(patch))
@@ -492,20 +483,25 @@ MultiphaseStaggeredStokesVelocityFACOperator::smoothError(
                                  patch_upper(0), // iupper0
                                  patch_lower(1), // ilower1
                                  patch_upper(1), // iupper1
-                                 un_data_0,
-                                 un_data_1,
-                                 un_gcw.min(),
-                                 us_data_0,
-                                 us_data_1,
-                                 us_gcw.min(),
-                                 f_un_data_0,
-                                 f_un_data_1,
-                                 f_un_gcw.min(),
-                                 f_us_data_0,
-                                 f_us_data_1,
-                                 f_us_gcw.min(),
-                                 thn_ptr_data,
-                                 thn_gcw.min(),
+                                 un_data->getPointer(0),
+                                 un_data->getPointer(1),
+                                 un_data->getGhostCellWidth().min(),
+                                 us_data->getPointer(0),
+                                 us_data->getPointer(1),
+                                 us_data->getGhostCellWidth().min(),
+                                 f_un_data->getPointer(0),
+                                 f_un_data->getPointer(1),
+                                 f_un_data->getGhostCellWidth().min(),
+                                 f_us_data->getPointer(0),
+                                 f_us_data->getPointer(1),
+                                 f_us_data->getGhostCellWidth().min(),
+                                 thn_data->getPointer(),
+                                 thn_data->getGhostCellWidth().min(),
+                                 thn_nc_data->getPointer(),
+                                 thn_nc_data->getGhostCellWidth().min(),
+                                 thn_sc_data->getPointer(0),
+                                 thn_sc_data->getPointer(1),
+                                 thn_sc_data->getGhostCellWidth().min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
                                  d_params.lambda_n,
@@ -554,6 +550,8 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
     const int res_un_idx = residual.getComponentDescriptorIndex(0);
     const int res_us_idx = residual.getComponentDescriptorIndex(1);
     const int thn_cc_idx = d_thn_manager->getCellIndex();
+    const int thn_sc_idx = d_thn_manager->getSideIndex();
+    const int thn_nc_idx = d_thn_manager->getNodeIndex();
 
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
@@ -611,7 +609,7 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
             //         //patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
             // else
             computeVelocitySubBlockOnPatch(
-                *patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_cc_idx, d_params, d_C, d_D);
+                *patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, d_C, d_D);
 
             for (int axis = 0; axis < NDIM; ++axis)
             {

@@ -127,6 +127,8 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     bp_vec.addComponent(d_p_scr_var, d_p_scr_idx, b.getControlVolumeIndex(2), d_hier_cc_data_ops);
 
     const int thn_cc_idx = d_thn_manager->getCellIndex();
+    const int thn_sc_idx = d_thn_manager->getSideIndex();
+    const int thn_nc_idx = d_thn_manager->getNodeIndex();
 
     /*
      * The preconditioner solves:
@@ -165,7 +167,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     multiphase_grad_on_hierarchy(*d_hierarchy,
                                  d_un_scr_idx,
                                  d_us_scr_idx,
-                                 thn_cc_idx,
+                                 thn_sc_idx,
                                  p_vec.getComponentDescriptorIndex(0),
                                  -1.0,
                                  false,
@@ -184,6 +186,8 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                                                          d_un_scr_idx,
                                                          d_us_scr_idx,
                                                          thn_cc_idx,
+                                                         thn_nc_idx,
+                                                         thn_sc_idx,
                                                          d_params,
                                                          d_C,
                                                          d_D,
@@ -194,7 +198,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                              bp_vec.getComponentDescriptorIndex(0),
                              d_fn_scr_idx,
                              d_fs_scr_idx,
-                             thn_cc_idx,
+                             thn_sc_idx,
                              1.0,
                              d_coarsest_ln,
                              d_finest_ln);
