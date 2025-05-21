@@ -255,20 +255,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::restrictResidual(const SAMRAIVecto
     const int src_us_idx = src.getComponentDescriptorIndex(1);
     std::array<int, 2> src_idxs = { src_un_idx, src_us_idx };
 
-    // SAMRAI's refine operators will copy data from patch interiors if the patch indices are different.
-    // Therefore, I don't think we need to do this
-    // TODO: test if this is necessary.
-    if (dst_un_idx != src_un_idx)
-    {
-        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
-        level_sc_data_ops.copyData(dst_un_idx, src_un_idx, false /*interior_only*/);
-    }
-    if (dst_us_idx != src_us_idx)
-    {
-        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
-        level_sc_data_ops.copyData(dst_us_idx, src_us_idx, false /*interior_only*/);
-    }
-
     // Now perform restriction
     performRestriction(dst_idxs, src_idxs, dst_ln);
     return;
@@ -440,9 +426,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::smoothError(
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            double dx_dx = (dx[0] * dx[0]);
-            double dy_dy = (dx[1] * dx[1]);
-            double dx_dy = (dx[0] * dx[1]);
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             Pointer<NodeData<NDIM, double>> thn_nc_data = patch->getPatchData(thn_nc_idx);
             Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(thn_sc_idx);
@@ -560,7 +543,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(2);
     transaction_comps[0] = InterpolationTransactionComponent(un_idx,
-                                                             un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
@@ -569,7 +551,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
                                                              d_un_bc_coefs, // modifiy?
                                                              d_un_fill_pattern);
     transaction_comps[1] = InterpolationTransactionComponent(us_idx,
-                                                             us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
@@ -590,9 +571,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const double* const xlow =
-                pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
-            const hier::Index<NDIM>& idx_low = patch->getBox().lower();
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> rhs_un_data =
@@ -799,26 +777,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::initializeOperatorState(const SAMR
                 d_patch_side_bc_box_overlap[ln][patch_counter][axis] = BoxList<NDIM>(side_ghost_box);
                 d_patch_side_bc_box_overlap[ln][patch_counter][axis].removeIntersections(side_box);
             }
-        }
-    }
-
-    d_patch_cell_bc_box_overlap.resize(finest_ln + 1);
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-
-        const int num_local_patches = level->getProcessorMapping().getLocalIndices().getSize();
-        d_patch_cell_bc_box_overlap[ln].resize(num_local_patches);
-
-        int patch_counter = 0;
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++patch_counter)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            const Box<NDIM>& patch_box = patch->getBox();
-            const Box<NDIM>& ghost_box = Box<NDIM>::grow(patch_box, 1);
-
-            d_patch_cell_bc_box_overlap[ln][patch_counter] = BoxList<NDIM>(ghost_box);
-            d_patch_cell_bc_box_overlap[ln][patch_counter].removeIntersections(patch_box);
         }
     }
 
