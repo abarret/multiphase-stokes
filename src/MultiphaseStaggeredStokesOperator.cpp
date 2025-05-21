@@ -535,8 +535,19 @@ MultiphaseStaggeredStokesOperator::applySpecialized(const int A_P_idx,
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             if (d_params.isVariableDrag())
-                accumulateMomentumForcesOnPatchVariableDrag(
-                    patch, A_un_idx, A_us_idx, p_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D_u, d_D_p);
+                accumulateMomentumForcesOnPatchVariableDrag(patch,
+                                                            A_un_idx,
+                                                            A_us_idx,
+                                                            p_idx,
+                                                            un_idx,
+                                                            us_idx,
+                                                            thn_idx,
+                                                            thn_nc_idx,
+                                                            thn_sc_idx,
+                                                            d_params,
+                                                            d_C,
+                                                            d_D_u,
+                                                            d_D_p);
             else
                 accumulateMomentumForcesOnPatchConstantCoefficient(patch,
                                                                    A_un_idx,

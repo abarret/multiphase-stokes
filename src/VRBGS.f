@@ -33,7 +33,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        us_0, us_1, us_gcw,
      &        f_un_0, f_un_1, f_un_gcw,
      &        f_us_0, f_us_1, f_us_gcw,
-     &        thn, thn_gcw, eta_n, eta_s,
+     &        thn, thn_gcw, thn_nc, thn_nc_gcw,
+     &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s,
      &        nu_n, nu_s, xi, w, C, D, red_or_black)
 c
         use convert_to_ths
@@ -43,11 +44,20 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow0,  iup0
         integer ilow1,  iup1
         integer un_gcw, us_gcw, f_un_gcw, f_us_gcw
-        integer thn_gcw, red_or_black
+        integer red_or_black
         double precision eta_n, eta_s, nu_n, nu_s, xi, w, C, D
 c
+        integer thn_gcw
         double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
      &            ilow1-thn_gcw:iup1+thn_gcw)
+        integer thn_nc_gcw
+        double precision thn_nc(ilow0-thn_nc_gcw:iup0+thn_nc_gcw+1,
+     &            ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)
+        integer thn_sc_gcw
+        double precision thn_sc_0(ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw)
+        double precision thn_sc_1(ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1)
 c
         double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,  ! Adding 1 because # of sides = # of cells + 1
      &            ilow1-un_gcw:iup1+un_gcw)
@@ -91,13 +101,11 @@ c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
 c
               ! calculate thn at sides
-              thn_lower_x = 0.5d0*(thn(i0,i1)+thn(i0-1,i1))  ! thn(i-1/2, j)
+              thn_lower_x = thn_sc_0(i0,i1)
 
               ! calculate thn at corners
-              thn_imh_jph = 0.25d0*(thn(i0-1, i1) + thn(i0,i1)
-     &                       +thn(i0,i1+1) + thn(i0-1,i1+1))   ! thn(i-1/2, j+1/2)
-              thn_imh_jmh = 0.25d0*(thn(i0, i1) + thn(i0-1,i1)
-     &                       +thn(i0,i1-1) + thn(i0-1,i1-1))   ! thn(i-1/2, j-1/2)
+              thn_imh_jph = thn_nc(i0,i1+1)
+              thn_imh_jmh = thn_nc(i0,i1)
 
               ! solve for network velocities
               un_imhalf_j = f_un_0(i0,i1) - (D * eta_n *
@@ -157,13 +165,11 @@ c     Loop over side centers in y-dir
 c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
               ! calculate thn at (i,j-1/2)
-              thn_lower_y = 0.5d0*(thn(i0,i1)+thn(i0,i1-1))  ! thn(i, j-1/2)
+              thn_lower_y = thn_sc_1(i0,i1)
 
               ! calculate thn at corners
-              thn_imh_jmh = 0.25d0*(thn(i0, i1) + thn(i0-1,i1)
-     &                       +thn(i0,i1-1) + thn(i0-1,i1-1))   ! thn(i-1/2, j-1/2)
-              thn_iph_jmh = 0.25d0*(thn(i0+1, i1) + thn(i0,i1)
-     &                       +thn(i0,i1-1) + thn(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
+              thn_imh_jmh = thn_nc(i0,i1)
+              thn_iph_jmh = thn_nc(i0+1,i1)
 
               ! solve for network velocities
               un_i_jmhalf = f_un_1(i0,i1) - (D * eta_n
@@ -227,7 +233,8 @@ c
      &        us_0, us_1, us_gcw,
      &        f_un_0, f_un_1, f_un_gcw,
      &        f_us_0, f_us_1, f_us_gcw,
-     &        thn, thn_gcw, eta_n, eta_s,
+     &        thn, thn_gcw, thn_nc, thn_nc_gcw,
+     &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s,
      &        l_n, l_s, xi, w, C, D, red_or_black)
      c
         use convert_to_ths
@@ -237,12 +244,21 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow0,  iup0
         integer ilow1,  iup1
         integer un_gcw, us_gcw, f_un_gcw, f_us_gcw
-        integer thn_gcw, red_or_black
+        integer red_or_black
         double precision eta_n, eta_s, l_n, l_s, xi, w, C, D
 c
+        integer thn_gcw
         double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
      &            ilow1-thn_gcw:iup1+thn_gcw)
-     c
+        integer thn_nc_gcw
+        double precision thn_nc(ilow0-thn_nc_gcw:iup0+thn_nc_gcw+1,
+     &            ilow1-thn_nc_gcw:iup1+thn_nc_gcw+1)
+        integer thn_sc_gcw
+        double precision thn_sc_0(ilow0-thn_sc_gcw:iup0+thn_sc_gcw+1,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw)
+        double precision thn_sc_1(ilow0-thn_sc_gcw:iup0+thn_sc_gcw,
+     &            ilow1-thn_sc_gcw:iup1+thn_sc_gcw+1)
+
         double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,  ! Adding 1 because # of sides = # of cells + 1
      &            ilow1-un_gcw:iup1+un_gcw)
         double precision un_1(ilow0-un_gcw:iup0+un_gcw,
@@ -292,14 +308,12 @@ c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
 c
               ! calculate thn at sides
-              thn_lower_x = 0.5d0*(thn(i0,i1)+thn(i0-1,i1))  ! thn(i-1/2, j)
+              thn_lower_x = thn_sc_0(i0,i1)
               ths_lower_x = toThs(thn_lower_x)
 
               ! calculate thn at corners
-              thn_imh_jph = 0.25d0*(thn(i0-1, i1) + thn(i0,i1)
-     &                      +thn(i0,i1+1) + thn(i0-1,i1+1))   ! thn(i-1/2, j+1/2)
-              thn_imh_jmh = 0.25d0*(thn(i0, i1) + thn(i0-1,i1)
-     &                      +thn(i0,i1-1) + thn(i0-1,i1-1))   ! thn(i-1/2, j-1/2)
+              thn_imh_jph = thn_nc(i0,i1+1)
+              thn_imh_jmh = thn_nc(i0,i1)
               ths_imh_jph = toThs(thn_imh_jph)
               ths_imh_jmh = toThs(thn_imh_jmh)
 
@@ -375,15 +389,13 @@ c     Loop over side centers in y-dir
 c
             if( mod(i0+i1,2) .EQ. red_or_black ) then
               ! calculate thn at (i,j-1/2)
-              thn_lower_y = 0.5d0*(thn(i0,i1)+thn(i0,i1-1))  ! thn(i, j-1/2)
+              thn_lower_y = thn_sc_1(i0,i1)
               ths_lower_y = toThs(thn_lower_y)
 
               ! calculate thn at corners
-              thn_imh_jmh = 0.25d0*(thn(i0, i1) + thn(i0-1,i1)
-     &                      +thn(i0,i1-1) + thn(i0-1,i1-1))   ! thn(i-1/2, j-1/2)
+              thn_imh_jmh = thn_nc(i0,i1)
               ths_imh_jmh = toThs(thn_imh_jmh)
-              thn_iph_jmh = 0.25d0*(thn(i0+1, i1) + thn(i0,i1)
-     &                      +thn(i0,i1-1) + thn(i0+1,i1-1))    ! thn(i+1/2, j-1/2)
+              thn_iph_jmh = thn_nc(i0+1,i1)
               ths_iph_jmh = toThs(thn_iph_jmh)
 
               ! solve for network velocities
