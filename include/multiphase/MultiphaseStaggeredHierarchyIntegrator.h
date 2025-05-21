@@ -10,6 +10,7 @@
 #include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
+#include "multiphase/VolumeFractionDataManager.h"
 #include "multiphase/utility_functions.h"
 
 #include "ibamr/INSHierarchyIntegrator.h"
@@ -404,6 +405,7 @@ protected:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_cc_var;
     SAMRAI::tbox::Pointer<IBTK::CartGridFunction> d_thn_fcn;
     SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_thn_integrator;
+    std::unique_ptr<VolumeFractionDataManager> d_thn_cur_manager, d_thn_scr_manager, d_thn_new_manager;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
 
     // Scratch force index

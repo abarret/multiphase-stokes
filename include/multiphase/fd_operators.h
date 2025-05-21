@@ -24,11 +24,6 @@ namespace multiphase
  *
  * These functions result in a runtime error if params.isVariableDrag() returns true.
  */
-///\{
-/*!
- * Accumulate the momentum forces for constant coefficient problems with the network volume fraction interpolated
- * to cell nodes and cell sides.
- */
 void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
                                                         int A_un_idx,
                                                         int A_us_idx,
@@ -42,25 +37,6 @@ void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SA
                                                         double C,
                                                         double D_u,
                                                         double D_p);
-/*!
- * Accumulate the momentum forces for constant coefficient problems with the network volume fraction only provided at
- * cell centers. In this case, the volume fraction is linearly interpolated to respective sides and nodes when
- * necessary.
- *
- * Note that no synchronization is provided on the volume fraction when linear interpolation is done.
- */
-void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                                        int A_un_idx,
-                                                        int A_us_idx,
-                                                        int p_idx,
-                                                        int un_idx,
-                                                        int us_idx,
-                                                        int thn_idx,
-                                                        const MultiphaseParameters& params,
-                                                        double C,
-                                                        double D_u,
-                                                        double D_p);
-///\}
 
 /*!
  * Accumulate the forces into respective patch indices for the network and solvent
@@ -88,6 +64,8 @@ void accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::h
                                                  int un_idx,
                                                  int us_idx,
                                                  int thn_idx,
+                                                 int thn_nc_idx,
+                                                 int thn_sc_idx,
                                                  const MultiphaseParameters& params,
                                                  double C,
                                                  double D_u,
@@ -122,28 +100,15 @@ void accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::P
                                                                  const MultiphaseParameters& params,
                                                                  double C,
                                                                  double D_u);
-/*!
- * Accumulate the momentum forces for constant coefficient problems with the network volume fraction only provided at
- * cell centers. In this case, the volume fraction is linearly interpolated to respective sides and nodes when
- * necessary.
- *
- * Note that no synchronization is provided on the volume fraction when linear interpolation is done.
- */
-void accumulateMomentumWithoutPressureOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                                                 const int F_un_idx,
-                                                                 const int F_us_idx,
-                                                                 const int un_idx,
-                                                                 const int us_idx,
-                                                                 const int thn_idx,
-                                                                 const MultiphaseParameters& params,
-                                                                 const double C,
-                                                                 const double D_u);
+
 void accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
                                                           const int F_un_idx,
                                                           const int F_us_idx,
                                                           const int un_idx,
                                                           const int us_idx,
                                                           const int thn_idx,
+                                                          const int thn_nc_idx,
+                                                          const int thn_sc_idx,
                                                           const MultiphaseParameters& params,
                                                           const double C,
                                                           const double D_u,
@@ -175,6 +140,8 @@ void accumulateMomentumWithoutPressureOnPatchVariableDrag(SAMRAI::tbox::Pointer<
                                                           const int un_idx,
                                                           const int us_idx,
                                                           const int thn_idx,
+                                                          const int thn_nc_idx,
+                                                          const int thn_sc_idx,
                                                           const MultiphaseParameters& params,
                                                           const double C,
                                                           const double D_u);
@@ -184,6 +151,8 @@ void accumulateMomentumWithoutPressureVariableDrag(SAMRAI::hier::PatchHierarchy<
                                                    const int un_idx,
                                                    const int us_idx,
                                                    const int thn_idx,
+                                                   const int thn_nc_idx,
+                                                   const int thn_sc_idx,
                                                    const MultiphaseParameters& params,
                                                    const double C,
                                                    const double D_u,
@@ -204,35 +173,17 @@ void applyCoincompressibility(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> p
                               int A_idx,
                               int un_idx,
                               int us_idx,
-                              int thn_idx,
+                              int thn_sc_idx,
                               double D);
 void applyCoincompressibility(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
                               int A_idx,
                               int un_idx,
                               int us_idx,
-                              int thn_idx,
+                              int thn_sc_idx,
                               double D,
                               int coarsest_ln = IBTK::invalid_level_number,
                               int finest_ln = IBTK::invalid_level_number);
 ///}
-
-/*!
- * Computes the G^T*G operator on a given patch. G^T*G is used by the block preconditioner.
- *
- * Specifically, computes
- *
- * D_div * Div{ (D_p(thn^2+ths^2))*Grad }
- *
- * This function acts on cell-centered quantities to produce cell-centered results.
- */
-void preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
-                                   const int GtG_idx,
-                                   const int u_idx, // size of pressure vector
-                                   const int thn_idx,
-                                   const MultiphaseParameters& params,
-                                   const double C,
-                                   const double D_div,
-                                   const double D_p);
 
 /*!
  * Compute G*[u_n; u_s] with G = C*[thn*grad, ths*grad]^T * p.
@@ -248,7 +199,7 @@ void preconditonerBlockGTGOperator(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDI
 void multiphase_grad_on_hierarchy(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
                                   int Gun_idx,
                                   int Gus_idx,
-                                  int thn_idx,
+                                  int thn_sc_idx,
                                   int p_idx,
                                   double C,
                                   bool do_accumulate = true,
@@ -258,7 +209,7 @@ void multiphase_grad_on_hierarchy(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
 void multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
                      int Gun_idx,
                      int Gus_idx,
-                     int thn_idx,
+                     int thn_sc_idx,
                      int p_idx,
                      double C,
                      bool do_accumulate = true);
@@ -280,16 +231,6 @@ void computeVelocitySubBlockOnPatch(const SAMRAI::hier::Patch<NDIM>& patch,
                                     const int thn_idx,
                                     const int thn_nc_idx,
                                     const int thn_sc_idx,
-                                    const MultiphaseParameters& params,
-                                    const double C,
-                                    const double D);
-
-void computeVelocitySubBlockOnPatch(const SAMRAI::hier::Patch<NDIM>& patch,
-                                    const int A_un_idx,
-                                    const int A_us_idx,
-                                    const int un_idx,
-                                    const int us_idx,
-                                    const int thn_idx,
                                     const MultiphaseParameters& params,
                                     const double C,
                                     const double D);

@@ -402,16 +402,6 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
         d_hier_sc_data_ops->scale(rhs_un_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), un_old_idx);
         d_hier_sc_data_ops->scale(rhs_us_idx, -d_params.rho / (dt * alpha * (alpha + 1.0)), us_old_idx);
 
-        // Set Thn boundary conditions
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] =
-            ITC(thn_cur_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, d_thn_bc_coef);
-        HierarchyGhostCellInterpolation hier_ghost_fill;
-        hier_ghost_fill.initializeOperatorState(
-            ghost_cell_comp, d_hierarchy, 0 /*coarsest_ln*/, d_hierarchy->getFinestLevelNumber());
-        hier_ghost_fill.fillData(current_time);
-
         multiply_sc_and_thn(d_fn_scr_idx, un_cur_idx, thn_cur_idx, d_hierarchy);
         multiply_sc_and_ths(d_fs_scr_idx, us_cur_idx, thn_cur_idx, d_hierarchy);
 
@@ -420,16 +410,14 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
     }
     else
     {
-        MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params);
+        MultiphaseStaggeredStokesOperator RHS_op("RHS_op", true, d_params, d_thn_cur_manager);
         RHS_op.setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
-        RHS_op.setRegularizeThn(true, d_regularize_thn);
-        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
+        RHS_op.setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef);
         RHS_op.setSolutionTime(current_time);
         RHS_op.setTimeInterval(current_time, new_time);
         // Divergence free condition and pressure are not time stepped. We do not need to account for the contributions
         // in the RHS.
         RHS_op.setCandDCoefficients(C, D1, 0.0, 0.0);
-        RHS_op.setThnIdx(thn_cur_idx); // Values at time t_n
 
         // Store results of applying stokes operator in rhs_vec
         RHS_op.initializeOperatorState(*d_sol_vec, *d_rhs_vec);
@@ -437,11 +425,9 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
     }
 
     // Set up the operators and solvers needed to solve the linear system.
-    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params);
-    d_stokes_op->setRegularizeThn(true, d_regularize_thn);
-    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef, d_thn_bc_coef);
+    d_stokes_op = new MultiphaseStaggeredStokesOperator("stokes_op", false, d_params, d_thn_new_manager);
+    d_stokes_op->setPhysicalBcCoefs(d_un_bc_coefs, d_us_bc_coefs, d_p_bc_coef);
     d_stokes_op->setCandDCoefficients(C, D2);
-    d_stokes_op->setThnIdx(thn_new_idx); // Approximation at time t_{n+1}
     d_stokes_op->setPhysicalBoundaryHelper(bc_un_helper, bc_us_helper);
     d_stokes_op->setSolutionTime(new_time);
     d_stokes_op->setTimeInterval(current_time, new_time);
@@ -453,29 +439,28 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
     if (d_use_preconditioner)
     {
         d_precond = std::make_unique<MultiphasePreconditioner>(d_precond_type,
-            d_hierarchy,
-            d_precond_db,
-            d_params,
-            C,
-            D2,
-            thn_new_idx,
-            d_nul_vecs,
-            d_un_bc_coefs,
-            d_us_bc_coefs,
-            d_p_bc_coef,
-            d_thn_bc_coef);
+                                                               d_hierarchy,
+                                                               d_precond_db,
+                                                               d_params,
+                                                               C,
+                                                               D2,
+                                                               d_thn_new_manager,
+                                                               d_nul_vecs,
+                                                               d_un_bc_coefs,
+                                                               d_us_bc_coefs,
+                                                               d_p_bc_coef);
         d_stokes_solver->setPreconditioner(d_precond->getPreconditioner());
     }
 
     d_stokes_solver->setSolutionTime(new_time);
     d_stokes_solver->setTimeInterval(current_time, new_time);
-    d_stokes_solver->setNullspace(false, d_nul_vecs);
+    d_stokes_solver->setNullSpace(false, d_nul_vecs);
     d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
 
     // Set thn_cc_idx on the dense hierarchy.
     if (d_use_preconditioner)
     {
-        if (d_precond->updateVolumeFraction(thn_new_idx, d_thn_cc_var, new_time, d_thn_fcn, d_thn_bc_coef))
+        if (d_precond->updateVolumeFraction(d_thn_new_manager, new_time))
         {
             d_stokes_solver->deallocateSolverState();
             d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
@@ -556,8 +541,7 @@ MultiphaseStandardHierarchyIntegrator::integrateHierarchySpecialized(const doubl
     // Update the preconditioner with new volume fraction
     if (d_precond)
     {
-        bool needs_reallocation =
-            d_precond->updateVolumeFraction(thn_new_idx, d_thn_cc_var, new_time, nullptr, d_thn_bc_coef);
+        bool needs_reallocation = d_precond->updateVolumeFraction(d_thn_new_manager, new_time);
         if (isVariableDrag())
         {
             const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
@@ -703,7 +687,7 @@ MultiphaseStandardHierarchyIntegrator::postprocessIntegrateHierarchy(const doubl
         const int fs_old_idx = var_db->mapVariableAndContextToIndex(d_fs_old_var, getCurrentContext());
         const int un_cur_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
         const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
-        const int thn_cur_idx = var_db->mapVariableAndContextToIndex(d_thn_cc_var, getCurrentContext());
+        const int thn_cur_idx = d_thn_cur_manager->getCellIndex();
         const int fn_cur_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
         const int fs_cur_idx = var_db->mapVariableAndContextToIndex(d_f_us_sc_var, getCurrentContext());
 
@@ -850,15 +834,7 @@ MultiphaseStandardHierarchyIntegrator::addBodyForces(Pointer<SAMRAIVectorReal<ND
         d_hier_sc_data_ops->add(d_fs_scr_idx, fs_cloned_idx, d_fs_scr_idx);
     }
 
-    // Now account for scaled forces. We need to compute a volume fraction with ghost cells.
-    {
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp = { ITC(
-            thn_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", true, nullptr) };
-        HierarchyGhostCellInterpolation ghost_fill;
-        ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        ghost_fill.fillData(eval_time);
-    }
+    // Now account for scaled forces. Note volume fractions should always have ghost cells filled
     if (d_f_un_thn_fcn)
     {
         d_f_un_thn_fcn->setDataOnPatchHierarchy(fn_cloned_idx, d_f_un_sc_var, d_hierarchy, eval_time);
@@ -931,34 +907,32 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     const MultiphaseParameters& params,
     const double C,
     const double D,
-    const int thn_idx,
+    const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
     const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-    RobinBcCoefStrategy<NDIM>* p_bc_coef,
-    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+    RobinBcCoefStrategy<NDIM>* p_bc_coef)
     : d_hierarchy(hierarchy), d_precond_type(precond_type)
 {
     switch (d_precond_type)
     {
     case PreconditionerType::BLOCK:
     {
-        d_block_precond = new MultiphaseStaggeredStokesBlockPreconditioner("KrylovPrecondStrategy", params, input_db);
-        d_block_precond->setThnIdx(thn_idx);
+        d_block_precond =
+            new MultiphaseStaggeredStokesBlockPreconditioner("KrylovPrecondStrategy", params, input_db, thn_manager);
         d_block_precond->setCAndDCoefficients(C, D);
-        d_block_precond->setNullspace(false, null_vecs);
+        d_block_precond->setNullSpace(false, null_vecs);
         break;
     }
     case PreconditionerType::MULTIGRID:
     {
-        d_fac_op =
-            new MultiphaseStaggeredStokesBoxRelaxationFACOperator("KrylovPrecondStrategy", "Krylov_precond_", params);
-        d_fac_op->setThnIdx(thn_idx); // Approximation at time t_{n+1}
+        d_fac_op = new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
+            "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
         d_fac_op->setUnderRelaxationParamater(input_db->getDouble("relaxation_parameter"));
         d_fac_op->setCandDCoefficients(C, D);
-        d_fac_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef, thn_bc_coef);
+        d_fac_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef);
         d_fac_precond = new FullFACPreconditioner("KrylovPrecond", d_fac_op, input_db, "Krylov_precond_");
-        d_fac_precond->setNullspace(false, null_vecs);
+        d_fac_precond->setNullSpace(false, null_vecs);
         break;
     }
     default:
@@ -971,54 +945,46 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
 
 bool
 MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(
-    const int thn_idx,
-    Pointer<CellVariable<NDIM, double>>& thn_var,
-    const double time,
-    IBTK::CartGridFunction* thn_fcn,
-    RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+    const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
+    const double time)
 {
     switch (d_precond_type)
     {
     case PreconditionerType::BLOCK:
     {
-        d_block_precond->deallocateSolverState();
-        d_block_precond->setThnIdx(thn_idx);
+        if (d_block_precond->getVolumeFractionManager() == thn_manager)
+        {
+            d_block_precond->deallocateSolverState();
+        }
+        else
+        {
+            TBOX_ERROR(
+                "MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(): Can't hot "
+                "swap volume fraction managers!\n");
+        }
+
         return true;
         break;
     }
     case PreconditionerType::MULTIGRID:
     {
-        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_fac_precond->getDenseHierarchy();
-        if (thn_fcn)
+        Pointer<FACPreconditionerStrategy> fac_strat = d_fac_precond->getFACPreconditionerStrategy();
+        Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> box_relax_op = fac_strat;
+        if (box_relax_op)
         {
-            // Allocate data
-            for (int ln = 0; ln <= dense_hierarchy->getFinestLevelNumber(); ++ln)
+            if (box_relax_op->getVolumeFractionManager() == thn_manager)
             {
-                Pointer<PatchLevel<NDIM>> level = dense_hierarchy->getPatchLevel(ln);
-                if (!level->checkAllocated(thn_idx)) level->allocatePatchData(thn_idx, time);
+                Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_fac_precond->getDenseHierarchy();
+                d_fac_precond->transferToDense(thn_manager->getCellIndex());
+                thn_manager->updateVolumeFraction(thn_manager->getCellIndex(), dense_hierarchy, time);
             }
-            thn_fcn->setDataOnPatchHierarchy(
-                thn_idx, thn_var, dense_hierarchy, time, false, 0, dense_hierarchy->getFinestLevelNumber());
+            else
+            {
+                TBOX_ERROR(
+                    "MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(): Can't "
+                    "hot swap volume fraction managers!\n");
+            }
         }
-        else
-        {
-            d_fac_precond->transferToDense(thn_idx, true);
-        }
-
-        // Also fill in ghost cells on the dense hierarchy
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(thn_idx,
-                                 "CONSERVATIVE_LINEAR_REFINE",
-                                 false,
-                                 "NONE",
-                                 "LINEAR",
-                                 true,
-                                 thn_bc_coef); // defaults to fill corner
-        HierarchyGhostCellInterpolation ghost_cell_fill;
-        ghost_cell_fill.initializeOperatorState(
-            ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(time);
         return false;
         break;
     }

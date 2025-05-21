@@ -6,6 +6,7 @@
 #include <ibtk/config.h>
 
 #include "multiphase/MultiphaseParameters.h"
+#include "multiphase/VolumeFractionDataManager.h"
 
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/FACPreconditionerStrategy.h"
@@ -40,17 +41,22 @@ public:
      */
     MultiphaseStaggeredStokesBoxRelaxationFACOperator(const std::string& object_name,
                                                       const std::string& default_options_prefix,
-                                                      const MultiphaseParameters& params);
+                                                      const MultiphaseParameters& params,
+                                                      const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
 
     /*!
      * \brief Destructor.
      */
     ~MultiphaseStaggeredStokesBoxRelaxationFACOperator();
 
+    const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
+    {
+        return d_thn_manager;
+    }
+
     void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                             const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef,
-                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
 
     /*!
      * \name Functions for configuring the solver.
@@ -120,9 +126,6 @@ public:
                      bool performing_pre_sweeps,
                      bool performing_post_sweeps) override;
 
-    /*! \brief This method sets up the patch data indices for \param Thn */
-    void setThnIdx(int thn_idx);
-
     /*!
      * \brief Solve the residual equation Ae=r on the coarsest level of the
      * patch hierarchy.
@@ -173,54 +176,7 @@ public:
      */
     void setCandDCoefficients(double C, double D);
 
-    /*!
-     * If `regularize_thn` is true, then the volume fraction will be regularized by the specified amount. Specifically,
-     * the volume fraction will be set to \f$thn = max(min_thn, min(thn, 1.0 - min_thn))\f$.
-     *
-     * This will regularize both interior cells and ghost cells.
-     * @{
-     */
-    inline void setRegularizeThn(bool regularize_thn, double min_thn)
-    {
-        d_regularize_thn = regularize_thn;
-        d_min_thn = min_thn;
-    }
-
-    inline void setRegularizeThn(bool regularize_thn)
-    {
-        setRegularizeThn(regularize_thn, d_min_thn);
-    }
-    /*@}*/
-
 private:
-    /*!
-     * \brief Default constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     */
-    MultiphaseStaggeredStokesBoxRelaxationFACOperator() = delete;
-
-    /*!
-     * \brief Copy constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     *
-     * \param from The value to copy to this object.
-     */
-    MultiphaseStaggeredStokesBoxRelaxationFACOperator(const MultiphaseStaggeredStokesBoxRelaxationFACOperator& from) =
-        delete;
-
-    /*!
-     * \brief Assignment operator.
-     *
-     * \note This operator is not implemented and should not be used.
-     *
-     * \param that The value to assign to this object.
-     *
-     * \return A reference to this object.
-     */
-    MultiphaseStaggeredStokesBoxRelaxationFACOperator&
-    operator=(const MultiphaseStaggeredStokesBoxRelaxationFACOperator& that) = delete;
 
     /*!
      * \brief Perform prolongation or restriction on the provided indices.
@@ -268,12 +224,12 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_ghostfill_no_restrict_scheds;
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_ghostfill_no_restrict_alg;
 
-    int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index, d_p_scr_idx = IBTK::invalid_index;
     double d_w = 0.75;                                     // under relaxation factor
     double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
     double d_D = std::numeric_limits<double>::quiet_NaN(); // D depends on time stepping scheme
     const MultiphaseParameters& d_params;
+    const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
     std::unique_ptr<SAMRAI::solv::RobinBcCoefStrategy<NDIM>> d_default_un_bc_coef, d_default_us_bc_coef,
@@ -281,7 +237,6 @@ private:
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef = nullptr;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
     SAMRAI::tbox::Pointer<IBTK::CartSideRobinPhysBdryOp> d_un_bc_op, d_us_bc_op;
     SAMRAI::tbox::Pointer<IBTK::CartCellRobinPhysBdryOp> d_P_bc_op, d_thn_bc_op;
     std::unique_ptr<SAMRAI::xfer::RefinePatchStrategy<NDIM>> d_vel_P_bc_op;
@@ -296,11 +251,6 @@ private:
     SAMRAI::tbox::Pointer<IBTK::StaggeredPhysicalBoundaryHelper> d_bc_un_helper, d_bc_us_helper;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, int>> d_mask_var;
     int d_mask_idx = IBTK::invalid_index;
-
-    bool d_regularize_thn = false;
-    double d_min_thn = 1.0e-5;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_scr_var;
-    int d_thn_scr_idx = IBTK::invalid_index;
 };
 } // namespace multiphase
 
