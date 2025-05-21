@@ -88,12 +88,12 @@ main(int argc, char* argv[])
         Pointer<SideVariable<NDIM, double>> e_us_sc_var = new SideVariable<NDIM, double>("e_us_sc");
         Pointer<CellVariable<NDIM, double>> e_cc_var = new CellVariable<NDIM, double>("e_cc");
 
+        auto thn_manager = std::make_unique<VolumeFractionDataManager>("ThnManager", ctx, thn_cc_var, nullptr, 1.0e-5);
+
         // Register patch data indices...
         const int un_sc_idx = var_db->registerVariableAndContext(un_sc_var, ctx, IntVector<NDIM>(1));
         const int us_sc_idx = var_db->registerVariableAndContext(us_sc_var, ctx, IntVector<NDIM>(1));
         const int p_cc_idx = var_db->registerVariableAndContext(p_cc_var, ctx, IntVector<NDIM>(1));
-        const int thn_cc_idx =
-            var_db->registerVariableAndContext(thn_cc_var, ctx, IntVector<NDIM>(1)); // 1 layer of ghost cells
         const int f_cc_idx = var_db->registerVariableAndContext(f_cc_var, ctx, IntVector<NDIM>(1));
         const int f_un_sc_idx = var_db->registerVariableAndContext(f_un_sc_var, ctx, IntVector<NDIM>(1));
         const int f_us_sc_idx = var_db->registerVariableAndContext(f_us_sc_var, ctx, IntVector<NDIM>(1));
@@ -121,7 +121,7 @@ main(int argc, char* argv[])
         TBOX_ASSERT(visit_data_writer);
 
         visit_data_writer->registerPlotQuantity("Pressure", "SCALAR", p_cc_idx);
-        visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_cc_idx);
+        visit_data_writer->registerPlotQuantity("Thn", "SCALAR", thn_manager->getCellIndex());
         visit_data_writer->registerPlotQuantity("RHS_P", "SCALAR", f_cc_idx);
         visit_data_writer->registerPlotQuantity("error_p", "SCALAR", e_cc_idx);
 
@@ -183,7 +183,6 @@ main(int argc, char* argv[])
             level->allocatePatchData(e_un_sc_idx, 0.0);
             level->allocatePatchData(e_us_sc_idx, 0.0);
             level->allocatePatchData(p_cc_idx, 0.0);
-            level->allocatePatchData(thn_cc_idx, 0.0);
             level->allocatePatchData(f_cc_idx, 0.0);
             level->allocatePatchData(e_cc_idx, 0.0);
             level->allocatePatchData(draw_un_idx, 0.0);
@@ -253,7 +252,7 @@ main(int argc, char* argv[])
         f_un_fcn.setDataOnPatchHierarchy(f_un_sc_idx, f_un_sc_var, patch_hierarchy, 0.0);
         f_us_fcn.setDataOnPatchHierarchy(f_us_sc_idx, f_us_sc_var, patch_hierarchy, 0.0);
         f_p_fcn.setDataOnPatchHierarchy(f_cc_idx, f_cc_var, patch_hierarchy, 0.0);
-        thn_fcn.setDataOnPatchHierarchy(thn_cc_idx, thn_cc_var, patch_hierarchy, 0.0);
+        thn_manager->updateVolumeFraction(thn_fcn, patch_hierarchy, 0.0, TimePoint::CURRENT_TIME);
 
         un_fcn.setDataOnPatchHierarchy(un_sc_idx, un_sc_var, patch_hierarchy, 0.0);
         us_fcn.setDataOnPatchHierarchy(us_sc_idx, us_sc_var, patch_hierarchy, 0.0);
@@ -264,8 +263,7 @@ main(int argc, char* argv[])
         params.xi = params.nu_n = params.nu_s = 1.0;
 
         // Setup the box relaxation FAC operator
-        MultiphaseStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "", params);
-        box_relax.setThnIdx(thn_cc_idx);
+        MultiphaseStaggeredStokesBoxRelaxationFACOperator box_relax("box_relax", "", params, thn_manager);
         box_relax.setToZero(u_vec, 0);
         box_relax.setCandDCoefficients(0.0, 1.0);
         box_relax.setUnderRelaxationParamater(1.0);
@@ -301,7 +299,6 @@ main(int argc, char* argv[])
             level->deallocatePatchData(e_un_sc_idx);
             level->deallocatePatchData(e_us_sc_idx);
             level->deallocatePatchData(p_cc_idx);
-            level->deallocatePatchData(thn_cc_idx);
             level->deallocatePatchData(f_cc_idx);
             level->deallocatePatchData(e_cc_idx);
             level->deallocatePatchData(draw_un_idx);
