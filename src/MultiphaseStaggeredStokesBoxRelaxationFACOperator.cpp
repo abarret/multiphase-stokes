@@ -410,25 +410,6 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::restrictResidual(const SAMRAI
     const int src_p_idx = src.getComponentDescriptorIndex(2);
     std::array<int, 3> src_idxs = { src_un_idx, src_us_idx, src_p_idx };
 
-    // SAMRAI's refine operators will copy data from patch interiors if the patch indices are different.
-    // Therefore, I don't think we need to do this
-    // TODO: test if this is necessary.
-    if (dst_un_idx != src_un_idx)
-    {
-        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
-        level_sc_data_ops.copyData(dst_un_idx, src_un_idx, false /*interior_only*/);
-    }
-    if (dst_us_idx != src_us_idx)
-    {
-        HierarchySideDataOpsReal<NDIM, double> level_sc_data_ops(d_hierarchy, dst_ln, dst_ln);
-        level_sc_data_ops.copyData(dst_us_idx, src_us_idx, false /*interior_only*/);
-    }
-    if (dst_p_idx != src_p_idx)
-    {
-        HierarchyCellDataOpsReal<NDIM, double> level_cc_data_ops(d_hierarchy, dst_ln, dst_ln);
-        level_cc_data_ops.copyData(dst_p_idx, src_p_idx, false /*interior_only*/);
-    }
-
     // Now perform restriction
     performRestriction(dst_idxs, src_idxs, dst_ln);
     return;
@@ -884,7 +865,6 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(3);
     transaction_comps[0] = InterpolationTransactionComponent(un_idx,
-                                                             un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
@@ -893,7 +873,6 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
                                                              d_un_bc_coefs, // modifiy?
                                                              d_un_fill_pattern);
     transaction_comps[1] = InterpolationTransactionComponent(us_idx,
-                                                             us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
