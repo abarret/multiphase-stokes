@@ -235,7 +235,7 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
         double ddx_Thn_dy_vn = 1.0 / (dx[0] * dx[1]) *
                                ((*thn_data)(idx_c_up) * ((*un_data)(upper_y_idx) - (*un_data)(lower_y_idx)) -
                                 (*thn_data)(idx_c_low) * ((*un_data)(u_y_idx) - (*un_data)(l_y_idx)));
-        double visc_stress_n = (2.0 * eta_n - lambda_n) * ddx_Thn_dx_un + eta_n * ddy_Thn_dy_un +
+        double visc_stress_n = (2.0 * eta_n + lambda_n) * ddx_Thn_dx_un + eta_n * ddy_Thn_dy_un +
                                eta_n * ddy_Thn_dx_vn + lambda_n * ddx_Thn_dy_vn;
         double drag_n = -xi / nu_n * thn_lower * convertToThs(thn_lower) * ((*un_data)(idx) - (*us_data)(idx));
         double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
