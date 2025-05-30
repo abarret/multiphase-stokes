@@ -99,7 +99,7 @@ main(int argc, char* argv[])
         ins_integrator->setDragCoefficient(xi, nu_n, nu_s);
 
         // If necessary, grab boundary conditions. Note we only use dirichlet conditions on the flow.
-        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs, us_bc_coefs;
+        std::vector<RobinBcCoefStrategy<NDIM>*> un_bc_coefs(NDIM, nullptr), us_bc_coefs(NDIM, nullptr);
         if (grid_geometry->getPeriodicShift().min() == 0)
         {
             for (int d = 0; d < NDIM; ++d)
