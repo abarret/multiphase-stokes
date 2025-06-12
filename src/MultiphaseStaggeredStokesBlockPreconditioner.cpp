@@ -21,8 +21,10 @@ static constexpr int P_COMP_IDX = 2;
 MultiphaseStaggeredStokesBlockPreconditioner::MultiphaseStaggeredStokesBlockPreconditioner(
     std::string object_name,
     const MultiphaseParameters& params,
-    Pointer<Database> input_db)
+    Pointer<Database> input_db,
+    const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
     : d_params(params),
+      d_thn_manager(thn_manager),
       d_thn_ths_sq_var(new SideVariable<NDIM, double>(object_name + "::ThnThsSq")),
       d_un_scr_var(new SideVariable<NDIM, double>(object_name + "::UN_SCR")),
       d_us_scr_var(new SideVariable<NDIM, double>(object_name + "::US_SCR")),
@@ -97,16 +99,6 @@ MultiphaseStaggeredStokesBlockPreconditioner::~MultiphaseStaggeredStokesBlockPre
 }
 
 void
-MultiphaseStaggeredStokesBlockPreconditioner::setThnIdx(const int thn_idx)
-{
-#ifndef NDEBUG
-    if (d_is_initialized)
-        TBOX_ERROR(d_object_name + "::setThnIdx(). Solver must be uninitialized to set volume fraction!\n");
-#endif
-    d_thn_idx = thn_idx;
-}
-
-void
 MultiphaseStaggeredStokesBlockPreconditioner::setCAndDCoefficients(const double C, const double D)
 {
     d_C = C;
@@ -133,6 +125,10 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     bu_vec.addComponent(d_fn_scr_var, d_fn_scr_idx, b.getControlVolumeIndex(0), d_hier_sc_data_ops);
     bu_vec.addComponent(d_fs_scr_var, d_fs_scr_idx, b.getControlVolumeIndex(1), d_hier_sc_data_ops);
     bp_vec.addComponent(d_p_scr_var, d_p_scr_idx, b.getControlVolumeIndex(2), d_hier_cc_data_ops);
+
+    const int thn_cc_idx = d_thn_manager->getCellIndex();
+    const int thn_sc_idx = d_thn_manager->getSideIndex();
+    const int thn_nc_idx = d_thn_manager->getNodeIndex();
 
     /*
      * The preconditioner solves:
@@ -171,7 +167,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     multiphase_grad_on_hierarchy(*d_hierarchy,
                                  d_un_scr_idx,
                                  d_us_scr_idx,
-                                 d_thn_idx,
+                                 thn_sc_idx,
                                  p_vec.getComponentDescriptorIndex(0),
                                  -1.0,
                                  false,
@@ -189,7 +185,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                                                          d_fs_scr_idx,
                                                          d_un_scr_idx,
                                                          d_us_scr_idx,
-                                                         d_thn_idx,
+                                                         thn_cc_idx,
+                                                         thn_nc_idx,
+                                                         thn_sc_idx,
                                                          d_params,
                                                          d_C,
                                                          d_D,
@@ -200,7 +198,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                              bp_vec.getComponentDescriptorIndex(0),
                              d_fn_scr_idx,
                              d_fs_scr_idx,
-                             d_thn_idx,
+                             thn_sc_idx,
                              1.0,
                              d_coarsest_ln,
                              d_finest_ln);
@@ -233,7 +231,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
             Pointer<SideData<NDIM, double>> bun_data = bu_vec.getComponentPatchData(0, *patch);
             Pointer<SideData<NDIM, double>> bus_data = bu_vec.getComponentPatchData(1, *patch);
             Pointer<CellData<NDIM, double>> p_data = p_vec.getComponentPatchData(0, *patch);
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(d_thn_idx);
+            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(d_thn_manager->getSideIndex());
 
             for (int axis = 0; axis < NDIM; ++axis)
             {
@@ -243,7 +241,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                     // Note: This does not account for any synchronization that needs to occur at coarse-fine
                     // interfaces. Consider using HierarchyMathOps::grad() instead.
                     const double dp = ((*p_data)(idx.toCell(1)) - (*p_data)(idx.toCell(0))) / dx[axis];
-                    const double thn = 0.5 * ((*thn_data)(idx.toCell(1)) + (*thn_data)(idx.toCell(0)));
+                    const double thn = (*thn_sc_data)(idx);
                     (*bun_data)(idx) = (*bun_data)(idx)-thn * dp;
                     (*bus_data)(idx) = (*bus_data)(idx)-convertToThs(thn) * dp;
                 }
@@ -265,7 +263,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     }
 
     // Remove contributions of nullspace
-    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
+    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullSpaceBasisVectors();
     for (const auto& null_vec : null_vecs)
     {
         const double dot_prod = x.dot(null_vec);
@@ -316,14 +314,6 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
                         d_coarsest_ln,
                         d_finest_ln);
 
-    // Need ghost cells of thn to compute thn_ths_sq.
-    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-    std::vector<ITC> ghost_cell_comp{ ITC(
-        d_thn_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", false, d_thn_bc_coefs) };
-    HierarchyGhostCellInterpolation hier_ghost_fill;
-    hier_ghost_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, d_coarsest_ln, d_finest_ln);
-    hier_ghost_fill.fillData(d_solution_time);
-
     // Compute thn_ths_sq.
     for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
     {
@@ -332,7 +322,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
 
-            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(d_thn_idx);
+            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(d_thn_manager->getSideIndex());
             Pointer<SideData<NDIM, double>> thn_ths_sq_data = patch->getPatchData(d_thn_ths_sq_idx);
 
             for (int axis = 0; axis < NDIM; ++axis)
@@ -341,7 +331,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
                 {
                     const SideIndex<NDIM>& idx = si();
 
-                    const double thn = 0.5 * ((*thn_data)(idx.toCell(0)) + (*thn_data)(idx.toCell(1)));
+                    const double thn = (*thn_sc_data)(idx);
                     const double ths = convertToThs(thn);
                     (*thn_ths_sq_data)(idx) = thn * thn + ths * ths;
                 }
@@ -369,35 +359,33 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     if (d_using_symmetric)
     {
         Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op =
-            new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params);
+            new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params, d_thn_manager);
         mp_stokes_op->setCandDCoefficients(d_C, d_D);
         // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
-        mp_stokes_op->setThnIdx(d_thn_idx);
         stokes_op = mp_stokes_op;
     }
     else
     {
         Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op =
-            new MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, d_params);
+            new MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, d_params, d_thn_manager);
         mp_stokes_op->setCandDCoefficients(d_C, d_D);
         // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
-        mp_stokes_op->setThnIdx(d_thn_idx);
         stokes_op = mp_stokes_op;
     }
 
     if (d_using_symmetric)
     {
         Pointer<MultiphaseStaggeredStokesBlockFACOperator> mp_fac_precondition_strategy =
-            new MultiphaseStaggeredStokesBlockFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
-        mp_fac_precondition_strategy->setThnIdx(d_thn_idx);
+            new MultiphaseStaggeredStokesBlockFACOperator(
+                "KrylovPrecondStrategy", "Krylov_precond_", d_params, d_thn_manager);
         mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
         d_stokes_precond_op = mp_fac_precondition_strategy;
     }
     else
     {
         Pointer<MultiphaseStaggeredStokesVelocityFACOperator> mp_fac_precondition_strategy =
-            new MultiphaseStaggeredStokesVelocityFACOperator("KrylovPrecondStrategy", "Krylov_precond_", d_params);
-        mp_fac_precondition_strategy->setThnIdx(d_thn_idx);
+            new MultiphaseStaggeredStokesVelocityFACOperator(
+                "KrylovPrecondStrategy", "Krylov_precond_", d_params, d_thn_manager);
         mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
         d_stokes_precond_op = mp_fac_precondition_strategy;
     }
@@ -409,26 +397,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     d_stokes_solver->setPreconditioner(d_stokes_precond);
     d_stokes_solver->initializeSolverState(u_vec, bu_vec);
 
-    d_stokes_precond->transferToDense(d_thn_idx);
-
-    // Fill ghost cells on the dense hierarchy
-    {
-        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_stokes_precond->getDenseHierarchy();
-        // Also fill in theta ghost cells
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp(1);
-        ghost_cell_comp[0] = ITC(d_thn_idx,
-                                 "CONSERVATIVE_LINEAR_REFINE",
-                                 false,
-                                 "NONE",
-                                 "LINEAR",
-                                 true,
-                                 nullptr); // defaults to fill corner
-        HierarchyGhostCellInterpolation ghost_cell_fill;
-        ghost_cell_fill.initializeOperatorState(
-            ghost_cell_comp, dense_hierarchy, 0, dense_hierarchy->getFinestLevelNumber());
-        ghost_cell_fill.fillData(0.0);
-    }
+    d_stokes_precond->transferToDense(d_thn_manager->getCellIndex());
+    d_thn_manager->updateVolumeFraction(
+        d_thn_manager->getCellIndex(), d_stokes_precond->getDenseHierarchy(), d_solution_time);
 }
 
 void
@@ -441,6 +412,8 @@ MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
                           d_hierarchy,
                           d_coarsest_ln,
                           d_finest_ln);
+
+    d_thn_manager->deallocateData(d_stokes_precond->getDenseHierarchy());
 
     d_coarsest_ln = IBTK::invalid_level_number;
     d_finest_ln = IBTK::invalid_level_number;

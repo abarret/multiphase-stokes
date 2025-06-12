@@ -71,9 +71,11 @@ static Timer* t_deallocate_operator_state;
 } // namespace
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
-MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(const std::string& object_name,
-                                                                               bool homogeneous_bc,
-                                                                               const MultiphaseParameters& params)
+MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(
+    const std::string& object_name,
+    bool homogeneous_bc,
+    const MultiphaseParameters& params,
+    const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
     : LinearOperator(object_name, homogeneous_bc),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
@@ -81,14 +83,9 @@ MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(c
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_us_bc_coef", Pointer<Database>(nullptr))),
       d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef)),
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef)),
-      d_default_thn_bc_coef(
-          new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
-      d_thn_bc_coef(d_default_thn_bc_coef),
       d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable")),
-      d_nc_scr_var(new NodeVariable<NDIM, double>(d_object_name + "::ThnNode", 1, false)),
-      d_cc_ndim_var(new CellVariable<NDIM, double>(d_object_name + "::ThnCell", NDIM)),
-      d_sc_scr_var(new SideVariable<NDIM, double>(d_object_name + "::VelAvg", 1, false)),
-      d_params(params)
+      d_params(params),
+      d_thn_manager(thn_manager)
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -101,9 +98,6 @@ MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(c
         p_default_un_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
         p_default_us_bc_coef->setBoundaryValue(2 * d, 0.0);
         p_default_us_bc_coef->setBoundaryValue(2 * d + 1, 0.0);
-        auto p_default_thn_bc_coef = dynamic_cast<LocationIndexRobinBcCoefs<NDIM>*>(d_default_thn_bc_coef);
-        p_default_thn_bc_coef->setBoundarySlope(2 * d, 0.0);
-        p_default_thn_bc_coef->setBoundarySlope(2 * d + 1, 0.0);
     }
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -113,23 +107,9 @@ MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(c
     d_os_idx =
         var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(0));
 
-    if (var_db->checkVariableExists(d_object_name + "::ThnNode"))
-        d_nc_scr_var = var_db->getVariable(d_object_name + "::ThnNode");
-    d_nc_scr_idx = var_db->registerVariableAndContext(d_nc_scr_var, var_db->getContext(d_object_name + "::CTX"));
-
-    if (var_db->checkVariableExists(d_object_name + "::ThnCell"))
-        d_cc_ndim_var = var_db->getVariable(d_object_name + "::ThnCell");
-    d_cc_ndim_idx = var_db->registerVariableAndContext(
-        d_cc_ndim_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(1));
-
-    if (var_db->checkVariableExists(d_object_name + "::VelAvg"))
-        d_sc_scr_var = var_db->getVariable(d_object_name + "::VelAvg");
-    d_sc_scr_idx = var_db->registerVariableAndContext(d_sc_scr_var, var_db->getContext(d_object_name + "::CTX"));
-
     // Initialize the boundary conditions objects.
     setPhysicalBcCoefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef),
-                       std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef),
-                       d_default_thn_bc_coef);
+                       std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef));
 
     // Setup Timers.
     IBAMR_DO_ONCE(t_apply = TimerManager::getManager()->getTimer("IBAMR::TwoFluidStaggeredStokesOperator::apply()");
@@ -170,15 +150,8 @@ MultiphaseStaggeredStokesVelocitySolve::setCandDCoefficients(const double C, con
 }
 
 void
-MultiphaseStaggeredStokesVelocitySolve::setThnIdx(const int thn_idx)
-{
-    d_thn_idx = thn_idx;
-}
-
-void
 MultiphaseStaggeredStokesVelocitySolve::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-                                                           const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                                           RobinBcCoefStrategy<NDIM>* thn_bc_coef)
+                                                           const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs)
 {
 #if !defined(NDEBUG)
     TBOX_ASSERT(un_bc_coefs.size() == NDIM);
@@ -207,12 +180,6 @@ MultiphaseStaggeredStokesVelocitySolve::setPhysicalBcCoefs(const std::vector<Rob
             d_us_bc_coefs[d] = d_default_us_bc_coef;
         }
     }
-
-    if (thn_bc_coef)
-        d_thn_bc_coef = thn_bc_coef;
-    else
-        d_thn_bc_coef = d_default_thn_bc_coef;
-    return;
 } // setPhysicalBcCoefs
 
 void
@@ -236,23 +203,21 @@ MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x,
     const int us_idx = x.getComponentDescriptorIndex(1); // solvent velocity, Us
     const int A_un_idx = y.getComponentDescriptorIndex(0);
     const int A_us_idx = y.getComponentDescriptorIndex(1);
-    const int un_scratch_idx = d_x->getComponentDescriptorIndex(0);
-    const int us_scratch_idx = d_x->getComponentDescriptorIndex(1);
-    const int thn_idx = d_thn_idx;
+    const int thn_cc_idx = d_thn_manager->getCellIndex();
+    const int thn_nc_idx = d_thn_manager->getNodeIndex();
+    const int thn_sc_idx = d_thn_manager->getSideIndex();
 
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(2);
-    transaction_comps[0] = InterpolationTransactionComponent(un_scratch_idx,
-                                                             un_idx,
+    transaction_comps[0] = InterpolationTransactionComponent(un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_un_bc_coefs);
-    transaction_comps[1] = InterpolationTransactionComponent(us_scratch_idx,
-                                                             us_idx,
+    transaction_comps[1] = InterpolationTransactionComponent(us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
                                                              DATA_COARSEN_TYPE,
@@ -265,28 +230,12 @@ MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x,
     d_hier_bdry_fill->fillData(d_solution_time); // Fills in all of the ghost cells
     d_hier_bdry_fill->resetTransactionComponents(d_transaction_comps);
 
-    {
-        // Note that thn ghost cells are always filled under inhomogeneous conditions.
-        std::vector<InterpolationTransactionComponent> thn_ghost_comps = { InterpolationTransactionComponent(
-            thn_idx,
-            "CONSERVATIVE_LINEAR_REFINE",
-            USE_CF_INTERPOLATION,
-            DATA_COARSEN_TYPE,
-            BDRY_EXTRAP_TYPE,
-            CONSISTENT_TYPE_2_BDRY,
-            d_thn_bc_coef) };
-        HierarchyGhostCellInterpolation hier_bdry_fill;
-        hier_bdry_fill.initializeOperatorState(thn_ghost_comps, d_hierarchy);
-        hier_bdry_fill.setHomogeneousBc(false);
-        hier_bdry_fill.fillData(d_solution_time);
-    }
-
-    applySpecialized(A_un_idx, A_us_idx, un_scratch_idx, us_scratch_idx, thn_idx);
+    applySpecialized(A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx);
 
     if (d_bc_helper)
     {
-        d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_scratch_idx);
-        d_bc_helper->copyDataAtDirichletBoundaries(A_us_idx, us_scratch_idx);
+        d_bc_helper->copyDataAtDirichletBoundaries(A_un_idx, un_idx);
+        d_bc_helper->copyDataAtDirichletBoundaries(A_us_idx, us_idx);
     }
 
     {
@@ -334,16 +283,8 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
     // Deallocate the operator state if the operator is already initialized.
     if (d_is_initialized) deallocateOperatorState();
 
-    // Setup solution and rhs vectors.
-    d_x = in.cloneVector(in.getName());
-    d_b = out.cloneVector(out.getName());
-
     // Setup operator state.
     d_hierarchy = in.getPatchHierarchy();
-
-    // Allocate scratch data.
-    d_x->allocateVectorData();
-    const int thn_idx = d_thn_idx;
 
     // Allocate synchronization variable
     const int coarsest_ln = 0;
@@ -352,15 +293,12 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         if (!level->checkAllocated(d_os_idx)) level->allocatePatchData(d_os_idx);
-        if (!level->checkAllocated(d_sc_scr_idx)) level->allocatePatchData(d_sc_scr_idx);
-        if (!level->checkAllocated(d_nc_scr_idx)) level->allocatePatchData(d_nc_scr_idx);
-        if (!level->checkAllocated(d_cc_ndim_idx)) level->allocatePatchData(d_cc_ndim_idx);
     }
 
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
     d_os_coarsen_op = grid_geom->lookupCoarsenOperator(d_os_var, "CONSERVATIVE_COARSEN");
     d_os_coarsen_alg = new CoarsenAlgorithm<NDIM>();
-    d_os_coarsen_alg->registerCoarsen(d_b->getComponentDescriptorIndex(0), d_os_idx, d_os_coarsen_op);
+    d_os_coarsen_alg->registerCoarsen(out.getComponentDescriptorIndex(0), d_os_idx, d_os_coarsen_op);
     d_os_coarsen_scheds.resize(finest_ln - coarsest_ln);
     for (int dst_ln = coarsest_ln; dst_ln < finest_ln; ++dst_ln)
     {
@@ -372,16 +310,14 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
     // Setup the interpolation transaction information.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     d_transaction_comps.resize(2);
-    d_transaction_comps[0] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(0),
-                                                               in.getComponentDescriptorIndex(0),
+    d_transaction_comps[0] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(0),
                                                                SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_un_bc_coefs);
-    d_transaction_comps[1] = InterpolationTransactionComponent(d_x->getComponentDescriptorIndex(1),
-                                                               in.getComponentDescriptorIndex(1),
+    d_transaction_comps[1] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(1),
                                                                SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
                                                                DATA_COARSEN_TYPE,
@@ -391,7 +327,7 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
 
     // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
-    d_hier_bdry_fill->initializeOperatorState(d_transaction_comps, d_x->getPatchHierarchy());
+    d_hier_bdry_fill->initializeOperatorState(d_transaction_comps, in.getPatchHierarchy());
 
     // Initialize hierarchy math ops object.
     if (!d_hier_math_ops_external)
@@ -435,22 +371,6 @@ MultiphaseStaggeredStokesVelocitySolve::deallocateOperatorState()
     d_us_fill_pattern.setNull();
     d_P_fill_pattern.setNull();
 
-    // Deallocate scratch data.
-    d_x->deallocateVectorData();
-    d_b->deallocateVectorData();
-
-    // Delete the solution and rhs vectors.
-    d_x->resetLevels(d_x->getCoarsestLevelNumber(),
-                     std::min(d_x->getFinestLevelNumber(), d_x->getPatchHierarchy()->getFinestLevelNumber()));
-    d_x->freeVectorComponents();
-
-    d_b->resetLevels(d_b->getCoarsestLevelNumber(),
-                     std::min(d_b->getFinestLevelNumber(), d_b->getPatchHierarchy()->getFinestLevelNumber()));
-    d_b->freeVectorComponents();
-
-    d_x.setNull();
-    d_b.setNull();
-
     // Deallocate synchronization variable
     const int coarsest_ln = 0;
     const int finest_ln = d_hierarchy->getFinestLevelNumber();
@@ -458,9 +378,6 @@ MultiphaseStaggeredStokesVelocitySolve::deallocateOperatorState()
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         if (level->checkAllocated(d_os_idx)) level->deallocatePatchData(d_os_idx);
-        if (level->checkAllocated(d_sc_scr_idx)) level->deallocatePatchData(d_sc_scr_idx);
-        if (level->checkAllocated(d_nc_scr_idx)) level->deallocatePatchData(d_nc_scr_idx);
-        if (level->checkAllocated(d_cc_ndim_idx)) level->deallocatePatchData(d_cc_ndim_idx);
     }
     d_os_coarsen_scheds.clear();
     d_os_coarsen_alg = nullptr;
@@ -531,15 +448,10 @@ MultiphaseStaggeredStokesVelocitySolve::applySpecialized(const int A_un_idx,
                                                          const int A_us_idx,
                                                          const int un_idx,
                                                          const int us_idx,
-                                                         const int thn_idx)
+                                                         const int thn_cc_idx,
+                                                         const int thn_nc_idx,
+                                                         const int thn_sc_idx)
 {
-    // Interpolate and synchronize volume fraction
-    d_hier_math_ops->interp(
-        d_nc_scr_idx, d_nc_scr_var, true, thn_idx, Pointer<CellVariable<NDIM, double>>(nullptr), nullptr, d_new_time);
-    // Interpolate to cell sides
-    convert_to_ndim_cc(d_cc_ndim_idx, thn_idx, *d_hierarchy);
-    d_hier_math_ops->interp(d_sc_scr_idx, d_sc_scr_var, true, d_cc_ndim_idx, d_cc_ndim_var, nullptr, d_new_time);
-
     const double xi = d_params.xi;
     const double eta_n = d_params.eta_n;
     const double eta_s = d_params.eta_s;
@@ -553,7 +465,7 @@ MultiphaseStaggeredStokesVelocitySolve::applySpecialized(const int A_un_idx,
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             computeVelocitySubBlockOnPatch(
-                *patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, d_nc_scr_idx, d_sc_scr_idx, d_params, C, D);
+                *patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, C, D);
         }
     }
 }

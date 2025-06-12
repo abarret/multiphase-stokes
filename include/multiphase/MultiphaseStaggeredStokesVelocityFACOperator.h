@@ -6,6 +6,7 @@
 #include <ibtk/config.h>
 
 #include "multiphase/MultiphaseParameters.h"
+#include "multiphase/VolumeFractionDataManager.h"
 
 #include "ibtk/CCPoissonSolverManager.h"
 #include "ibtk/FACPreconditionerStrategy.h"
@@ -50,16 +51,21 @@ public:
      */
     MultiphaseStaggeredStokesVelocityFACOperator(const std::string& object_name,
                                                  const std::string& default_options_prefix,
-                                                 const MultiphaseParameters& params);
+                                                 const MultiphaseParameters& params,
+                                                 const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
 
     /*!
      * \brief Destructor.
      */
     ~MultiphaseStaggeredStokesVelocityFACOperator();
 
+    const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
+    {
+        return d_thn_manager;
+    }
+
     void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-                            const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+                            const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs);
 
     /*!
      * \name Functions for configuring the solver.
@@ -131,9 +137,6 @@ public:
                      bool performing_pre_sweeps,
                      bool performing_post_sweeps) override;
 
-    /*! \brief This method sets up the patch data indices for \param Thn */
-    void setThnIdx(int thn_idx);
-
     /*!
      * \brief Solve the residual equation Ae=r on the coarsest level of the
      * patch hierarchy.
@@ -185,33 +188,6 @@ public:
     void setCandDCoefficients(double C, double D);
 
 private:
-    /*!
-     * \brief Default constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     */
-    MultiphaseStaggeredStokesVelocityFACOperator() = delete;
-
-    /*!
-     * \brief Copy constructor.
-     *
-     * \note This constructor is not implemented and should not be used.
-     *
-     * \param from The value to copy to this object.
-     */
-    MultiphaseStaggeredStokesVelocityFACOperator(const MultiphaseStaggeredStokesVelocityFACOperator& from) = delete;
-
-    /*!
-     * \brief Assignment operator.
-     *
-     * \note This operator is not implemented and should not be used.
-     *
-     * \param that The value to assign to this object.
-     *
-     * \return A reference to this object.
-     */
-    MultiphaseStaggeredStokesVelocityFACOperator&
-    operator=(const MultiphaseStaggeredStokesVelocityFACOperator& that) = delete;
 
     /*!
      * \brief Perform prolongation or restriction on the provided indices.
@@ -259,21 +235,18 @@ private:
     std::vector<SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineSchedule<NDIM>>> d_ghostfill_no_restrict_scheds;
     SAMRAI::tbox::Pointer<SAMRAI::xfer::RefineAlgorithm<NDIM>> d_ghostfill_no_restrict_alg;
 
-    int d_thn_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index;
     double d_w = 0.75;                                     // under relaxation factor
     double d_C = std::numeric_limits<double>::quiet_NaN(); // C*u
     double d_D = std::numeric_limits<double>::quiet_NaN(); // D depends on time stepping scheme
     const MultiphaseParameters& d_params;
+    const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy; // Reference patch hierarchy
-    std::unique_ptr<SAMRAI::solv::RobinBcCoefStrategy<NDIM>> d_default_un_bc_coef, d_default_us_bc_coef,
-        d_default_thn_bc_coef;
+    std::unique_ptr<SAMRAI::solv::RobinBcCoefStrategy<NDIM>> d_default_un_bc_coef, d_default_us_bc_coef;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs;
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef = nullptr;
     SAMRAI::tbox::Pointer<IBTK::CartSideRobinPhysBdryOp> d_un_bc_op, d_us_bc_op;
-    SAMRAI::tbox::Pointer<IBTK::CartCellRobinPhysBdryOp> d_thn_bc_op;
     std::unique_ptr<SAMRAI::xfer::RefinePatchStrategy<NDIM>> d_vel_P_bc_op;
     // Cached communications operators.
     SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> d_un_fill_pattern, d_us_fill_pattern,
@@ -281,7 +254,6 @@ private:
     SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
 
     std::vector<std::vector<std::array<SAMRAI::hier::BoxList<NDIM>, NDIM>>> d_patch_side_bc_box_overlap;
-    std::vector<std::vector<SAMRAI::hier::BoxList<NDIM>>> d_patch_cell_bc_box_overlap;
 
     SAMRAI::tbox::Pointer<IBTK::StaggeredPhysicalBoundaryHelper> d_bc_un_helper, d_bc_us_helper;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, int>> d_mask_var;

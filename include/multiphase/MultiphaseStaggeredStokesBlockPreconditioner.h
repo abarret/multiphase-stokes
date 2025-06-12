@@ -11,6 +11,7 @@
 #include <multiphase/MultiphaseParameters.h>
 #include <multiphase/MultiphaseStaggeredStokesBlockFACOperator.h>
 #include <multiphase/MultiphaseStokesBlockSolver.h>
+#include <multiphase/VolumeFractionDataManager.h>
 
 #include <memory>
 
@@ -21,16 +22,15 @@ class MultiphaseStaggeredStokesBlockPreconditioner : public IBTK::LinearSolver
 public:
     MultiphaseStaggeredStokesBlockPreconditioner(std::string object_name,
                                                  const MultiphaseParameters& params,
-                                                 SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
+                                                 SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                                                 const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
 
     virtual ~MultiphaseStaggeredStokesBlockPreconditioner();
 
-    /*!
-     * Set the volume fraction to be used in this class.
-     *
-     * This function returns an error if the solver is already initialized. See initializeSolverState().
-     */
-    void setThnIdx(const int thn_idx);
+    const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
+    {
+        return d_thn_manager;
+    }
 
     void setCAndDCoefficients(double C, double D);
 
@@ -73,6 +73,7 @@ private:
     SAMRAI::tbox::Pointer<IBTK::FACPreconditionerStrategy> d_stokes_precond_op;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_precond_db;
     MultiphaseParameters d_params;
+    const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager;
 
     // Pressure solver settings.
     SAMRAI::tbox::Pointer<IBTK::PoissonSolver> d_pressure_solver;
@@ -92,9 +93,6 @@ private:
 
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_thn_ths_sq_var;
     int d_thn_ths_sq_idx = IBTK::invalid_index;
-
-    int d_thn_idx = IBTK::invalid_index;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coefs = nullptr;
 
     // Scratch variable and indices
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_scr_var, d_us_scr_var;
