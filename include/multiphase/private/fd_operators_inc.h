@@ -22,6 +22,7 @@
 // Define Fortran routines to accumulate momentum without pressure
 #define m_W_P_P_C_C IBTK_FC_FUNC_(m_w_p_p_c_c, FDOPS)
 #define m_W_P_P_Var_Drag IBTK_FC_FUNC_(m_w_p_p_var_drag, FDOPS)
+#define co_div IBTK_FC_FUNC_(co_div, FDOPS)
 
 extern "C"
 {
@@ -92,6 +93,23 @@ extern "C"
                           const int&,     // xi_gcw
                           const double&,  // C in C*u term
                           const double&); // D
+    void co_div(double* const,
+                const int&,
+                double* const,
+                double* const,
+                const int&,
+                double* const,
+                double* const,
+                const int&,
+                double* const,
+                double* const,
+                const int&,
+                const int&,
+                const int&,
+                const int&,
+                const int&,
+                const double* const,
+                const double&);
 }
 namespace multiphase
 {
@@ -443,37 +461,25 @@ applyCoincompressibility(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> A_data = patch->getPatchData(A_idx);
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-    SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
-    for (SAMRAI::pdat::CellIterator<NDIM> ci(patch->getBox()); ci; ci++) // cell-centers
-    {
-        const SAMRAI::pdat::CellIndex<NDIM>& idx = ci();
+    const SAMRAI::hier::Box<NDIM>& patch_box = patch->getBox();
 
-        SAMRAI::pdat::SideIndex<NDIM> lower_x_idx(idx, 0, 0); // (i-1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> upper_x_idx(idx, 0, 1); // (i+1/2,j)
-        SAMRAI::pdat::SideIndex<NDIM> lower_y_idx(idx, 1, 0); // (i,j-1/2)
-        SAMRAI::pdat::SideIndex<NDIM> upper_y_idx(idx, 1, 1); // (i,j+1/2)
-
-        // thn at sides
-        double thn_lower_x = (*thn_data)(lower_x_idx);
-        double thn_upper_x = (*thn_data)(upper_x_idx);
-        double thn_lower_y = (*thn_data)(lower_y_idx);
-        double thn_upper_y = (*thn_data)(upper_y_idx);
-
-        double div_un_dot_thn_dx =
-            ((thn_upper_x * (*un_data)(upper_x_idx)) - (thn_lower_x * (*un_data)(lower_x_idx))) / dx[0];
-        double div_un_dot_thn_dy =
-            ((thn_upper_y * (*un_data)(upper_y_idx)) - (thn_lower_y * (*un_data)(lower_y_idx))) / dx[1];
-        double div_un_thn = div_un_dot_thn_dx + div_un_dot_thn_dy;
-
-        double div_us_dot_ths_dx = ((convertToThs(thn_upper_x) * (*us_data)(upper_x_idx)) -
-                                    (convertToThs(thn_lower_x) * (*us_data)(lower_x_idx))) /
-                                   dx[0];
-        double div_us_dot_ths_dy = ((convertToThs(thn_upper_y) * (*us_data)(upper_y_idx)) -
-                                    (convertToThs(thn_lower_y) * (*us_data)(lower_y_idx))) /
-                                   dx[1];
-        double div_us_ths = div_us_dot_ths_dx + div_us_dot_ths_dy;
-        (*A_data)(idx) = D * (div_un_thn + div_us_ths);
-    }
+    co_div(A_data->getPointer(),
+           A_data->getGhostCellWidth().min(),
+           un_data->getPointer(0),
+           un_data->getPointer(1),
+           un_data->getGhostCellWidth().min(),
+           us_data->getPointer(0),
+           us_data->getPointer(1),
+           us_data->getGhostCellWidth().min(),
+           thn_data->getPointer(0),
+           thn_data->getPointer(1),
+           thn_data->getGhostCellWidth().min(),
+           patch_box.lower(0),
+           patch_box.upper(0),
+           patch_box.lower(1),
+           patch_box.upper(1),
+           dx,
+           D);
 }
 
 inline void

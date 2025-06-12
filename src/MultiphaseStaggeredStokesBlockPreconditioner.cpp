@@ -217,37 +217,15 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     d_hier_sc_data_ops->copyData(bu_vec.getComponentDescriptorIndex(0), b.getComponentDescriptorIndex(0));
     d_hier_sc_data_ops->copyData(bu_vec.getComponentDescriptorIndex(1), b.getComponentDescriptorIndex(1));
 
-    for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-
-            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            const Box<NDIM>& box = patch->getBox();
-            const double* const dx = pgeom->getDx();
-
-            Pointer<SideData<NDIM, double>> bun_data = bu_vec.getComponentPatchData(0, *patch);
-            Pointer<SideData<NDIM, double>> bus_data = bu_vec.getComponentPatchData(1, *patch);
-            Pointer<CellData<NDIM, double>> p_data = p_vec.getComponentPatchData(0, *patch);
-            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(d_thn_manager->getSideIndex());
-
-            for (int axis = 0; axis < NDIM; ++axis)
-            {
-                for (SideIterator<NDIM> si(box, axis); si; si++)
-                {
-                    const SideIndex<NDIM>& idx = si();
-                    // Note: This does not account for any synchronization that needs to occur at coarse-fine
-                    // interfaces. Consider using HierarchyMathOps::grad() instead.
-                    const double dp = ((*p_data)(idx.toCell(1)) - (*p_data)(idx.toCell(0))) / dx[axis];
-                    const double thn = (*thn_sc_data)(idx);
-                    (*bun_data)(idx) = (*bun_data)(idx)-thn * dp;
-                    (*bus_data)(idx) = (*bus_data)(idx)-convertToThs(thn) * dp;
-                }
-            }
-        }
-    }
+    multiphase_grad_on_hierarchy(*d_hierarchy,
+                                 bu_vec.getComponentDescriptorIndex(0),
+                                 bu_vec.getComponentDescriptorIndex(1),
+                                 d_thn_manager->getSideIndex(),
+                                 p_vec.getComponentDescriptorIndex(0),
+                                 -1.0,
+                                 true,
+                                 d_coarsest_ln,
+                                 d_finest_ln);
 
     // Now solve the velocity block
     if (d_using_symmetric)

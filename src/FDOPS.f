@@ -514,3 +514,73 @@ c
         end do
 c
       end subroutine
+
+      subroutine co_div(p, p_gcw, un_0, un_1, un_gcw,
+     &   us_0, us_1, us_gcw, thn_0, thn_1, thn_gcw,
+     &   ilow0, iup0, ilow1, iup1, dx, D)
+
+      use converting_to_ths
+      implicit none
+      integer ilow0, ilow1
+      integer iup0, iup1
+      double precision dx(0:1)
+      double precision D
+
+      integer p_gcw
+      double precision p(ilow0-p_gcw:iup0+p_gcw,
+     &                   ilow1-p_gcw:iup1+p_gcw)
+
+      integer un_gcw
+      double precision un_0(ilow0-un_gcw:iup0+un_gcw+1,
+     &                      ilow1-un_gcw:iup1+un_gcw)
+      double precision un_1(ilow0-un_gcw:iup0+un_gcw,
+     &                      ilow1-un_gcw:iup1+un_gcw+1)
+
+      integer us_gcw
+      double precision us_0(ilow0-us_gcw:iup0+us_gcw+1,
+     &                      ilow1-us_gcw:iup1+us_gcw)
+      double precision us_1(ilow0-us_gcw:iup0+us_gcw,
+     &                      ilow1-us_gcw:iup1+us_gcw+1)
+
+      integer thn_gcw
+      double precision thn_0(ilow0-thn_gcw:iup0+thn_gcw+1,
+     &                      ilow1-thn_gcw:iup1+thn_gcw)
+      double precision thn_1(ilow0-thn_gcw:iup0+thn_gcw,
+     &                      ilow1-thn_gcw:iup1+thn_gcw+1)
+
+       integer i0, i1
+       double precision inv_dx, inv_dy
+
+       double precision thn_up_x, thn_up_y
+       double precision thn_low_x, thn_low_y
+       double precision ths_up_x, ths_up_y
+       double precision ths_low_x, ths_low_y
+       double precision div_un, div_us
+       inv_dx = 1.d0 / dx(0)
+       inv_dy = 1.d0 / dx(1)
+
+       do i1=ilow1, iup1
+         do i0=ilow0, iup0
+           thn_up_x = thn_0(i0+1,i1)
+           thn_low_x = thn_0(i0,i1)
+           ths_up_x = toThs(thn_up_x)
+           ths_low_x = toThs(thn_low_x)
+
+           thn_up_y = thn_1(i0,i1+1)
+           thn_low_y = thn_1(i0,i1)
+           ths_up_y = toThs(thn_up_y)
+           ths_low_y = toThs(thn_low_y)
+
+           div_un = (thn_up_x * un_0(i0+1,i1) - thn_low_x * un_0(i0,i1))
+     &       * inv_dx
+     &       + (thn_up_y * un_1(i0,i1+1) - thn_low_y * un_1(i0,i1))
+     &       * inv_dy
+           div_us = (ths_up_x * us_0(i0+1,i1) - ths_low_x * us_0(i0,i1))
+     &       * inv_dx
+     &       + (ths_up_y * us_1(i0,i1+1) - ths_low_y * us_1(i0,i1))
+     &       * inv_dy
+           p(i0,i1) = D * (div_un + div_us)
+         enddo
+       enddo
+
+       endsubroutine
