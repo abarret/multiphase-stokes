@@ -524,46 +524,34 @@ MultiphaseStaggeredStokesOperator::applySpecialized(const int A_P_idx,
                          d_solution_time,
                          true);
 
-    HierarchySideDataOpsReal<NDIM, double> hier_sc_ops(d_hierarchy);
-    hier_sc_ops.setToScalar(A_un_idx, 0.0);
-    hier_sc_ops.setToScalar(A_us_idx, 0.0);
-    // Compute the forces on momentum.
-    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            if (d_params.isVariableDrag())
-                accumulateMomentumForcesOnPatchVariableDrag(patch,
-                                                            A_un_idx,
-                                                            A_us_idx,
-                                                            p_idx,
-                                                            un_idx,
-                                                            us_idx,
-                                                            thn_idx,
-                                                            thn_nc_idx,
-                                                            thn_sc_idx,
-                                                            d_params,
-                                                            d_C,
-                                                            d_D_u,
-                                                            d_D_p);
-            else
-                accumulateMomentumForcesOnPatchConstantCoefficient(patch,
-                                                                   A_un_idx,
-                                                                   A_us_idx,
-                                                                   p_idx,
-                                                                   un_idx,
-                                                                   us_idx,
-                                                                   thn_idx,
-                                                                   thn_nc_idx,
-                                                                   thn_sc_idx,
-                                                                   d_params,
-                                                                   d_C,
-                                                                   d_D_u,
-                                                                   d_D_p);
-        }
-    }
+    if (d_params.isVariableDrag())
+        accumulateMomentumForcesVariableDrag(*d_hierarchy,
+                                             A_un_idx,
+                                             A_us_idx,
+                                             p_idx,
+                                             un_idx,
+                                             us_idx,
+                                             thn_idx,
+                                             thn_nc_idx,
+                                             thn_sc_idx,
+                                             d_params,
+                                             d_C,
+                                             d_D_u,
+                                             d_D_p);
+    else
+        accumulateMomentumForcesConstantCoefficient(*d_hierarchy,
+                                                    A_un_idx,
+                                                    A_us_idx,
+                                                    p_idx,
+                                                    un_idx,
+                                                    us_idx,
+                                                    thn_idx,
+                                                    thn_nc_idx,
+                                                    thn_sc_idx,
+                                                    d_params,
+                                                    d_C,
+                                                    d_D_u,
+                                                    d_D_p);
 }
 
 } // namespace multiphase
