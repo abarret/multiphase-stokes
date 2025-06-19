@@ -37,6 +37,34 @@ void accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SA
                                                         double C,
                                                         double D_u,
                                                         double D_p);
+void accumulateMomentumForcesConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                 int A_un_idx,
+                                                 int A_us_idx,
+                                                 int p_idx,
+                                                 int un_idx,
+                                                 int us_idx,
+                                                 int thn_idx,
+                                                 int thn_nc_idx,
+                                                 int thn_sc_idx,
+                                                 const MultiphaseParameters& params,
+                                                 double C,
+                                                 double D_u,
+                                                 double D_p,
+                                                 int coarsest_ln = IBTK::invalid_level_number,
+                                                 int finest_ln = IBTK::invalid_level_number);
+void accumulateMomentumForcesConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                 int A_un_idx,
+                                                 int A_us_idx,
+                                                 int p_idx,
+                                                 int un_idx,
+                                                 int us_idx,
+                                                 const VolumeFractionDataManager& thn_manager,
+                                                 const MultiphaseParameters& params,
+                                                 double C,
+                                                 double D_u,
+                                                 double D_p,
+                                                 int coarsest_ln = IBTK::invalid_level_number,
+                                                 int finest_ln = IBTK::invalid_level_number);
 
 /*!
  * Accumulate the forces into respective patch indices for the network and solvent
@@ -70,6 +98,34 @@ void accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::h
                                                  double C,
                                                  double D_u,
                                                  double D_p);
+void accumulateMomentumForcesVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                          int A_un_idx,
+                                          int A_us_idx,
+                                          int p_idx,
+                                          int un_idx,
+                                          int us_idx,
+                                          int thn_idx,
+                                          int thn_nc_idx,
+                                          int thn_sc_idx,
+                                          const MultiphaseParameters& params,
+                                          double C,
+                                          double D_u,
+                                          double D_p,
+                                          int coarsest_ln = IBTK::invalid_level_number,
+                                          int finest_ln = IBTK::invalid_level_number);
+void accumulateMomentumForcesVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                          int A_un_idx,
+                                          int A_us_idx,
+                                          int p_idx,
+                                          int un_idx,
+                                          int us_idx,
+                                          const VolumeFractionDataManager& thn_manager,
+                                          const MultiphaseParameters& params,
+                                          double C,
+                                          double D_u,
+                                          double D_p,
+                                          int coarsest_ln = IBTK::invalid_level_number,
+                                          int finest_ln = IBTK::invalid_level_number);
 
 /*!
  * Accumulate the forces into respective patch indices for the network and solvent on a given patch. Assumes ghost cells
@@ -114,6 +170,17 @@ void accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHie
                                                           const double D_u,
                                                           int coarsest_ln = IBTK::invalid_index,
                                                           int finest_ln = IBTK::invalid_index);
+void accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                          const int F_un_idx,
+                                                          const int F_us_idx,
+                                                          const int un_idx,
+                                                          const int us_idx,
+                                                          const VolumeFractionDataManager& thn_manager,
+                                                          const MultiphaseParameters& params,
+                                                          const double C,
+                                                          const double D_u,
+                                                          int coarsest_ln = IBTK::invalid_index,
+                                                          int finest_ln = IBTK::invalid_index);
 ///\}
 
 /*!
@@ -153,6 +220,17 @@ void accumulateMomentumWithoutPressureVariableDrag(SAMRAI::hier::PatchHierarchy<
                                                    const int thn_idx,
                                                    const int thn_nc_idx,
                                                    const int thn_sc_idx,
+                                                   const MultiphaseParameters& params,
+                                                   const double C,
+                                                   const double D_u,
+                                                   int coarsest_ln = IBTK::invalid_index,
+                                                   int finest_ln = IBTK::invalid_index);
+void accumulateMomentumWithoutPressureVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                   const int F_un_idx,
+                                                   const int F_us_idx,
+                                                   const int un_idx,
+                                                   const int us_idx,
+                                                   const VolumeFractionDataManager& thn_manager,
                                                    const MultiphaseParameters& params,
                                                    const double C,
                                                    const double D_u,
