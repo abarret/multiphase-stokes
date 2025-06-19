@@ -11,6 +11,13 @@
 
 #include <SAMRAIVectorReal.h>
 
+namespace
+{
+Timer* t_solve_system;
+Timer* t_initialize_solver_state;
+Timer* t_deallocate_solver_state;
+} // namespace
+
 namespace multiphase
 {
 
@@ -90,6 +97,13 @@ MultiphaseStaggeredStokesBlockPreconditioner::MultiphaseStaggeredStokesBlockPrec
     d_pressure_precond_db = input_db->getDatabase("pressure_precond_db");
 
     d_using_symmetric = input_db->getBool("using_symmetric");
+
+    IBTK_DO_ONCE(t_solve_system = TimerManager::getManager()->getTimer(
+                     "multiphase::MultiphaseStaggeredStokesBlockPreconditioner::solveSystem");
+                 t_initialize_solver_state = TimerManager::getManager()->getTimer(
+                     "multiphase::MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState");
+                 t_deallocate_solver_state = TimerManager::getManager()->getTimer(
+                     "multiphase::MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState"););
 }
 
 MultiphaseStaggeredStokesBlockPreconditioner::~MultiphaseStaggeredStokesBlockPreconditioner()
@@ -109,6 +123,7 @@ bool
 MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& x,
                                                           SAMRAIVectorReal<NDIM, double>& b)
 {
+    IBTK_TIMER_START(t_solve_system);
     x.setToScalar(0.0);
     // Create the individual vectors, add components to the vectors
     SAMRAIVectorReal<NDIM, double> u_vec(d_object_name + "::U_VEC", d_hierarchy, d_coarsest_ln, d_finest_ln),
@@ -250,6 +265,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
     }
 
     // TODO: What should we be returning here??
+    IBTK_TIMER_STOP(t_solve_system);
     return true;
 }
 
@@ -257,6 +273,7 @@ void
 MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAIVectorReal<NDIM, double>& x,
                                                                     const SAMRAIVectorReal<NDIM, double>& b)
 {
+    IBTK_TIMER_START(t_initialize_solver_state);
     LinearSolver::initializeSolverState(x, b);
     d_hierarchy = x.getPatchHierarchy();
 #ifndef NDEBUG
@@ -378,11 +395,14 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     d_stokes_precond->transferToDense(d_thn_manager->getCellIndex());
     d_thn_manager->updateVolumeFraction(
         d_thn_manager->getCellIndex(), d_stokes_precond->getDenseHierarchy(), d_solution_time);
+
+    IBTK_TIMER_STOP(t_initialize_solver_state);
 }
 
 void
 MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
 {
+    IBTK_TIMER_START(t_deallocate_solver_state);
     LinearSolver::deallocateSolverState();
 
     // Deallocate any scratch data.
@@ -395,6 +415,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
 
     d_coarsest_ln = IBTK::invalid_level_number;
     d_finest_ln = IBTK::invalid_level_number;
+    IBTK_TIMER_STOP(t_deallocate_solver_state);
 }
 
 } // namespace multiphase

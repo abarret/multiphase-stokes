@@ -112,11 +112,12 @@ MultiphaseStaggeredStokesBlockOperator::MultiphaseStaggeredStokesBlockOperator(
                        std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef));
 
     // Setup Timers.
-    IBAMR_DO_ONCE(t_apply = TimerManager::getManager()->getTimer("IBAMR::TwoFluidStaggeredStokesOperator::apply()");
-                  t_initialize_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::initializeOperatorState()");
-                  t_deallocate_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::deallocateOperatorState()"););
+    IBAMR_DO_ONCE(
+        t_apply = TimerManager::getManager()->getTimer("multiphase::MultiphaseStaggeredStokesBlockOperator::apply()");
+        t_initialize_operator_state = TimerManager::getManager()->getTimer(
+            "multiphase::MultiphaseStaggeredStokesBlockOperator::initializeOperatorState()");
+        t_deallocate_operator_state = TimerManager::getManager()->getTimer(
+            "multiphase::MultiphaseStaggeredStokesBlockOperator::deallocateOperatorState()"););
     return;
 } // TwoFluidStaggeredStokesOperator
 
