@@ -581,6 +581,114 @@ c
      &       * inv_dy
            p(i0,i1) = D * (div_un + div_us)
          enddo
-       enddo
+      enddo
 
+      endsubroutine
+
+      subroutine multiphase_grad_accum(gun_0, gun_1, gun_gcw,
+     &   gus_0, gus_1, gus_gcw, thn_0, thn_1, thn_gcw,
+     &   p, p_gcw, ilow0, ilow1, iup0, iup1, dx, C)
+      use converting_to_ths
+      implicit none
+      integer ilow0, ilow1, iup0, iup1
+      integer gun_gcw
+      double precision gun_0(ilow0-gun_gcw:iup0+gun_gcw+1,
+     &                  ilow1-gun_gcw:iup1+gun_gcw)
+      double precision gun_1(ilow0-gun_gcw:iup0+gun_gcw,
+     &                  ilow1-gun_gcw:iup1+gun_gcw+1)
+      integer gus_gcw
+      double precision gus_0(ilow0-gus_gcw:iup0+gus_gcw+1,
+     &                  ilow1-gus_gcw:iup1+gus_gcw)
+      double precision gus_1(ilow0-gus_gcw:iup0+gus_gcw,
+     &                  ilow1-gus_gcw:iup1+gus_gcw+1)
+      integer thn_gcw
+      double precision thn_0(ilow0-thn_gcw:iup0+thn_gcw+1,
+     &                  ilow1-thn_gcw:iup1+thn_gcw)
+      double precision thn_1(ilow0-thn_gcw:iup0+thn_gcw,
+     &                  ilow1-thn_gcw:iup1+thn_gcw+1)
+
+      integer p_gcw
+      double precision p(ilow0-p_gcw:iup0+p_gcw,
+     &                   ilow1-p_gcw:iup1+p_gcw)
+
+      double precision dx(0:1)
+      double precision C
+
+      integer i0, i1
+      double precision inv_dx, inv_dy
+      double precision thn, dp
+
+      inv_dx = 1.d0 / dx(0)
+      inv_dy = 1.d0 / dx(1)
+c     X axis
+      do i1=ilow1,iup1
+       do i0=ilow0,iup0+1
+              dp = (p(i0,i1) - p(i0-1,i1)) * inv_dx
+              thn = thn_0(i0,i1)
+              gun_0(i0,i1) = gun_0(i0,i1) + C*thn*dp
+              gus_0(i0,i1) = gus_0(i0,i1) + C*toThs(thn)*dp
+       enddo
+      enddo
+c     Y axis
+      do i1=ilow1,iup1+1
+        do i0=ilow0,iup0
+              dp = (p(i0,i1) - p(i0,i1-1)) * inv_dy
+              thn = thn_1(i0,i1)
+              gun_1(i0,i1) = gun_1(i0,i1) + C*thn*dp
+              gus_1(i0,i1) = gus_1(i0,i1) + C*toThs(thn)*dp
+        enddo
+       enddo
        endsubroutine
+
+      subroutine multiphase_grad(gun_0, gun_1, gun_gcw,
+     &   gus_0, gus_1, gus_gcw, thn_0, thn_1, thn_gcw,
+     &   p, p_gcw, ilow0, ilow1, iup0, iup1, dx, C)
+      use converting_to_ths
+      implicit none
+      integer ilow0, ilow1, iup0, iup1
+      integer gun_gcw
+      double precision gun_0(ilow0-gun_gcw:iup0+gun_gcw+1,
+     &                  ilow1-gun_gcw:iup1+gun_gcw)
+      double precision gun_1(ilow0-gun_gcw:iup0+gun_gcw,
+     &                  ilow1-gun_gcw:iup1+gun_gcw+1)
+      integer gus_gcw
+      double precision gus_0(ilow0-gus_gcw:iup0+gus_gcw+1,
+     &                  ilow1-gus_gcw:iup1+gus_gcw)
+      double precision gus_1(ilow0-gus_gcw:iup0+gus_gcw,
+     &                  ilow1-gus_gcw:iup1+gus_gcw+1)
+      integer thn_gcw
+      double precision thn_0(ilow0-thn_gcw:iup0+thn_gcw+1,
+     &                  ilow1-thn_gcw:iup1+thn_gcw)
+      double precision thn_1(ilow0-thn_gcw:iup0+thn_gcw,
+     &                  ilow1-thn_gcw:iup1+thn_gcw+1)
+      integer p_gcw
+      double precision p(ilow0-p_gcw:iup0+p_gcw,
+     &                   ilow1-p_gcw:iup1+p_gcw)
+      double precision dx(0:1)
+      double precision C
+         
+      integer i0, i1
+      double precision inv_dx, inv_dy
+      double precision thn, dp
+         
+      inv_dx = 1.d0 / dx(0)
+      inv_dy = 1.d0 / dx(1)
+c     X axis
+      do i1=ilow1,iup1
+        do i0=ilow0,iup0+1
+          dp = (p(i0,i1) - p(i0-1,i1)) * inv_dx
+          thn = thn_0(i0,i1)
+          gun_0(i0,i1) = C*thn*dp
+          gus_0(i0,i1) = C*toThs(thn)*dp
+        enddo
+      enddo
+         
+      do i1=ilow1,iup1+1
+        do i0=ilow0,iup0
+          dp = (p(i0,i1) - p(i0,i1-1)) * inv_dy
+          thn = thn_1(i0,i1)
+          gun_1(i0,i1) = C*thn*dp
+          gus_1(i0,i1) = C*toThs(thn)*dp
+        enddo
+      enddo
+      endsubroutine
