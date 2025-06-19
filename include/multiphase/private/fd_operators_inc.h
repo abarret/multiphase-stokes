@@ -233,42 +233,7 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
     accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
         patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, thn_nc_idx, thn_sc_idx, params, C, D_u);
 
-    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_sc_data = patch->getPatchData(thn_sc_idx);
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_un_data =
-        patch->getPatchData(A_un_idx); // Forces on network
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_us_data =
-        patch->getPatchData(A_us_idx); // Forces on solvent
-    SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
-    const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-
-    // Now add the pressure force to the momentum forces computed from above.
-    for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
-    {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 0, (i-1/2,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i-1,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
-
-        double thn_lower = (*thn_sc_data)(idx);
-        double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) += D_p * (pressure_n);
-        (*A_us_data)(idx) += D_p * (pressure_s);
-    }
-
-    for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
-    {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 1, (i,j-1/2)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
-
-        double thn_lower = (*thn_sc_data)(idx);
-        double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) += D_p * (pressure_n);
-        (*A_us_data)(idx) += D_p * (pressure_s);
-    }
+    multiphase_grad(*patch, A_un_idx, A_us_idx, thn_sc_idx, p_idx, -1.0 * D_p, true);
 }
 
 inline void
@@ -354,44 +319,7 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
     accumulateMomentumWithoutPressureOnPatchVariableDrag(
         patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_idx, thn_nc_idx, thn_sc_idx, params, C, D_u);
 
-    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-    const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch->getPatchData(p_idx);
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_data = patch->getPatchData(thn_sc_idx);
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_un_data =
-        patch->getPatchData(A_un_idx); // Forces on network
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> A_us_data =
-        patch->getPatchData(A_us_idx); // Forces on solvent
-    SAMRAI::hier::IntVector<NDIM> xp(1, 0), yp(0, 1);
-
-    // Now add the pressure force to the momentum forces computed from above.
-    for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 0); si; si++) // side-centers in x-dir
-    {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 0, (i-1/2,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i-1,j)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
-
-        double thn_lower = (*thn_data)(idx);
-        double pressure_n = -thn_lower / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        double pressure_s = -convertToThs(thn_lower) / dx[0] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) += D_p * (pressure_n);
-        (*A_us_data)(idx) += D_p * (pressure_s);
-    }
-
-    for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), 1); si; si++) // side-centers in y-dir
-    {
-        const SAMRAI::pdat::SideIndex<NDIM>& idx = si();         // axis = 1, (i,j-1/2)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_low = idx.toCell(0); // (i,j-1)
-        SAMRAI::pdat::CellIndex<NDIM> idx_c_up = idx.toCell(1);  // (i,j)
-
-        double thn_lower = (*thn_data)(idx);
-        double pressure_n = -thn_lower / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        double pressure_s = -convertToThs(thn_lower) / dx[1] * ((*p_data)(idx_c_up) - (*p_data)(idx_c_low));
-        (*A_un_data)(idx) += D_p * (pressure_n);
-        (*A_us_data)(idx) += D_p * (pressure_s);
-    }
+    multiphase_grad(*patch, A_un_idx, A_us_idx, thn_sc_idx, p_idx, -1.0 * D_p, true);
 }
 
 inline void
