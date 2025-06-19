@@ -23,6 +23,8 @@
 #define m_W_P_P_C_C IBTK_FC_FUNC_(m_w_p_p_c_c, FDOPS)
 #define m_W_P_P_Var_Drag IBTK_FC_FUNC_(m_w_p_p_var_drag, FDOPS)
 #define co_div IBTK_FC_FUNC_(co_div, FDOPS)
+#define multiphase_grad_fcn IBTK_FC_FUNC_(multiphase_grad, FDOPS)
+#define multiphase_grad_accum IBTK_FC_FUNC_(multiphase_grad_accum, FDOPS)
 
 extern "C"
 {
@@ -110,9 +112,105 @@ extern "C"
                 const int&,
                 const double* const,
                 const double&);
+    void multiphase_grad_fcn(double* const,
+                             double* const,
+                             const int&,
+                             double* const,
+                             double* const,
+                             const int&,
+                             double* const,
+                             double* const,
+                             const int&,
+                             double* const,
+                             const int&,
+                             const int&,
+                             const int&,
+                             const int&,
+                             const int&,
+                             const double* const,
+                             const double&);
+    void multiphase_grad_accum(double* const,
+                               double* const,
+                               const int&,
+                               double* const,
+                               double* const,
+                               const int&,
+                               double* const,
+                               double* const,
+                               const int&,
+                               double* const,
+                               const int&,
+                               const int&,
+                               const int&,
+                               const int&,
+                               const int&,
+                               const double* const,
+                               const double&);
 }
 namespace multiphase
 {
+inline void
+accumulateMomentumForcesConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                            const int A_un_idx,
+                                            const int A_us_idx,
+                                            const int p_idx,
+                                            const int un_idx,
+                                            const int us_idx,
+                                            const int thn_idx,
+                                            const int thn_nc_idx,
+                                            const int thn_sc_idx,
+                                            const MultiphaseParameters& params,
+                                            const double C,
+                                            const double D_u,
+                                            const double D_p,
+                                            int coarsest_ln,
+                                            int finest_ln)
+{
+    set_valid_level_numbers(hierarchy, coarsest_ln, finest_ln);
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy.getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            accumulateMomentumForcesOnPatchConstantCoefficient(
+                patch, A_un_idx, A_us_idx, p_idx, un_idx, us_idx, thn_idx, thn_nc_idx, thn_sc_idx, params, C, D_u, D_p);
+        }
+    }
+}
+
+inline void
+accumulateMomentumForcesConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                            const int A_un_idx,
+                                            const int A_us_idx,
+                                            const int p_idx,
+                                            const int un_idx,
+                                            const int us_idx,
+                                            const VolumeFractionDataManager& thn_manager,
+                                            const MultiphaseParameters& params,
+                                            const double C,
+                                            const double D_u,
+                                            const double D_p,
+                                            int coarsest_ln,
+                                            int finest_ln)
+{
+    accumulateMomentumForcesConstantCoefficient(hierarchy,
+                                                A_un_idx,
+                                                A_us_idx,
+                                                p_idx,
+                                                un_idx,
+                                                us_idx,
+                                                thn_manager.getCellIndex(),
+                                                thn_manager.getNodeIndex(),
+                                                thn_manager.getSideIndex(),
+                                                params,
+                                                C,
+                                                D_u,
+                                                D_p,
+                                                coarsest_ln,
+                                                finest_ln);
+}
+
 inline void
 accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch,
                                                    const int A_un_idx,
@@ -171,6 +269,68 @@ accumulateMomentumForcesOnPatchConstantCoefficient(SAMRAI::tbox::Pointer<SAMRAI:
         (*A_un_data)(idx) += D_p * (pressure_n);
         (*A_us_data)(idx) += D_p * (pressure_s);
     }
+}
+
+inline void
+accumulateMomentumForcesVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                     const int A_un_idx,
+                                     const int A_us_idx,
+                                     const int p_idx,
+                                     const int un_idx,
+                                     const int us_idx,
+                                     const int thn_idx,
+                                     const int thn_nc_idx,
+                                     const int thn_sc_idx,
+                                     const MultiphaseParameters& params,
+                                     const double C,
+                                     const double D_u,
+                                     const double D_p,
+                                     int coarsest_ln,
+                                     int finest_ln)
+{
+    set_valid_level_numbers(hierarchy, coarsest_ln, finest_ln);
+    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    {
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy.getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+        {
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            accumulateMomentumForcesOnPatchVariableDrag(
+                patch, A_un_idx, A_us_idx, p_idx, un_idx, us_idx, thn_idx, thn_nc_idx, thn_sc_idx, params, C, D_u, D_p);
+        }
+    }
+}
+
+inline void
+accumulateMomentumForcesVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                     const int A_un_idx,
+                                     const int A_us_idx,
+                                     const int p_idx,
+                                     const int un_idx,
+                                     const int us_idx,
+                                     const VolumeFractionDataManager& thn_manager,
+                                     const MultiphaseParameters& params,
+                                     const double C,
+                                     const double D_u,
+                                     const double D_p,
+                                     int coarsest_ln,
+                                     int finest_ln)
+{
+    accumulateMomentumForcesVariableDrag(hierarchy,
+                                         A_un_idx,
+                                         A_us_idx,
+                                         p_idx,
+                                         un_idx,
+                                         us_idx,
+                                         thn_manager.getCellIndex(),
+                                         thn_manager.getNodeIndex(),
+                                         thn_manager.getSideIndex(),
+                                         params,
+                                         C,
+                                         D_u,
+                                         D_p,
+                                         coarsest_ln,
+                                         finest_ln);
 }
 
 inline void
@@ -233,6 +393,35 @@ accumulateMomentumForcesOnPatchVariableDrag(SAMRAI::tbox::Pointer<SAMRAI::hier::
         (*A_us_data)(idx) += D_p * (pressure_s);
     }
 }
+
+inline void
+accumulateMomentumWithoutPressureVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                              const int F_un_idx,
+                                              const int F_us_idx,
+                                              const int un_idx,
+                                              const int us_idx,
+                                              const VolumeFractionDataManager& thn_manager,
+                                              const MultiphaseParameters& params,
+                                              const double C,
+                                              const double D_u,
+                                              int coarsest_ln,
+                                              int finest_ln)
+{
+    accumulateMomentumWithoutPressureVariableDrag(hierarchy,
+                                                  F_un_idx,
+                                                  F_us_idx,
+                                                  un_idx,
+                                                  us_idx,
+                                                  thn_manager.getCellIndex(),
+                                                  thn_manager.getNodeIndex(),
+                                                  thn_manager.getSideIndex(),
+                                                  params,
+                                                  C,
+                                                  D_u,
+                                                  coarsest_ln,
+                                                  finest_ln);
+}
+
 inline void
 accumulateMomentumWithoutPressureVariableDrag(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
                                               const int F_un_idx,
@@ -366,6 +555,34 @@ accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHierarch
                 patch, F_un_idx, F_us_idx, un_idx, us_idx, thn_idx, thn_nc_idx, thn_sc_idx, params, C, D_u);
         }
     }
+}
+
+inline void
+accumulateMomentumWithoutPressureConstantCoefficient(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                                                     const int F_un_idx,
+                                                     const int F_us_idx,
+                                                     const int un_idx,
+                                                     const int us_idx,
+                                                     const VolumeFractionDataManager& thn_manager,
+                                                     const MultiphaseParameters& params,
+                                                     const double C,
+                                                     const double D_u,
+                                                     int coarsest_ln,
+                                                     int finest_ln)
+{
+    accumulateMomentumWithoutPressureConstantCoefficient(hierarchy,
+                                                         F_un_idx,
+                                                         F_us_idx,
+                                                         un_idx,
+                                                         us_idx,
+                                                         thn_manager.getCellIndex(),
+                                                         thn_manager.getNodeIndex(),
+                                                         thn_manager.getSideIndex(),
+                                                         params,
+                                                         C,
+                                                         D_u,
+                                                         coarsest_ln,
+                                                         finest_ln);
 }
 
 // Accumulate the momentum forces with thn interpolated to cell nodes and cell sides.
@@ -545,26 +762,46 @@ multiphase_grad(const SAMRAI::hier::Patch<NDIM>& patch,
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> p_data = patch.getPatchData(p_idx);
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_data = patch.getPatchData(thn_sc_idx);
 
-    for (int axis = 0; axis < NDIM; ++axis)
+    const Box<NDIM>& box = patch.getBox();
+    if (do_accumulate)
     {
-        for (SAMRAI::pdat::SideIterator<NDIM> si(patch.getBox(), axis); si; si++)
-        {
-            const SAMRAI::pdat::SideIndex<NDIM>& idx = si();
-            // Note: This does not account for any synchronization that needs to occur at coarse-fine
-            // interfaces. Consider using HierarchyMathOps::grad() instead.
-            const double dp = ((*p_data)(idx.toCell(1)) - (*p_data)(idx.toCell(0))) / dx[axis];
-            const double thn = (*thn_data)(idx);
-            if (do_accumulate)
-            {
-                (*Gun_data)(idx) += C * thn * dp;
-                (*Gus_data)(idx) += C * convertToThs(thn) * dp;
-            }
-            else
-            {
-                (*Gun_data)(idx) = C * thn * dp;
-                (*Gus_data)(idx) = C * convertToThs(thn) * dp;
-            }
-        }
+        multiphase_grad_accum(Gun_data->getPointer(0),
+                              Gun_data->getPointer(1),
+                              Gun_data->getGhostCellWidth().max(),
+                              Gus_data->getPointer(0),
+                              Gus_data->getPointer(1),
+                              Gus_data->getGhostCellWidth().max(),
+                              thn_data->getPointer(0),
+                              thn_data->getPointer(1),
+                              thn_data->getGhostCellWidth().max(),
+                              p_data->getPointer(),
+                              p_data->getGhostCellWidth().max(),
+                              box.lower(0),
+                              box.lower(1),
+                              box.upper(0),
+                              box.upper(1),
+                              dx,
+                              C);
+    }
+    else
+    {
+        multiphase_grad_fcn(Gun_data->getPointer(0),
+                            Gun_data->getPointer(1),
+                            Gun_data->getGhostCellWidth().max(),
+                            Gus_data->getPointer(0),
+                            Gus_data->getPointer(1),
+                            Gus_data->getGhostCellWidth().max(),
+                            thn_data->getPointer(0),
+                            thn_data->getPointer(1),
+                            thn_data->getGhostCellWidth().max(),
+                            p_data->getPointer(),
+                            p_data->getGhostCellWidth().max(),
+                            box.lower(0),
+                            box.lower(1),
+                            box.upper(0),
+                            box.upper(1),
+                            dx,
+                            C);
     }
 }
 
