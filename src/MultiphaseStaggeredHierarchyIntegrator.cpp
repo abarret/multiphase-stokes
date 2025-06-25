@@ -649,12 +649,16 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
         d_div_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Div_Draw");
         d_fn_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Fn_draw", NDIM);
         d_fs_draw_var = new CellVariable<NDIM, double>(d_object_name + "::Fs_draw", NDIM);
-        int un_draw_idx, us_draw_idx, div_draw_idx, fn_draw_idx, fs_draw_idx;
+        d_div_un_var = new CellVariable<NDIM, double>(d_object_name + "::Div_Un");
+        d_div_us_var = new CellVariable<NDIM, double>(d_object_name + "::Div_Us");
+        int un_draw_idx, us_draw_idx, div_draw_idx, fn_draw_idx, fs_draw_idx, div_un_idx, div_us_idx;
         registerVariable(un_draw_idx, d_un_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(us_draw_idx, d_us_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(div_draw_idx, d_div_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(fn_draw_idx, d_fn_draw_var, IntVector<NDIM>(0), getCurrentContext());
         registerVariable(fs_draw_idx, d_fs_draw_var, IntVector<NDIM>(0), getCurrentContext());
+        registerVariable(div_un_idx, d_div_un_var, IntVector<NDIM>(0), getCurrentContext());
+        registerVariable(div_us_idx, d_div_us_var, IntVector<NDIM>(0), getCurrentContext());
 
         d_visit_writer->registerPlotQuantity("Un", "VECTOR", un_draw_idx, 0, 1.0, "NODE");
         for (int d = 0; d < NDIM; ++d)
@@ -675,6 +679,8 @@ MultiphaseStaggeredHierarchyIntegrator::initializeHierarchyIntegrator(Pointer<Pa
         d_visit_writer->registerPlotQuantity("P", "SCALAR", p_cur_idx, 0, 1.0, "CELL");
 
         d_visit_writer->registerPlotQuantity("Div", "SCALAR", div_draw_idx, 0, 1.0, "CELL");
+        d_visit_writer->registerPlotQuantity("Div_Un", "SCALAR", div_un_idx, 0, 1.0, "CELL");
+        d_visit_writer->registerPlotQuantity("Div_Us", "SCALAR", div_us_idx, 0, 1.0, "CELL");
 
         // Only need to plot this variable if we aren't advecting it.
         // If we do advect theta, the advection integrator will plot it.
@@ -909,6 +915,8 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
     const int fn_draw_idx = var_db->mapVariableAndContextToIndex(d_fn_draw_var, getCurrentContext());
     const int fs_draw_idx = var_db->mapVariableAndContextToIndex(d_fs_draw_var, getCurrentContext());
     const int div_draw_idx = var_db->mapVariableAndContextToIndex(d_div_draw_var, getCurrentContext());
+    const int div_un_idx = var_db->mapVariableAndContextToIndex(d_div_un_var, getCurrentContext());
+    const int div_us_idx = var_db->mapVariableAndContextToIndex(d_div_us_var, getCurrentContext());
     const int un_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
     const int us_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
     const int fn_idx = var_db->mapVariableAndContextToIndex(d_f_un_sc_var, getCurrentContext());
@@ -995,9 +1003,13 @@ MultiphaseStaggeredHierarchyIntegrator::setupPlotDataSpecialized()
         fs_draw_idx, d_fs_draw_var, fs_idx, d_f_us_sc_var, nullptr, d_integrator_time, synch_cf_interface);
 
     // Compute divergence of velocity fields.
+    d_hier_math_ops->div(div_un_idx, d_div_un_var, 1.0, un_scr_idx, d_un_sc_var, nullptr, 0.0, true);
+    d_hier_math_ops->div(div_us_idx, d_div_us_var, 1.0, us_scr_idx, d_us_sc_var, nullptr, 0.0, true);
     pre_div_interp(un_scr_idx, thn_cur_idx, un_scr_idx, us_scr_idx, d_hierarchy);
     d_hier_math_ops->div(div_draw_idx, d_div_draw_var, 1.0, un_scr_idx, d_un_sc_var, nullptr, 0.0, true);
-    ghost_comp = { ITC(div_draw_idx, "NONE", false, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr) };
+    ghost_comp = { ITC(div_draw_idx, "NONE", false, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
+                   ITC(div_un_idx, "NONE", false, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr),
+                   ITC(div_us_idx, "NONE", false, "CONSERVATIVE_COARSEN", "LINEAR", false, nullptr) };
     hier_bdry_fill.deallocateOperatorState();
     hier_bdry_fill.initializeOperatorState(ghost_comp, d_hierarchy);
     hier_bdry_fill.fillData(d_integrator_time);
