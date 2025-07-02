@@ -1,8 +1,3 @@
-Warning in file ``/scratch/ibamr/IBAMR/src/navier_stokes/INSHierarchyIntegrator.cpp'' at line 779
-WARNING MESSAGE: 
-INSHierarchyIntegrator::getFromInput()
-  no constant viscosity specified;
-  setting to quiet_NaN
 FluidSolver::initializePatchHierarchy(): tag_buffer = 0
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++
