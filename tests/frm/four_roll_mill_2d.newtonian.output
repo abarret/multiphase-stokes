@@ -13,7 +13,7 @@ Simulation time is 0.0003125
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 1
 Simulation time is 0.0003125
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000892138
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000892139
 
 At end       of timestep # 1
 Simulation time is 0.000625
@@ -33,7 +33,7 @@ Simulation time is 0.0009375
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 3
 Simulation time is 0.0009375
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00161287
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00161288
 
 At end       of timestep # 3
 Simulation time is 0.00125
@@ -43,7 +43,7 @@ Simulation time is 0.00125
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 4
 Simulation time is 0.00125
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00191899
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.001919
 
 At end       of timestep # 4
 Simulation time is 0.0015625

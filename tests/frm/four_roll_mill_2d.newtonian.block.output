@@ -1,1 +1,51 @@
-four_roll_mill_2d.newtonian.output
+FluidSolver::initializePatchHierarchy(): tag_buffer = 0
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 0
+Simulation time is 0
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000115327
+
+At end       of timestep # 0
+Simulation time is 0.0003125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 1
+Simulation time is 0.0003125
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000219852
+
+At end       of timestep # 1
+Simulation time is 0.000625
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 2
+Simulation time is 0.000625
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000314605
+
+At end       of timestep # 2
+Simulation time is 0.0009375
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 3
+Simulation time is 0.0009375
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000400518
+
+At end       of timestep # 3
+Simulation time is 0.00125
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++
+At beginning of timestep # 4
+Simulation time is 0.00125
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.000478434
+
+At end       of timestep # 4
+Simulation time is 0.0015625
++++++++++++++++++++++++++++++++++++++++++++++++++++
+

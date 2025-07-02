@@ -77,7 +77,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    use_grad_tagging = TRUE
    tag_buffer = TAG_BUFFER
    regrid_interval = REGRID_INTERVAL
-
+   mu = 1.0 // Prevent warnings in logfile
 
    solver_db {
       ksp_type = "fgmres"
@@ -136,7 +136,7 @@ AdvDiffIntegrator {
 
 Main {
 // log file parameters
-   log_file_name = "logfile"
+   log_file_name = "output"
    log_all_nodes = FALSE
 
 // visualization dump parameters

@@ -43,7 +43,7 @@ Simulation time is 0.00125
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 At beginning of timestep # 4
 Simulation time is 0.00125
-FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00189826
+FluidSolver::postprocessIntegrateHierarchy(): Network CFL number = 0.00189827
 
 At end       of timestep # 4
 Simulation time is 0.0015625

@@ -70,7 +70,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    num_cycles                    = NUM_CYCLES
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
-   w = W
    mu = 0.0 // TO ELIMINATE WARNINGS
    use_preconditioner = USE_PRECONDITIONER
    grad_abs_thresh = 0.75
@@ -84,6 +83,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    }
 
    precond_db {
+      relaxation_parameter = W
       cycle_type = "V_CYCLE"
       num_pre_sweeps = 5
       num_post_sweeps = 5
