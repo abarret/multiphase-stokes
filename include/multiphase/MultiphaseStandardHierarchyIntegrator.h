@@ -160,10 +160,16 @@ private:
             SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_bc_coef);
 
         /*!
+         * Deallocates any data stored on the dense hierarchy if using a multigrid preconditioner. Note that the block
+         * preconditioner deallocates data for itself.
+         */
+        ~MultiphasePreconditioner();
+
+        /*!
          * Updates the volume fraction in the preconditioner. Returns true if the solver must be reallocated after this
          * call.
          */
-        bool updateVolumeFraction(const std::unique_ptr<VolumeFractionDataManager>& thn_manager, double time);
+        bool updateVolumeFraction(double time);
 
         /*!
          * Updates the drag coefficient in the preconditioner. Returns true if the solver must be reallocated after this
@@ -190,6 +196,9 @@ private:
 
     private:
         SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
+        const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager; // We need to store the volume fraction manager
+                                                                         // so we can deallocate data on the dense
+                                                                         // hierarchy if necessary.
 
         PreconditionerType d_precond_type;
 

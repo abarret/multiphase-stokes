@@ -500,7 +500,7 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
     // Set thn_cc_idx on the dense hierarchy.
     if (d_use_preconditioner)
     {
-        if (d_precond->updateVolumeFraction(d_thn_new_manager, new_time))
+        if (d_precond->updateVolumeFraction(new_time))
         {
             d_stokes_solver->deallocateSolverState();
             d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
@@ -581,7 +581,7 @@ MultiphaseStandardHierarchyIntegrator::integrateHierarchySpecialized(const doubl
     // Update the preconditioner with new volume fraction
     if (d_precond)
     {
-        bool needs_reallocation = d_precond->updateVolumeFraction(d_thn_new_manager, new_time);
+        bool needs_reallocation = d_precond->updateVolumeFraction(new_time);
         if (isVariableDrag())
         {
             const int xi_idx = var_db->mapVariableAndContextToIndex(d_xi_var, getScratchContext());
@@ -952,7 +952,7 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
     RobinBcCoefStrategy<NDIM>* p_bc_coef)
-    : d_hierarchy(hierarchy), d_precond_type(precond_type)
+    : d_hierarchy(hierarchy), d_precond_type(precond_type), d_thn_manager(thn_manager)
 {
     switch (d_precond_type)
     {
@@ -983,48 +983,31 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     }
 }
 
+MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::~MultiphasePreconditioner()
+{
+    if (d_precond_type == PreconditionerType::MULTIGRID)
+    {
+        d_thn_manager->deallocateData(d_fac_precond->getDenseHierarchy());
+    }
+}
+
 bool
-MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(
-    const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
-    const double time)
+MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(const double time)
 {
     switch (d_precond_type)
     {
     case PreconditionerType::BLOCK:
     {
-        if (d_block_precond->getVolumeFractionManager() == thn_manager)
-        {
-            d_block_precond->deallocateSolverState();
-        }
-        else
-        {
-            TBOX_ERROR(
-                "MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(): Can't hot "
-                "swap volume fraction managers!\n");
-        }
-
+        d_block_precond->deallocateSolverState();
         return true;
         break;
     }
     case PreconditionerType::MULTIGRID:
     {
         Pointer<FACPreconditionerStrategy> fac_strat = d_fac_precond->getFACPreconditionerStrategy();
-        Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> box_relax_op = fac_strat;
-        if (box_relax_op)
-        {
-            if (box_relax_op->getVolumeFractionManager() == thn_manager)
-            {
-                Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_fac_precond->getDenseHierarchy();
-                d_fac_precond->transferToDense(thn_manager->getCellIndex());
-                thn_manager->updateVolumeFraction(thn_manager->getCellIndex(), dense_hierarchy, time);
-            }
-            else
-            {
-                TBOX_ERROR(
-                    "MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::updateVolumeFraction(): Can't "
-                    "hot swap volume fraction managers!\n");
-            }
-        }
+        Pointer<PatchHierarchy<NDIM>> dense_hierarchy = d_fac_precond->getDenseHierarchy();
+        d_fac_precond->transferToDense(d_thn_manager->getCellIndex());
+        d_thn_manager->updateVolumeFraction(d_thn_manager->getCellIndex(), dense_hierarchy, time);
         return false;
         break;
     }
