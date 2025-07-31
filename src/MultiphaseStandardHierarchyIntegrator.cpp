@@ -502,13 +502,13 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
         d_precond_op->setSolutionTime(new_time);
         d_precond_op->setTimeInterval(current_time, new_time);
         d_stokes_precond = new FullFACPreconditioner("KrylovPrecond", d_precond_op, d_precond_db, "Krylov_precond_");
-        d_stokes_precond->setNullSpace(false, d_nul_vecs);
+        d_stokes_precond->setNullspace(false, d_nul_vecs);
         d_stokes_solver->setPreconditioner(d_stokes_precond);
     }
 
     d_stokes_solver->setSolutionTime(new_time);
     d_stokes_solver->setTimeInterval(current_time, new_time);
-    d_stokes_solver->setNullSpace(false, d_nul_vecs);
+    d_stokes_solver->setNullspace(false, d_nul_vecs);
     d_stokes_solver->initializeSolverState(*d_sol_vec, *d_rhs_vec);
 
     // Set thn_cc_idx on the dense hierarchy.

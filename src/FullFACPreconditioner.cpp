@@ -116,7 +116,7 @@ FullFACPreconditioner::solveSystem(SAMRAIVectorReal<NDIM, double>& u, SAMRAIVect
     transferToBase(u, *d_u);
 
     // Inform preconditioner of the nullspace.
-    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullSpaceBasisVectors();
+    const std::vector<Pointer<SAMRAIVectorReal<NDIM, double>>>& null_vecs = getNullspaceBasisVectors();
     for (const auto& null_vec : null_vecs)
     {
         const double dot_prod = u.dot(null_vec);
