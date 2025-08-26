@@ -958,8 +958,8 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     {
     case PreconditionerType::BLOCK:
     {
-        d_block_precond =
-            new MultiphaseStaggeredStokesBlockPreconditioner("KrylovPrecondStrategy", params, input_db, thn_manager);
+        d_block_precond = new MultiphaseStaggeredStokesBlockPreconditioner(
+            "KrylovBlockPreconditioner", params, input_db, thn_manager);
         d_block_precond->setCAndDCoefficients(C, D);
         d_block_precond->setNullSpace(false, null_vecs);
         break;
@@ -967,11 +967,12 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     case PreconditionerType::MULTIGRID:
     {
         d_fac_op = new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
-            "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
+            "MultigridStrategy", "Krylov_precond_", params, thn_manager);
         d_fac_op->setUnderRelaxationParamater(input_db->getDouble("relaxation_parameter"));
         d_fac_op->setCandDCoefficients(C, D);
         d_fac_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef);
-        d_fac_precond = new FullFACPreconditioner("KrylovPrecond", d_fac_op, input_db, "Krylov_precond_");
+        d_fac_precond =
+            new FullFACPreconditioner("KrylovMultigridPreconditioner", d_fac_op, input_db, "Krylov_precond_");
         d_fac_precond->setNullSpace(false, null_vecs);
         break;
     }

@@ -274,6 +274,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
                                                                     const SAMRAIVectorReal<NDIM, double>& b)
 {
     IBTK_TIMER_START(t_initialize_solver_state);
+    if (d_is_initialized) deallocateSolverState();
     LinearSolver::initializeSolverState(x, b);
     d_hierarchy = x.getPatchHierarchy();
 #ifndef NDEBUG
@@ -353,16 +354,16 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     Pointer<LinearOperator> stokes_op;
     if (d_using_symmetric)
     {
-        Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op =
-            new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, d_params, d_thn_manager);
+        Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op = new MultiphaseStaggeredStokesBlockOperator(
+            d_object_name + "::StokesBlockOP", true, d_params, d_thn_manager);
         mp_stokes_op->setCandDCoefficients(d_C, d_D);
         // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
         stokes_op = mp_stokes_op;
     }
     else
     {
-        Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op =
-            new MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, d_params, d_thn_manager);
+        Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op = new MultiphaseStaggeredStokesVelocitySolve(
+            d_object_name + "::StokesVelocityOP", true, d_params, d_thn_manager);
         mp_stokes_op->setCandDCoefficients(d_C, d_D);
         // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
         stokes_op = mp_stokes_op;
@@ -372,7 +373,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     {
         Pointer<MultiphaseStaggeredStokesBlockFACOperator> mp_fac_precondition_strategy =
             new MultiphaseStaggeredStokesBlockFACOperator(
-                "KrylovPrecondStrategy", "Krylov_precond_", d_params, d_thn_manager);
+                d_object_name + "::StokesBlockFACStrategy", "Krylov_precond_", d_params, d_thn_manager);
         mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
         d_stokes_precond_op = mp_fac_precondition_strategy;
     }
@@ -380,15 +381,17 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     {
         Pointer<MultiphaseStaggeredStokesVelocityFACOperator> mp_fac_precondition_strategy =
             new MultiphaseStaggeredStokesVelocityFACOperator(
-                "KrylovPrecondStrategy", "Krylov_precond_", d_params, d_thn_manager);
+                d_object_name + "::StokesVelocityFACStrategy", "Krylov_precond_", d_params, d_thn_manager);
         mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
         d_stokes_precond_op = mp_fac_precondition_strategy;
     }
-    d_stokes_solver =
-        std::make_unique<PETScKrylovLinearSolver>("stokes_solver", d_stokes_solver_db, "stokes_velocity_");
+    d_stokes_solver = std::make_unique<PETScKrylovLinearSolver>(
+        d_object_name + "::stokes_solver", d_stokes_solver_db, "stokes_velocity_");
     d_stokes_solver->setOperator(stokes_op);
-    d_stokes_precond = new FullFACPreconditioner(
-        "stokes_precond", d_stokes_precond_op, d_stokes_precond_db, d_object_name + "_stokes_pc_");
+    d_stokes_precond = new FullFACPreconditioner(d_object_name + "::StokesBlockPreconditioner",
+                                                 d_stokes_precond_op,
+                                                 d_stokes_precond_db,
+                                                 d_object_name + "_stokes_pc_");
     d_stokes_solver->setPreconditioner(d_stokes_precond);
     d_stokes_solver->initializeSolverState(u_vec, bu_vec);
 
@@ -403,6 +406,7 @@ void
 MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
 {
     IBTK_TIMER_START(t_deallocate_solver_state);
+    if (!d_is_initialized) return;
     LinearSolver::deallocateSolverState();
 
     // Deallocate any scratch data.

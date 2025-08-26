@@ -109,9 +109,15 @@ MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     // Check if we've already made this variable
     if (var_db->checkVariableExists(d_object_name + "::outerside_variable"))
+    {
         d_os_var = var_db->getVariable(d_object_name + "::outerside_variable");
-    d_os_idx =
-        var_db->registerVariableAndContext(d_os_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(0));
+        d_os_idx = var_db->mapVariableAndContextToIndex(d_os_var, var_db->getContext(d_object_name + "::CTX"));
+    }
+    else
+    {
+        d_os_idx = var_db->registerVariableAndContext(
+            d_os_var, var_db->getContext(d_object_name + "::CTX"), IntVector<NDIM>(0));
+    }
 
     // Initialize the boundary conditions objects.
     setPhysicalBcCoefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef),
@@ -137,9 +143,6 @@ MultiphaseStaggeredStokesOperator::~MultiphaseStaggeredStokesOperator()
     d_default_us_bc_coef = nullptr;
     delete d_default_P_bc_coef;
     d_default_P_bc_coef = nullptr;
-    // Remove internal patch index from variable database.
-    auto var_db = VariableDatabase<NDIM>::getDatabase();
-    var_db->removePatchDataIndex(d_os_idx);
     return;
 } // ~TwoFluidStaggeredStokesOperator
 
@@ -396,7 +399,6 @@ MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
 
     // Indicate the operator is initialized.
     d_is_initialized = true;
-
     IBAMR_TIMER_STOP(t_initialize_operator_state);
     return;
 } // initializeOperatorState
