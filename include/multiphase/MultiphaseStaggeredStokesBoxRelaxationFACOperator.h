@@ -232,27 +232,6 @@ private:
     //\}
 
     /*
-     * Level solvers and solver parameters.
-     */
-    std::string d_level_solver_type = IBTK::CCPoissonSolverManager::PETSC_LEVEL_SOLVER,
-                d_level_solver_default_options_prefix;
-    double d_level_solver_abs_residual_tol = 1.0e-50, d_level_solver_rel_residual_tol = 1.0e-5;
-    int d_level_solver_max_iterations = 1;
-    std::vector<SAMRAI::tbox::Pointer<IBTK::PoissonSolver>> d_level_solvers;
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_level_solver_db;
-
-    /*
-     * Coarse level solvers and solver parameters.
-     */
-    SAMRAI::tbox::Pointer<IBTK::PoissonSolver> d_coarse_solver;
-    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_coarse_solver_db;
-
-    /*
-     * Patch overlap data.
-     */
-    std::vector<std::vector<SAMRAI::hier::BoxList<NDIM>>> d_patch_bc_box_overlap;
-
-    /*
      * Coarse-fine interface interpolation objects.
      */
     SAMRAI::tbox::Pointer<IBTK::CoarseFineBoundaryRefinePatchStrategy> d_sc_bdry_op, d_cc_bdry_op;

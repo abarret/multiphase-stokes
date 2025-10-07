@@ -891,7 +891,7 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
 } // postprocessIntegrateHierarchy
 
 void
-MultiphaseStaggeredHierarchyIntegrator::regridProjection()
+MultiphaseStaggeredHierarchyIntegrator::regridProjection(const bool)
 {
     // During regridding, the coarsening and refining operations can introduce errors. Here, we project the velocity
     // onto a divergence free field.

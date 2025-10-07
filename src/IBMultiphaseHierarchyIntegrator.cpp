@@ -203,7 +203,6 @@ IBMultiphaseHierarchyIntegrator::integrateHierarchySpecialized(const double curr
     const int un_new_idx = var_db->mapVariableAndContextToIndex(d_un_var, ins_hier_integrator->getNewContext());
     const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_u_var, ins_hier_integrator->getCurrentContext());
     const int us_new_idx = var_db->mapVariableAndContextToIndex(d_u_var, ins_hier_integrator->getNewContext());
-    const int p_new_idx = var_db->mapVariableAndContextToIndex(d_p_var, ins_hier_integrator->getNewContext());
 
     // Compute the Lagrangian forces and spread them to the Eulerian grid.
     switch (d_time_stepping_type)
@@ -466,25 +465,6 @@ IBMultiphaseHierarchyIntegrator::postprocessIntegrateHierarchy(const double curr
                                                                const int num_cycles)
 {
     auto ops = HierarchyDataOpsManager<NDIM>::getManager()->getOperationsDouble(d_u_var, d_hierarchy, true);
-
-    auto velocity_ghost_update = [&](const std::vector<int>& indices)
-    {
-        using ITC = IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghostfills;
-        for (const int& idx : indices)
-        {
-            ghostfills.emplace_back(idx,
-                                    "CONSERVATIVE_LINEAR_REFINE",
-                                    /*use_cf_bdry_interpolation*/ true,
-                                    "CONSERVATIVE_COARSEN",
-                                    "LINEAR",
-                                    false,
-                                    d_ins_hier_integrator->getVelocityBoundaryConditions());
-        }
-        HierarchyGhostCellInterpolation ghost_fill_op;
-        ghost_fill_op.initializeOperatorState(ghostfills, d_hierarchy);
-        ghost_fill_op.fillData(current_time);
-    };
 
     // The last thing we need to do (before we really postprocess) is update the structure velocity:
     Pointer<MultiphaseStaggeredHierarchyIntegrator> ins_integrator = d_ins_hier_integrator;

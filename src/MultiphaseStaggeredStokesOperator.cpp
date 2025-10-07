@@ -108,10 +108,10 @@ MultiphaseStaggeredStokesOperator::MultiphaseStaggeredStokesOperator(const std::
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
       d_thn_bc_coef(d_default_thn_bc_coef),
       d_os_var(new OutersideVariable<NDIM, double>(d_object_name + "::outerside_variable")),
+      d_params(params),
       d_nc_scr_var(new NodeVariable<NDIM, double>(d_object_name + "::ThnNode", 1, false)),
       d_cc_ndim_var(new CellVariable<NDIM, double>(d_object_name + "::ThnCell", NDIM)),
       d_sc_scr_var(new SideVariable<NDIM, double>(d_object_name + "::VelAvg", 1, false)),
-      d_params(params),
       d_thn_scr_var(new CellVariable<NDIM, double>(d_object_name + "::Thn"))
 {
     // Setup a default boundary condition object that specifies homogeneous
@@ -435,7 +435,6 @@ MultiphaseStaggeredStokesOperator::initializeOperatorState(const SAMRAIVectorRea
 
     // Allocate scratch data.
     d_x->allocateVectorData();
-    const int thn_idx = d_thn_idx;
 
     // Allocate synchronization variable
     const int coarsest_ln = 0;

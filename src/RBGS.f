@@ -87,7 +87,6 @@ c
 c    
       double precision A_box(9,9)
       double precision b(9)
-      integer ipiv(9), info
 c
       integer i0, i1
 c    
@@ -506,7 +505,6 @@ c
 c
       double precision A_box(9,9)
       double precision b(9)
-      integer ipiv(9), info
 c
       integer i0, i1
 c
@@ -1030,8 +1028,7 @@ c
       double precision ths_iphalf_jphalf, ths_iphalf_jmhalf
 c
       double precision A_box(9,9)
-      double precision b(9), x(9)
-      integer ipiv(9), info
+      double precision b(9)
 c
       integer i0, i1
 c
@@ -1456,8 +1453,7 @@ c
       double precision ths_iphalf_jphalf, ths_iphalf_jmhalf
 c
       double precision A_box(9,9)
-      double precision b(9), x(9)
-      integer ipiv(9), info
+      double precision b(9)
 c
       integer i0, i1
 c
