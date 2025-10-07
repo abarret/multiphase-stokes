@@ -306,7 +306,7 @@ public:
                                        bool skip_synchronize_new_state_data,
                                        int num_cycles = 1) override;
 
-    void regridProjection() override;
+    void regridProjection(const bool initial_time) override;
 
     double getStableTimestep(SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch) const override;
 

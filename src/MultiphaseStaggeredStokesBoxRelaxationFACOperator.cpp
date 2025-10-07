@@ -259,20 +259,21 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
     const std::string& default_options_prefix,
     const MultiphaseParameters& params)
     : FACPreconditionerStrategy(object_name),
+      d_params(params),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
       d_default_us_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_us_bc_coef", Pointer<Database>(nullptr))),
-      d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
-      d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
       d_default_P_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_P_bc_coef", Pointer<Database>(nullptr))),
-      d_P_bc_coef(d_default_P_bc_coef.get()),
       d_default_thn_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_thn_bc_coef", Pointer<Database>(nullptr))),
+
+      d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
+      d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
+      d_P_bc_coef(d_default_P_bc_coef.get()),
       d_thn_bc_coef(d_default_thn_bc_coef.get()),
       d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
-      d_params(params),
       d_thn_scr_var(new CellVariable<NDIM, double>(d_object_name + "::Thn"))
 {
     // Setup a default boundary condition object that specifies homogeneous
@@ -980,10 +981,6 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
-            const double* const xlow =
-                pgeom->getXLower(); // {xlow[0], xlow[1]} -> physical location of bottom left of box.
-            const hier::Index<NDIM>& idx_low = patch->getBox().lower();
             Pointer<CellData<NDIM, double>> p_data = patch->getPatchData(P_idx);
             Pointer<CellData<NDIM, double>> rhs_P_data =
                 patch->getPatchData(rhs_P_idx); // result of applying operator (eqn 3)

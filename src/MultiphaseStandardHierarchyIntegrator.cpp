@@ -589,7 +589,6 @@ MultiphaseStandardHierarchyIntegrator::integrateHierarchySpecialized(const doubl
 {
     IBTK_TIMER_START(t_integrate_hierarchy);
     MultiphaseStaggeredHierarchyIntegrator::integrateHierarchySpecialized(current_time, new_time, cycle_num);
-    double half_time = 0.5 * (current_time + new_time);
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     const int un_cur_idx = var_db->mapVariableAndContextToIndex(d_un_sc_var, getCurrentContext());
     const int us_cur_idx = var_db->mapVariableAndContextToIndex(d_us_sc_var, getCurrentContext());
@@ -631,7 +630,6 @@ MultiphaseStandardHierarchyIntegrator::integrateHierarchySpecialized(const doubl
         d_xi_fcn->setDataOnPatchHierarchy(xi_idx, d_xi_var, d_hierarchy, new_time);
         d_stokes_precond->transferToDense(xi_idx, true);
     }
-    const double dt = new_time - current_time;
 
     // Compute forces
     Pointer<SAMRAIVectorReal<NDIM, double>> f_vec = d_rhs_vec->cloneVector(d_object_name + "::F_temp");
