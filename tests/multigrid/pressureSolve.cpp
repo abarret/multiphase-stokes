@@ -135,7 +135,6 @@ main(int argc, char* argv[])
 
         // Setup vector objects.
         HierarchyMathOps hier_math_ops("hier_math_ops", patch_hierarchy);
-        const int h_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
         const int h_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
 
         SAMRAIVectorReal<NDIM, double> u_vec("p", patch_hierarchy, 0, patch_hierarchy->getFinestLevelNumber());
@@ -178,7 +177,6 @@ main(int argc, char* argv[])
             {
                 Pointer<Patch<NDIM>> patch = level->getPatch(p());
                 SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-                const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
                 SAMRAI::tbox::Pointer<SAMRAI::pdat::CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
                 SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> thn_ths_sq_data =
                     patch->getPatchData(thn_ths_sq_idx);
@@ -228,7 +226,6 @@ main(int argc, char* argv[])
         hier_math_ops.setPatchHierarchy(patch_hierarchy);
         hier_math_ops.resetLevels(0, patch_hierarchy->getFinestLevelNumber());
         const int wgt_cc_idx = hier_math_ops.getCellWeightPatchDescriptorIndex();
-        const int wgt_sc_idx = hier_math_ops.getSideWeightPatchDescriptorIndex();
 
         // This subtracts the projection of solution on the nullspace.
         // The nullspace consists of constants.

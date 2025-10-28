@@ -146,15 +146,15 @@ MultiphaseStaggeredStokesVelocityFACOperator::MultiphaseStaggeredStokesVelocityF
     const MultiphaseParameters& params,
     const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
     : FACPreconditionerStrategy(object_name),
+      d_params(params),
+      d_thn_manager(thn_manager),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
       d_default_us_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_us_bc_coef", Pointer<Database>(nullptr))),
       d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
-      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
-      d_params(params),
-      d_thn_manager(thn_manager)
+      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
@@ -570,7 +570,6 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> rhs_un_data =

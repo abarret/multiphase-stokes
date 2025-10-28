@@ -92,7 +92,7 @@ c
 c
         double precision thn_lower_x, thn_lower_y
         double precision thn_imh_jph, thn_imh_jmh
-        double precision thn_iph_jph, thn_iph_jmh
+        double precision thn_iph_jmh
 c
         double precision dx_dx, dy_dy, dx_dy
 c
@@ -348,7 +348,7 @@ c
 c
         double precision thn_lower_x, thn_lower_y
         double precision thn_imh_jph, thn_imh_jmh
-        double precision thn_iph_jph, thn_iph_jmh
+        double precision thn_iph_jmh
 c
         double precision dx_dx, dy_dy, dx_dy
 c

@@ -91,8 +91,6 @@ extern "C"
                           const int&,
                           const double&, // eta_n
                           const double&, // eta_s
-                          const double&, // nu_n
-                          const double&, // nu_s
                           const double&, // xi
                           const double&, // w = under relaxation factor
                           const double&, // C in C*u term
@@ -145,16 +143,22 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
     const MultiphaseParameters& params,
     const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
     : FACPreconditionerStrategy(object_name),
+      d_params(params),
+      d_thn_manager(thn_manager),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
       d_default_us_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_us_bc_coef", Pointer<Database>(nullptr))),
       d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
-      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
-      d_params(params),
-      d_thn_manager(thn_manager)
+      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
 {
+    // Some error checking. If nu_n or nu_s is not 1 or NaN, then this class won't give the expected result
+    if (d_params.nu_n != 1.0 || d_params.nu_s != 1.0 || d_params.nu_n != d_params.nu_n ||
+        d_params.nu_s != d_params.nu_s)
+    {
+        TBOX_ERROR(d_object_name + ": nu_n and nu_s must be one or NaN for the block preconditioner.");
+    }
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
     // boundary conditions for the pressure.
@@ -488,8 +492,6 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                  thn_sc_data->getGhostCellWidth().min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
-                                 d_params.nu_n,
-                                 d_params.nu_s,
                                  d_params.xi,
                                  d_w,
                                  d_C,
@@ -571,7 +573,6 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-            const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> rhs_un_data =
                 patch->getPatchData(rhs_un_idx); // result of applying operator (eqn 1)

@@ -455,12 +455,6 @@ MultiphaseStaggeredStokesVelocitySolve::applySpecialized(const int A_un_idx,
                                                          const int thn_nc_idx,
                                                          const int thn_sc_idx)
 {
-    const double xi = d_params.xi;
-    const double eta_n = d_params.eta_n;
-    const double eta_s = d_params.eta_s;
-    const double C = d_C;
-    const double D = d_D_u;
-
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
@@ -468,7 +462,7 @@ MultiphaseStaggeredStokesVelocitySolve::applySpecialized(const int A_un_idx,
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             computeVelocitySubBlockOnPatch(
-                *patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, C, D);
+                *patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, d_C, d_D_u);
         }
     }
 }

@@ -950,7 +950,7 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
     RobinBcCoefStrategy<NDIM>* p_bc_coef)
-    : d_hierarchy(hierarchy), d_precond_type(precond_type), d_thn_manager(thn_manager)
+    : d_hierarchy(hierarchy), d_thn_manager(thn_manager), d_precond_type(precond_type)
 {
     switch (d_precond_type)
     {

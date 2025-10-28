@@ -281,6 +281,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
     const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
     : FACPreconditionerStrategy(object_name),
       d_params(params),
+      d_thn_manager(thn_manager),
       d_default_un_bc_coef(
           new LocationIndexRobinBcCoefs<NDIM>(d_object_name + "::default_un_bc_coef", Pointer<Database>(nullptr))),
       d_default_us_bc_coef(
@@ -290,8 +291,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::MultiphaseStaggeredStokesBoxR
       d_un_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_un_bc_coef.get())),
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
       d_P_bc_coef(d_default_P_bc_coef.get()),
-      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var")),
-      d_thn_manager(thn_manager)
+      d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
 {
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann

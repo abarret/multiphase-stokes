@@ -35,7 +35,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &        f_us_0, f_us_1, f_us_gcw,
      &        thn, thn_gcw, thn_nc, thn_nc_gcw,
      &      thn_sc_0, thn_sc_1, thn_sc_gcw, eta_n, eta_s,
-     &        nu_n, nu_s, xi, w, C, D, red_or_black)
+     &        xi, w, C, D, red_or_black)
 c
         use convert_to_ths
         implicit none
@@ -45,7 +45,7 @@ cccccccccccccccccccccccccccccccccc INPUTS ccccccccccccccccccccccccccccc
         integer ilow1,  iup1
         integer un_gcw, us_gcw, f_un_gcw, f_us_gcw
         integer red_or_black
-        double precision eta_n, eta_s, nu_n, nu_s, xi, w, C, D
+        double precision eta_n, eta_s, xi, w, C, D
 c
         integer thn_gcw
         double precision thn(ilow0-thn_gcw:iup0+thn_gcw,
@@ -81,7 +81,7 @@ c
 c
         double precision thn_lower_x, thn_lower_y
         double precision thn_imh_jph, thn_imh_jmh
-        double precision thn_iph_jph, thn_iph_jmh
+        double precision thn_iph_jmh
 c
         double precision dx_dx, dy_dy, dx_dy
 c
@@ -282,9 +282,9 @@ c
         double precision thn_lower_x, thn_lower_y
         double precision ths_lower_x, ths_lower_y
         double precision thn_imh_jph, thn_imh_jmh
-        double precision thn_iph_jph, thn_iph_jmh
+        double precision thn_iph_jmh
         double precision ths_imh_jph, ths_imh_jmh
-        double precision ths_iph_jph, ths_iph_jmh
+        double precision ths_iph_jmh
 c
         double precision dx_dx, dy_dy, dx_dy
 c
@@ -293,8 +293,6 @@ c
 c
         double precision ddx_Thn_dx_un, ddy_Thn_dy_un
         double precision ddy_Thn_dx_vn, ddx_Thn_dy_vn
-        double precision ddx_Ths_dx_us, ddy_Ths_dy_us
-        double precision ddy_Ths_dx_vs, ddx_Ths_dy_vs
         integer i0, i1
 c
         dx_dx = 1.d0/(dx(0) * dx(0))
