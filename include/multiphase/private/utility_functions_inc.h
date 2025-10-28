@@ -1,6 +1,8 @@
 #ifndef included_multiphase_utility_functions_inc
 #define included_multiphase_utility_functions_inc
 #include "multiphase/utility_functions.h"
+
+#include <ibtk/ibtk_utilities.h>
 namespace multiphase
 {
 inline void

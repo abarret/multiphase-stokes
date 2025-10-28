@@ -34,9 +34,8 @@ void fill_ghost_cells(HierarchyGhostCellInterpolation& hier_ghost_cell,
                       SAMRAI::tbox::Pointer<SAMRAI::xfer::VariableFillPattern<NDIM>> fill_pattern = nullptr,
                       const std::string& phys_bdry_type = "LINEAR");
 
-void normalize_volume_fraction(const int thn_cc_idx,
-                               SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-                               double regularize_thn);
+void
+normalize_volume_fraction(const int thn_cc_idx, SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, double regularize_thn);
 } // namespace multiphase
 
 #include <multiphase/private/volume_fraction_functions_inc.h>

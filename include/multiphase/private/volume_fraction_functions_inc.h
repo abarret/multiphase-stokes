@@ -68,7 +68,7 @@ fill_ghost_cells(IBTK::HierarchyGhostCellInterpolation& hier_ghost_fill,
 
 inline void
 normalize_volume_fraction(const int thn_cc_idx,
-                          SAMRAI::hier::PatchHierarchy<NDIM> hierarchy,
+                          SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
                           double regularize_thn,
                           int coarsest_ln,
                           int finest_ln)

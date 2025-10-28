@@ -345,7 +345,7 @@ MultiphaseConvectiveManager::allocateData(const double time)
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
         std::vector<ITC> thn_ghost_comp = { ITC(d_thn_scr_idx,
                                                 "CONSERVATIVE_LINEAR_REFINE",
-                                                true,
+                                                false,
                                                 "NONE",
                                                 "LINEAR",
                                                 false,
@@ -356,7 +356,7 @@ MultiphaseConvectiveManager::allocateData(const double time)
 
         std::vector<ITC> u_ghost_fill_itc = { ITC(d_un_scr_idx,
                                                   "CONSERVATIVE_LINEAR_REFINE",
-                                                  true,
+                                                  false,
                                                   "NONE",
                                                   "LINEAR",
                                                   false,
@@ -365,7 +365,7 @@ MultiphaseConvectiveManager::allocateData(const double time)
                                                   d_bdry_interp_order),
                                               ITC(d_us_scr_idx,
                                                   "CONSERVATIVE_LINEAR_REFINE",
-                                                  true,
+                                                  false,
                                                   "NONE",
                                                   "LINEAR",
                                                   false,
@@ -461,6 +461,9 @@ MultiphaseConvectiveManager::approximateOperator(const int dst_un_idx,
                                                  const int us_idx,
                                                  const int thn_idx)
 {
+    const int coarsest_ln = 0;
+    const int finest_ln = d_hierarchy->getFinestLevelNumber();
+
     // Fill in ghost cells for thn. Because thn may have changed indices, we need to reinitialize the ghost filling
     // routines.
     d_hier_cc_data_ops->copyData(d_thn_scr_idx, thn_idx);
@@ -475,9 +478,6 @@ MultiphaseConvectiveManager::approximateOperator(const int dst_un_idx,
     // First find the respective momentums. Note that this should also fill in ghost cells of the momentum operator.
     findNetworkMomentum(d_mom_un_idx, d_thn_scr_idx, d_un_scr_idx);
     findSolventMomentum(d_mom_us_idx, d_thn_scr_idx, d_us_scr_idx);
-
-    const int coarsest_ln = 0;
-    const int finest_ln = d_hierarchy->getFinestLevelNumber();
     for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
