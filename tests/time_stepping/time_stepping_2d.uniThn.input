@@ -71,7 +71,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    num_cycles                    = NUM_CYCLES
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
-   w = W
    use_preconditioner = USE_PRECONDITIONER
    viscous_time_stepping_type = VISCOUS_TIME_STEPPING_TYPE
    regrid_interval = 1000000000
@@ -81,6 +80,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    }
 
    precond_db {
+      relaxation_parameter = W
       cycle_type = "V_CYCLE"
       num_pre_sweeps = 3
       num_post_sweeps = 3
@@ -140,8 +140,8 @@ StandardTagAndInitialize {
    tagging_method = "REFINE_BOXES"
    RefineBoxes {
     // level_0 = [( N/4 , N/4 ),( 3*N/4 - 1 , N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1, 3*N/4 - 2)]
-    level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
-    // level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
+    // level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )] // L-shaped refinement
+     level_0 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 
     // level_0 = [(N/4 + 5 , N/4 + 5),( N/4 + 10, N/4 + 10)] 
     // level_0 = [(1,1), (14,14)] 
     // level_1 = [( N/4 , N/8 ),( 3*N/4 - 1 , 3*N/4 - 1 )] 

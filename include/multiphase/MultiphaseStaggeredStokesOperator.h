@@ -6,6 +6,7 @@
 #include <ibamr/config.h>
 
 #include "multiphase/MultiphaseParameters.h"
+#include "multiphase/VolumeFractionDataManager.h"
 
 #include "ibamr/StaggeredStokesPhysicalBoundaryHelper.h"
 
@@ -41,7 +42,7 @@ namespace multiphase
  * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   D_p*ths*grad ][us]
  * [ D_div*div(thn)                    D_div*div(ths)                    0            ][p ]
  * in which
- * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
+ * A_i = D_u*eta_i*div(thn*((grad+grad^T)-div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
  *   -- C: Constant, set via setCandDCoefficients().
@@ -67,15 +68,24 @@ public:
      *
      * Note that C and D MUST be provided by the call to setCandDCoefficients(). Their default values are 0.0 and -1.0
      * by default.
+     *
+     * The volume fraction manager will be used to retrieve the volume fraction as needed and should be updated before
+     * calls to apply().
      */
     MultiphaseStaggeredStokesOperator(const std::string& object_name,
                                       bool homogeneous_bc,
-                                      const MultiphaseParameters& params);
+                                      const MultiphaseParameters& params,
+                                      const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
 
     /*!
      * \brief Destructor.
      */
     ~MultiphaseStaggeredStokesOperator();
+
+    const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
+    {
+        return d_thn_manager;
+    }
 
     /*!
      * \brief Set the PoissonSpecifications object used to specify the C and D values for the momentum equations
@@ -91,11 +101,6 @@ public:
     void setCandDCoefficients(double C, double D_u, double D_p = -1.0, double D_div = 1.0);
 
     /*!
-     * \brief Set the cell centered patch index for the volume fraction.
-     */
-    void setThnIdx(int thn_idx);
-
-    /*!
      * \brief Set the SAMRAI::solv::RobinBcCoefStrategy objects used to specify
      * physical boundary conditions.
      *
@@ -105,19 +110,20 @@ public:
      * boundary conditions are employed for the pressure.
      *
      * \param un_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
-     *condition coefficients for the network velocity
+     *condition coefficients for the network velocity.
 
      * \param us_bc_coefs  IBTK::Vector of pointers to objects that can set the Robin boundary
-     *condition coefficients for the network velocity
+     *condition coefficients for the network velocity.
 
      * \param P_bc_coef   Pointer to object that can set the Robin boundary condition
-     *coefficients
-     *for the pressure
+     *coefficients for the pressure.
+     *
+     * \param thn_bc_coef   Pointer to object that can set the Robin boundary condition
+     *coefficients for the volume fraction.
      */
     virtual void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                                     const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
-                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef,
-                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* thn_bc_coef);
+                                    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* P_bc_coef);
 
     /*!
      * \brief Set the physical boundary condition helper object.
@@ -216,24 +222,6 @@ public:
     void imposeSolBcs(SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& u) override;
 
     //\}
-
-    /*!
-     * If `regularize_thn` is true, then the volume fraction will be regularized by the specified amount. Specifically,
-     * the volume fraction will be set to \f$thn = max(min_thn, min(thn, 1.0 - min_thn))\f$.
-     *
-     * This will regularize both interior cells and ghost cells.
-     * @{
-     */
-    inline void setRegularizeThn(bool regularize_thn, double min_thn)
-    {
-        d_regularize_thn = regularize_thn;
-        d_min_thn = min_thn;
-    }
-
-    inline void setRegularizeThn(bool regularize_thn)
-    {
-        setRegularizeThn(regularize_thn, d_min_thn);
-    }
     /*@}*/
 
 protected:
@@ -244,8 +232,6 @@ protected:
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_P_bc_coef;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_default_thn_bc_coef;
-    SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_thn_bc_coef;
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
@@ -259,11 +245,8 @@ protected:
     std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> d_transaction_comps;
     SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill, d_no_fill;
 
-    // Scratch data.
-    SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;
-
 private:
-    void applySpecialized(int A_P_idx, int A_un_idx, int A_us_idx, int p_idx, int un_idx, int us_idx, int thn_idx);
+    void applySpecialized(int A_P_idx, int A_un_idx, int A_us_idx, int p_idx, int un_idx, int us_idx);
 
     /*!
      * \brief Default constructor.
@@ -301,22 +284,8 @@ private:
 
     /// Parameters
     double d_C = 0.0, d_D_u = -1.0, d_D_p = -1.0, d_D_div = 1.0;
-    int d_thn_idx = IBTK::invalid_index;
     const MultiphaseParameters& d_params;
-
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> d_nc_scr_var;
-    int d_nc_scr_idx = IBTK::invalid_index;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_cc_ndim_var;
-    int d_cc_ndim_idx = IBTK::invalid_index;
-
-    // Volume averaged velocity
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_sc_scr_var;
-    int d_sc_scr_idx = IBTK::invalid_index;
-
-    bool d_regularize_thn = false;
-    double d_min_thn = 1.0e-5;
-    SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_thn_scr_var;
-    int d_thn_scr_idx = IBTK::invalid_index;
+    const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager;
 };
 } // namespace multiphase
 

@@ -74,7 +74,6 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    num_cycles                    = NUM_CYCLES
    dt_max                        = DT_MAX
    enable_logging                = ENABLE_LOGGING
-   w = W
    use_preconditioner = USE_PRECONDITIONER
    viscous_time_stepping_type = VISCOUS_TIME_STEPPING_TYPE
    regrid_interval = 1000000000
@@ -85,6 +84,7 @@ INSVCTwoFluidStaggeredHierarchyIntegrator {
    }
 
    precond_db {
+      relaxation_parameter = W
       cycle_type = "V_CYCLE"
       num_pre_sweeps = 3
       num_post_sweeps = 3

@@ -18,7 +18,15 @@ SET(MULTIPHASE_SRC
     src/MultiphaseStandardHierarchyIntegrator.cpp
     src/MultiphaseStaggeredStokesBoxRelaxationFACOperator.cpp
     src/MultiphaseStaggeredStokesOperator.cpp
+    src/MultiphaseStaggeredStokesBlockFACOperator.cpp
+    src/MultiphaseStaggeredStokesBlockOperator.cpp
+    src/MultiphaseStaggeredStokesBlockPreconditioner.cpp
+    src/MultiphaseStaggeredStokesVelocitySolve.cpp
+    src/MultiphaseStaggeredStokesVelocityFACOperator.cpp
     src/RBGS.f
+    src/VRBGS.f
+    src/FDOPS.f
+    src/VolumeFractionDataManager.cpp
     )
 
 ADD_LIBRARY(MultiphaseLib)

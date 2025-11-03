@@ -143,11 +143,77 @@ private:
     /*!
      * Preconditioner information
      */
+    class MultiphasePreconditioner
+    {
+    public:
+        MultiphasePreconditioner(
+            PreconditionerType precond_type,
+            SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
+            SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+            const MultiphaseParameters& params,
+            double C,
+            double D,
+            const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
+            const std::vector<SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>>>& null_vecs,
+            const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+            const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs,
+            SAMRAI::solv::RobinBcCoefStrategy<NDIM>* p_bc_coef);
+
+        /*!
+         * Deallocates any data stored on the dense hierarchy if using a multigrid preconditioner. Note that the block
+         * preconditioner deallocates data for itself.
+         */
+        ~MultiphasePreconditioner();
+
+        /*!
+         * Updates the volume fraction in the preconditioner. Returns true if the solver must be reallocated after this
+         * call.
+         */
+        bool updateVolumeFraction(double time);
+
+        /*!
+         * Updates the drag coefficient in the preconditioner. Returns true if the solver must be reallocated after this
+         * call.
+         */
+        bool updateDragCoefficient(const int drag_idx,
+                                   SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>>& drag_var,
+                                   double time,
+                                   IBTK::CartGridFunction* drag_fcn);
+
+        inline SAMRAI::tbox::Pointer<IBTK::LinearSolver> getPreconditioner()
+        {
+            switch (d_precond_type)
+            {
+            case PreconditionerType::BLOCK:
+                return d_block_precond;
+            case PreconditionerType::MULTIGRID:
+                return d_fac_precond;
+            default:
+                TBOX_ERROR("Unknown preconditioner type!\n");
+                return nullptr;
+            }
+        }
+
+    private:
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
+        const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager; // We need to store the volume fraction manager
+                                                                         // so we can deallocate data on the dense
+                                                                         // hierarchy if necessary.
+
+        PreconditionerType d_precond_type;
+
+        SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
+        SAMRAI::tbox::Pointer<FullFACPreconditioner> d_fac_precond;
+        SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_fac_op;
+
+        SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockPreconditioner> d_block_precond;
+    };
+
+    std::unique_ptr<MultiphasePreconditioner> d_precond;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
-    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
-    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBoxRelaxationFACOperator> d_precond_op;
-    double d_w = std::numeric_limits<double>::quiet_NaN();
+
     bool d_use_preconditioner = true;
+    PreconditionerType d_precond_type;
 
     bool d_make_div_rhs_sum_to_zero = true;
 

@@ -200,6 +200,21 @@ void allocate_patch_data(const int idx,
                          double time,
                          int coarsest_ln,
                          int finest_ln);
+void allocate_patch_data(const SAMRAI::hier::ComponentSelector& comp,
+                         const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         double time,
+                         int coarsest_ln,
+                         int finest_ln);
+void allocate_patch_data(const std::set<int>& idxs,
+                         const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         double time,
+                         int coarsest_ln,
+                         int finest_ln);
+void allocate_patch_data(const int idx,
+                         const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                         double time,
+                         int coarsest_ln,
+                         int finest_ln);
 //\}
 
 /*!
@@ -218,7 +233,23 @@ void deallocate_patch_data(const int idx,
                            const SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>>& hierarchy,
                            int coarsest_ln,
                            int finest_ln);
+void deallocate_patch_data(const SAMRAI::hier::ComponentSelector& comp,
+                           const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln);
+void deallocate_patch_data(const std::set<int>& idxs,
+                           const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln);
+void deallocate_patch_data(const int idx,
+                           const SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy,
+                           int coarsest_ln,
+                           int finest_ln);
 //\}
+
+void set_valid_level_numbers(SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy, int& coarsest_ln, int& finest_ln);
+
+void convert_to_ndim_cc(int dst_idx, int cc_idx, SAMRAI::hier::PatchHierarchy<NDIM>& hierarchy);
 
 template <typename T>
 inline T
@@ -273,6 +304,43 @@ enum_to_string<TimeSteppingType>(TimeSteppingType val)
     if (val == TimeSteppingType::BDF2) return "BDF2";
     return "UNKNOWN_TIME_STEPPING_TYPE";
 } // enum_to_string
+
+enum class PreconditionerType
+{
+    MULTIGRID,
+    BLOCK,
+    UNKNOWN_TYPE = -1
+};
+
+template <>
+inline PreconditionerType
+string_to_enum<PreconditionerType>(const std::string& val)
+{
+    if (strcasecmp(val.c_str(), "MULTIGRID") == 0) return PreconditionerType::MULTIGRID;
+    if (strcasecmp(val.c_str(), "BLOCK") == 0) return PreconditionerType::BLOCK;
+    return PreconditionerType::UNKNOWN_TYPE;
+}
+
+template <>
+inline std::string
+enum_to_string<PreconditionerType>(PreconditionerType val)
+{
+    if (val == PreconditionerType::MULTIGRID) return "MULTIGRID";
+    if (val == PreconditionerType::BLOCK) return "BLOCK";
+    return "UNKNOWN_TYPE";
+}
+
+template <typename VarType>
+SAMRAI::tbox::Pointer<VarType> get_var(const std::string& var_name, int depth = 1);
+
+template <typename T>
+struct PtrCompare
+{
+    bool operator()(const SAMRAI::tbox::Pointer<T>& a, const SAMRAI::tbox::Pointer<T>& b) const
+    {
+        return a.getPointer() < b.getPointer();
+    }
+};
 
 } // namespace multiphase
 
