@@ -536,8 +536,8 @@ MultiphaseStaggeredStokesVelocityFACOperator::computeResidual(SAMRAIVectorReal<N
     const int thn_sc_idx = d_thn_manager->getSideIndex();
     const int thn_nc_idx = d_thn_manager->getNodeIndex();
 
-    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
+    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false);
+    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false);
 
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
