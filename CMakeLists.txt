@@ -5,7 +5,7 @@ PROJECT(MultiphaseStokes LANGUAGES C CXX Fortran)
 INCLUDE(GNUInstallDirs)
 INCLUDE(CMakePackageConfigHelpers)
 
-FIND_PACKAGE(IBAMR REQUIRED)
+FIND_PACKAGE(IBAMR 0.18 REQUIRED)
 
 SET(MULTIPHASE_SRC
     src/CFMultiphaseOldroydB.cpp

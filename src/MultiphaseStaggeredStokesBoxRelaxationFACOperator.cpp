@@ -858,9 +858,9 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::computeResidual(SAMRAIVectorR
     const int thn_nc_idx = d_thn_manager->getNodeIndex();
     const int thn_sc_idx = d_thn_manager->getSideIndex();
 
-    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false, false, true);
-    d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false, false, true);
+    d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false);
+    d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false);
+    d_P_fill_pattern = new CellNoCornersFillPattern(CELLG, false);
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<InterpolationTransactionComponent> transaction_comps(3);
