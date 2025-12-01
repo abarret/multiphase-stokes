@@ -169,6 +169,10 @@ MultiphaseStaggeredHierarchyIntegrator::MultiphaseStaggeredHierarchyIntegrator(s
     // TODO: The default here should really be "false", but for now, this will not change the default behavior.
     d_creeping_flow = input_db->getBoolWithDefault("creeping_flow", true);
 
+    // Regridding information
+    d_regrid_un_cfl_interval = input_db->getDoubleWithDefault("regrid_un_cfl_interval", d_regrid_un_cfl_interval);
+    d_regrid_us_cfl_interval = input_db->getDoubleWithDefault("regrid_us_cfl_interval", d_regrid_us_cfl_interval);
+
     // Arbitrarily set the base class velocity variable to the solvent variable. Note this is required for the base
     // class to compute the CFL number.
     d_U_var = d_us_sc_var;
@@ -854,6 +858,30 @@ MultiphaseStaggeredHierarchyIntegrator::resetHierarchyConfigurationSpecialized(
     d_hier_fc_data_ops->resetLevels(0, hierarchy->getFinestLevelNumber());
 }
 
+bool
+MultiphaseStaggeredHierarchyIntegrator::atRegridPointSpecialized() const
+{
+    const bool initial_time = IBTK::rel_equal_eps(d_integrator_time, d_start_time);
+    if (initial_time) return true;
+    bool regrid = false;
+    if (d_regrid_un_cfl_interval >= 0.0)
+    {
+        regrid = regrid || d_regrid_un_cfl_estimate >= d_regrid_un_cfl_interval;
+    }
+    if (d_regrid_us_cfl_interval >= 0.0)
+    {
+        regrid = regrid || d_regrid_us_cfl_estimate >= d_regrid_us_cfl_interval;
+    }
+    return regrid;
+}
+
+void
+MultiphaseStaggeredHierarchyIntegrator::regridHierarchyEndSpecialized()
+{
+    d_regrid_un_cfl_estimate = 0.0;
+    d_regrid_us_cfl_estimate = 0.0;
+}
+
 void
 MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const double current_time,
                                                                       const double new_time,
@@ -886,6 +914,18 @@ MultiphaseStaggeredHierarchyIntegrator::postprocessIntegrateHierarchy(const doub
     }
     d_cfl_un_current = IBTK_MPI::maxReduction(cfl_max);
     plog << d_object_name << "::postprocessIntegrateHierarchy(): Network CFL number = " << d_cfl_un_current << "\n";
+
+    d_regrid_us_cfl_estimate += getCurrentCFLNumber();
+    d_regrid_un_cfl_estimate += d_cfl_un_current;
+    if (d_enable_logging)
+    {
+        plog << d_object_name
+             << "::postprocessIntegrateHierarchy(): Estimate of Eulerian solvent displacement since last regrid: "
+             << d_regrid_us_cfl_estimate << "\n";
+        plog << d_object_name
+             << "::postprocessIntegrateHierarchy(): Estimate of Eulerian network displacement since last regrid: "
+             << d_regrid_un_cfl_estimate << "\n";
+    }
 
     // Do anything that needs to be done after integrateHierarchy().
     INSHierarchyIntegrator::postprocessIntegrateHierarchy(
