@@ -100,6 +100,20 @@ public:
      * default values, reads in configuration information from input and restart
      * databases, and registers the integrator object with the restart manager
      * when requested.
+     *
+     * \param input_db Database containing multiphase hierarchy options. This constructor reads:
+     * - "rho" (optional, default: NaN)
+     * - "eta_n" (optional, default: NaN)
+     * - "eta_s" (optional, default: NaN)
+     * - "l_n" (optional, default: eta_n)
+     * - "l_s" (optional, default: eta_s)
+     * - "use_grad_tagging" (optional, default: false)
+     * - "grad_rel_thresh" (optional, default: existing array value)
+     * - "grad_abs_thresh" (optional, default: existing array value)
+     * - "use_accel_ts" (optional, default: false)
+     * - "accel_ts_safety_factor" (optional, default: 0.1)
+     * - "regualarize_thn" (optional, default: 1.0e-5)
+     * - "creeping_flow" (optional, default: true)
      */
     MultiphaseStaggeredHierarchyIntegrator(
         std::string object_name,

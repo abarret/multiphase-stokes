@@ -49,6 +49,10 @@ class FullFACPreconditioner : public IBTK::FACPreconditioner
 public:
     /*!
      * Constructor.
+     *
+     * \param input_db Database providing preconditioner options. This constructor reads:
+     * - "max_multigrid_levels"
+     * - "preconditioner_coarsening_op" (optional, default: "CONSERVATIVE_COARSEN")
      */
     FullFACPreconditioner(std::string object_name,
                           SAMRAI::tbox::Pointer<IBTK::FACPreconditionerStrategy> fac_strategy,

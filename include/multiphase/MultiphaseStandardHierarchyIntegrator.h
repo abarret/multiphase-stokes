@@ -55,6 +55,18 @@ public:
      * default values, reads in configuration information from input and restart
      * databases, and registers the integrator object with the restart manager
      * when requested.
+     *
+     * \param input_db Database containing standard hierarchy options. This constructor reads:
+     * - "viscous_time_stepping_type" (optional, default: "TRAPEZOIDAL_RULE")
+     * - "solver_db" (optional, default: no override database)
+     * - "precond_db" (optional, default: no override database)
+     * - "use_preconditioner" (optional, default: true)
+     * - "precond_type" (optional, used when preconditioning is enabled; no explicit constructor default)
+     * - "make_div_rhs_sum_to_zero" (optional, default: true)
+     * - "has_vel_nullspace" (optional, default: false)
+     * - "has_pressure_nullspace" (optional, default: true)
+     * - "convec_limiter_type" (optional, default: enum default string for UNKNOWN_LIMITER_TYPE)
+     * - "convec_ts_type" (optional, default: "FORWARD_EULER")
      */
     MultiphaseStandardHierarchyIntegrator(std::string object_name,
                                           SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
@@ -143,9 +155,19 @@ private:
     /*!
      * Preconditioner information
      */
+    /*!
+     * \brief Class MultiphasePreconditioner owns and updates the selected linear preconditioner implementation
+     * (multigrid or block) for the outer multiphase Stokes solve.
+     */
     class MultiphasePreconditioner
     {
     public:
+        /*!
+         * \brief Constructor.
+         *
+         * \param input_db Database containing preconditioner options. This constructor reads:
+         * - "relaxation_parameter" (required when precond_type is MULTIGRID; no default)
+         */
         MultiphasePreconditioner(
             PreconditionerType precond_type,
             SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,

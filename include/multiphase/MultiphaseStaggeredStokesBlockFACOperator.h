@@ -31,6 +31,10 @@
 
 namespace multiphase
 {
+/*!
+ * \brief Class MultiphaseStaggeredStokesBlockFACOperator is a FAC preconditioner strategy for the coupled network and
+ * solvent velocity block in the multiphase Stokes system.
+ */
 class MultiphaseStaggeredStokesBlockFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:

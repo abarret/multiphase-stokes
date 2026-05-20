@@ -5,6 +5,14 @@
 
 namespace multiphase
 {
+/*!
+ * \brief Class MultiphaseLSCSchurComplementSolver defines the GeneralSolver interface for solving the LSC Schur
+ * complement system associated with the multiphase Stokes block formulation.
+ *
+ * The linear system is
+ * S*x = b, with S = (G^T*G)*(G^T*F*G)^-1*(G^T*G),
+ * and concrete implementations solve it approximately as the pressure stage of the block preconditioner.
+ */
 class MultiphaseLSCSchurComplementSolver : IBTK::GeneralSolver
 {
 public:

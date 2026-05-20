@@ -17,9 +17,29 @@
 
 namespace multiphase
 {
+/*!
+ * \brief Class MultiphaseStaggeredStokesBlockPreconditioner applies a block preconditioner for the multiphase
+ * staggered Stokes system by approximately inverting velocity and pressure subproblems.
+ *
+ * The solve process applies a lower block-triangular approximation M = [F, G; 0, -S] in two stages:
+ * first solve the LSC Schur-complement system S*x_p = -b_p for pressure, then solve
+ * F*x_u = b_u - G*x_p for the two velocity fields.
+ */
 class MultiphaseStaggeredStokesBlockPreconditioner : public IBTK::LinearSolver
 {
 public:
+    /*!
+     * \brief Constructor.
+     *
+     * \param input_db Database containing block preconditioner options. This constructor reads:
+     * - "stokes_solver_db"
+     * - "stokes_precond_db"
+     * - "pressure_solver_type" (optional, default: "PETSC_KRYLOV_SOLVER")
+     * - "pressure_solver_db"
+     * - "pressure_precond_type" (optional, default: "POINT_RELAXATION_FAC_PRECONDITIONER")
+     * - "pressure_precond_db"
+     * - "using_symmetric"
+     */
     MultiphaseStaggeredStokesBlockPreconditioner(std::string object_name,
                                                  const MultiphaseParameters& params,
                                                  SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,

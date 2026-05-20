@@ -31,6 +31,10 @@
 
 namespace multiphase
 {
+/*!
+ * \brief Class MultiphaseStaggeredStokesBoxRelaxationFACOperator is a FAC preconditioner strategy for the full
+ * multiphase Stokes block (network velocity, solvent velocity, and pressure) using box-relaxation smoothing.
+ */
 class MultiphaseStaggeredStokesBoxRelaxationFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:

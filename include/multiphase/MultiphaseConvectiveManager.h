@@ -24,8 +24,11 @@ class MultiphaseConvectiveManager
 {
 public:
     /*!
-     * Constructor that takes in a Database. The Database is searched for the string "limiter_type". The limiter must be
-     * one of "UPWIND", "CUI", "FBICS", or "MGAMMA".
+     * Constructor that takes in a Database.
+     *
+     * \param input_db Database with convective operator options. This constructor reads:
+     * - "limiter_type" (required; one of "UPWIND", "CUI", "FBICS", or "MGAMMA")
+     * - "bdry_interp_order" (optional, default: "LINEAR")
      */
     MultiphaseConvectiveManager(std::string object_name,
                                 SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,

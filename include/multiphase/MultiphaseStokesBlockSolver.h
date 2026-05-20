@@ -5,6 +5,13 @@
 
 namespace multiphase
 {
+/*!
+ * \brief Class MultiphaseStokesBlockSolver defines the GeneralSolver interface for solving the coupled multiphase
+ * Stokes velocity block system F*x_u = b_u.
+ *
+ * Concrete implementations are expected to solve this system approximately with a Krylov method preconditioned by
+ * multilevel FAC components (as configured by the derived solver).
+ */
 class MultiphaseStokesBlockSolver : IBTK::GeneralSolver
 {
 public:
