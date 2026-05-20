@@ -7,10 +7,8 @@
 
 #include "Patch.h"
 #include <multiphase/FullFACPreconditioner.h>
-#include <multiphase/MultiphaseLSCSchurComplementSolver.h>
 #include <multiphase/MultiphaseParameters.h>
 #include <multiphase/MultiphaseStaggeredStokesBlockFACOperator.h>
-#include <multiphase/MultiphaseStokesBlockSolver.h>
 #include <multiphase/VolumeFractionDataManager.h>
 
 #include <memory>
