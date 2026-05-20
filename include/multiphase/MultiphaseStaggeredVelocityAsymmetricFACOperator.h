@@ -1,5 +1,5 @@
-#ifndef included_multiphase_MultiphaseStaggeredStokesVelocityFACOperator
-#define included_multiphase_MultiphaseStaggeredStokesVelocityFACOperator
+#ifndef included_multiphase_MultiphaseStaggeredVelocityAsymmetricFACOperator
+#define included_multiphase_MultiphaseStaggeredVelocityAsymmetricFACOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -41,7 +41,7 @@ namespace multiphase
  * coupling between the velocity operators in A_n and A_s make it difficult to efficiently apply Gauss-Seidel in a
  * matrix free way.
  */
-class MultiphaseStaggeredStokesVelocityFACOperator : public IBTK::FACPreconditionerStrategy
+class MultiphaseStaggeredVelocityAsymmetricFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:
     /*!
@@ -49,7 +49,7 @@ public:
      * \param w under relaxation factor in box relaxation scheme
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
-    MultiphaseStaggeredStokesVelocityFACOperator(const std::string& object_name,
+    MultiphaseStaggeredVelocityAsymmetricFACOperator(const std::string& object_name,
                                                  const std::string& default_options_prefix,
                                                  const MultiphaseParameters& params,
                                                  const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
@@ -57,7 +57,7 @@ public:
     /*!
      * \brief Destructor.
      */
-    ~MultiphaseStaggeredStokesVelocityFACOperator();
+    ~MultiphaseStaggeredVelocityAsymmetricFACOperator();
 
     const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
     {
@@ -263,4 +263,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_IBTK_MultiphaseStaggeredStokesVelocityFACOperator
+#endif // #ifndef included_IBTK_MultiphaseStaggeredVelocityAsymmetricFACOperator

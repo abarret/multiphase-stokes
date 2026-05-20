@@ -1,6 +1,7 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include "multiphase/MultiphaseStaggeredStokesBlockFACOperator.h"
+#include "multiphase/MultiphaseStaggeredVelocityAsymmetricFACOperator.h"
+#include "multiphase/MultiphaseStaggeredVelocityAsymmetricOperator.h"
 #include "multiphase/fd_operators.h"
 #include "multiphase/utility_functions.h"
 
@@ -61,7 +62,7 @@
 #include <vector>
 
 // Fortran Routines
-#define velocity_R_B_G_S IBTK_FC_FUNC_(velocity_rbgs, VRBGS)
+#define velocity_R_B_G_S IBTK_FC_FUNC_(velocity_rbgs_m2, VRBGS)
 
 extern "C"
 {
@@ -91,6 +92,8 @@ extern "C"
                           const int&,
                           const double&, // eta_n
                           const double&, // eta_s
+                          const double&, // l_n
+                          const double&, // l_s
                           const double&, // xi
                           const double&, // w = under relaxation factor
                           const double&, // C in C*u term
@@ -137,7 +140,7 @@ static const bool CONSISTENT_TYPE_2_BDRY = false;
 } // namespace
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
-MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOperator(
+MultiphaseStaggeredVelocityAsymmetricFACOperator::MultiphaseStaggeredVelocityAsymmetricFACOperator(
     const std::string& object_name,
     const std::string& default_options_prefix,
     const MultiphaseParameters& params,
@@ -153,12 +156,6 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
       d_us_bc_coefs(std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef.get())),
       d_mask_var(new SideVariable<NDIM, int>(d_object_name + "::mask_var"))
 {
-    // Some error checking. If nu_n or nu_s is not 1 or NaN, then this class won't give the expected result
-    if (d_params.nu_n != 1.0 || d_params.nu_s != 1.0 || d_params.nu_n != d_params.nu_n ||
-        d_params.nu_s != d_params.nu_s)
-    {
-        TBOX_ERROR(d_object_name + ": nu_n and nu_s must be one or NaN for the block preconditioner.");
-    }
     // Setup a default boundary condition object that specifies homogeneous
     // Dirichlet boundary conditions for the velocity and homogeneous Neumann
     // boundary conditions for the pressure.
@@ -206,16 +203,16 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
 
     // Setup Timers.
     IBTK_DO_ONCE(t_smooth_error = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBlockFACOperator::smoothError()");
+                     "IBTK::MultiphaseStaggeredVelocityAsymmetricFACOperator::smoothError()");
                  t_solve_coarsest_level = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBlockFACOperator::solveCoarsestLevel()");
+                     "IBTK::MultiphaseStaggeredVelocityAsymmetricFACOperator::solveCoarsestLevel()");
                  t_compute_residual = TimerManager::getManager()->getTimer(
-                     "IBTK::MultiphaseStaggeredStokesBlockFACOperator::computeResidual()"););
+                     "IBTK::MultiphaseStaggeredVelocityAsymmetricFACOperator::computeResidual()"););
     return;
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::setPhysicalBcCoefs(
+MultiphaseStaggeredVelocityAsymmetricFACOperator::setPhysicalBcCoefs(
     const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
     const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs)
 {
@@ -237,7 +234,7 @@ MultiphaseStaggeredStokesBlockFACOperator::setPhysicalBcCoefs(
     }
 }
 
-MultiphaseStaggeredStokesBlockFACOperator::~MultiphaseStaggeredStokesBlockFACOperator()
+MultiphaseStaggeredVelocityAsymmetricFACOperator::~MultiphaseStaggeredVelocityAsymmetricFACOperator()
 {
     // Dallocate operator state first
     deallocateOperatorState();
@@ -245,9 +242,9 @@ MultiphaseStaggeredStokesBlockFACOperator::~MultiphaseStaggeredStokesBlockFACOpe
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
-                                                                    SAMRAIVectorReal<NDIM, double>& dst,
-                                                                    const int dst_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::restrictResidual(const SAMRAIVectorReal<NDIM, double>& src,
+                                                                   SAMRAIVectorReal<NDIM, double>& dst,
+                                                                   const int dst_ln)
 {
     // Pull out patch indices.
     const int dst_un_idx = dst.getComponentDescriptorIndex(0);
@@ -264,9 +261,9 @@ MultiphaseStaggeredStokesBlockFACOperator::restrictResidual(const SAMRAIVectorRe
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
-                                                                SAMRAIVectorReal<NDIM, double>& dst,
-                                                                const int dst_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::prolongError(const SAMRAIVectorReal<NDIM, double>& src,
+                                                               SAMRAIVectorReal<NDIM, double>& dst,
+                                                               const int dst_ln)
 {
     // Pull out patch indices.
     const int dst_un_idx = dst.getComponentDescriptorIndex(0);
@@ -283,9 +280,9 @@ MultiphaseStaggeredStokesBlockFACOperator::prolongError(const SAMRAIVectorReal<N
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
-                                                                          SAMRAIVectorReal<NDIM, double>& dst,
-                                                                          const int dst_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::prolongErrorAndCorrect(const SAMRAIVectorReal<NDIM, double>& src,
+                                                                         SAMRAIVectorReal<NDIM, double>& dst,
+                                                                         const int dst_ln)
 {
     // Pull out patch indices.
     const int dst_un_idx = dst.getComponentDescriptorIndex(0);
@@ -318,7 +315,7 @@ MultiphaseStaggeredStokesBlockFACOperator::prolongErrorAndCorrect(const SAMRAIVe
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::smoothError(
+MultiphaseStaggeredVelocityAsymmetricFACOperator::smoothError(
     SAMRAIVectorReal<NDIM, double>& error,          // Solution
     const SAMRAIVectorReal<NDIM, double>& residual, // RHS - A*error on the entire patch level
     int level_num,
@@ -372,11 +369,11 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
 
     // outer for loop for number of sweeps
     // Change to 2 * num_sweeps if using red-black
-    for (int sweep = 0; sweep < 2*num_sweeps; sweep++)
-    {   
+    for (int sweep = 0; sweep < 2 * num_sweeps; sweep++)
+    {
         if (level_num > 0)
-        {   
-             // Use 1 here if using red-black ordering.
+        {
+            // Use 1 here if using red-black ordering.
             if (sweep > 1)
             {
                 // Copy coarse-fine interface ghost cell values which are cached in the scratch data.
@@ -394,13 +391,12 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                     for (unsigned int axis = 0; axis < NDIM; ++axis)
                     {
                         un_data->getArrayData(axis).copy(un_scr_data->getArrayData(axis),
-                                                            d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
-                                                            IntVector<NDIM>(0));
+                                                         d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                         IntVector<NDIM>(0));
                         us_data->getArrayData(axis).copy(us_scr_data->getArrayData(axis),
-                                                            d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
-                                                            IntVector<NDIM>(0));
+                                                         d_patch_side_bc_box_overlap[level_num][patch_counter][axis],
+                                                         IntVector<NDIM>(0));
                     }
-
                 }
             }
             // Fill in ghost cells. We only want to use values on our current level to fill in ghost cells.
@@ -421,7 +417,7 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
         }
         else if (sweep > 0)
         {
-                performGhostFilling({ un_idx, us_idx }, level_num);
+            performGhostFilling({ un_idx, us_idx }, level_num);
         }
 
         // loop through all patches on this level
@@ -431,8 +427,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx(); // dx[0] -> x, dx[1] -> y
             Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
-            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(thn_sc_idx);
             Pointer<NodeData<NDIM, double>> thn_nc_data = patch->getPatchData(thn_nc_idx);
+            Pointer<SideData<NDIM, double>> thn_sc_data = patch->getPatchData(thn_sc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> us_data = patch->getPatchData(us_idx);
             Pointer<SideData<NDIM, double>> f_un_data = patch->getPatchData(f_un_idx);
@@ -452,7 +448,6 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
             const Box<NDIM>& patch_box = patch->getBox();
             const IntVector<NDIM>& patch_lower = patch_box.lower();
             const IntVector<NDIM>& patch_upper = patch_box.upper();
-
             int red_or_black = sweep % 2; // red = 0 and black = 1
             // if (d_bc_un_helper->patchTouchesDirichletBoundary(patch) ||
             //     d_bc_us_helper->patchTouchesDirichletBoundary(patch))
@@ -462,7 +457,7 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                 // Place var xi implementation here
                 Pointer<SideData<NDIM, double>> xi_data = patch->getPatchData(d_params.xi_idx);
 
-            }// end variable drag
+            } // end variable drag
             else // use constant xi coefficient
             {
                 // Red-Black Gauss-Seidel with successive under relaxation
@@ -483,7 +478,7 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                  f_us_data->getPointer(0),
                                  f_us_data->getPointer(1),
                                  f_us_data->getGhostCellWidth().min(),
-                                 thn_data->getPointer(0),
+                                 thn_data->getPointer(),
                                  thn_data->getGhostCellWidth().min(),
                                  thn_nc_data->getPointer(),
                                  thn_nc_data->getGhostCellWidth().min(),
@@ -492,6 +487,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                  thn_sc_data->getGhostCellWidth().min(),
                                  d_params.eta_n,
                                  d_params.eta_s,
+                                 d_params.lambda_n,
+                                 d_params.lambda_s,
                                  d_params.xi,
                                  d_w,
                                  d_C,
@@ -499,17 +496,17 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(
                                  red_or_black);
             } // end constant xi coefficient
         } // patches
-    }// sweeps
+    } // sweeps
     performGhostFilling({ un_idx, us_idx }, level_num); // Synchronization at patch boundaries
-   
+
     IBTK_TIMER_STOP(t_smooth_error);
     return;
 }
 
 bool
-MultiphaseStaggeredStokesBlockFACOperator::solveCoarsestLevel(SAMRAIVectorReal<NDIM, double>& error,
-                                                                      const SAMRAIVectorReal<NDIM, double>& residual,
-                                                                      int coarsest_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::solveCoarsestLevel(SAMRAIVectorReal<NDIM, double>& error,
+                                                                     const SAMRAIVectorReal<NDIM, double>& residual,
+                                                                     int coarsest_ln)
 {
     IBTK_TIMER_START(t_solve_coarsest_level);
 
@@ -520,11 +517,11 @@ MultiphaseStaggeredStokesBlockFACOperator::solveCoarsestLevel(SAMRAIVectorReal<N
 } // solveCoarsestLevel
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
-                                                                   const SAMRAIVectorReal<NDIM, double>& solution,
-                                                                   const SAMRAIVectorReal<NDIM, double>& rhs,
-                                                                   int coarsest_level_num,
-                                                                   int finest_level_num)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::computeResidual(SAMRAIVectorReal<NDIM, double>& residual,
+                                                                  const SAMRAIVectorReal<NDIM, double>& solution,
+                                                                  const SAMRAIVectorReal<NDIM, double>& rhs,
+                                                                  int coarsest_level_num,
+                                                                  int finest_level_num)
 {
     IBTK_TIMER_START(t_compute_residual);
 
@@ -536,8 +533,8 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
     const int res_un_idx = residual.getComponentDescriptorIndex(0);
     const int res_us_idx = residual.getComponentDescriptorIndex(1);
     const int thn_cc_idx = d_thn_manager->getCellIndex();
-    const int thn_nc_idx = d_thn_manager->getNodeIndex();
     const int thn_sc_idx = d_thn_manager->getSideIndex();
+    const int thn_nc_idx = d_thn_manager->getNodeIndex();
 
     d_un_fill_pattern = new SideNoCornersFillPattern(SIDEG, false);
     d_us_fill_pattern = new SideNoCornersFillPattern(SIDEG, false);
@@ -573,6 +570,7 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            Pointer<CellData<NDIM, double>> thn_data = patch->getPatchData(thn_cc_idx);
             Pointer<SideData<NDIM, double>> un_data = patch->getPatchData(un_idx);
             Pointer<SideData<NDIM, double>> rhs_un_data =
                 patch->getPatchData(rhs_un_idx); // result of applying operator (eqn 1)
@@ -587,8 +585,8 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
             //     //accumulateMomentumWithoutPressureOnPatchVariableDrag(
             //         //patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_idx, d_params, d_C, d_D, d_D);
             // else
-            accumulateMomentumWithoutPressureOnPatchConstantCoefficient(
-                patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, d_C, d_D);
+            computeVelocitySubBlockOnPatch(
+                *patch, res_un_idx, res_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, d_C, d_D);
 
             for (int axis = 0; axis < NDIM; ++axis)
             {
@@ -625,7 +623,7 @@ MultiphaseStaggeredStokesBlockFACOperator::computeResidual(SAMRAIVectorReal<NDIM
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::setToZero(SAMRAIVectorReal<NDIM, double>& vec, int level_num)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::setToZero(SAMRAIVectorReal<NDIM, double>& vec, int level_num)
 {
     const int un_idx = vec.getComponentDescriptorIndex(0); // network velocity, Un
     const int us_idx = vec.getComponentDescriptorIndex(1); // solvent velocity, Us
@@ -643,8 +641,8 @@ MultiphaseStaggeredStokesBlockFACOperator::setToZero(SAMRAIVectorReal<NDIM, doub
 } // setToZero
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
-                                                                           const SAMRAIVectorReal<NDIM, double>& rhs)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& sol,
+                                                                          const SAMRAIVectorReal<NDIM, double>& rhs)
 {
     if (d_is_initialized) deallocateOperatorState();
     // Setup solution and rhs vectors.
@@ -786,7 +784,7 @@ MultiphaseStaggeredStokesBlockFACOperator::initializeOperatorState(const SAMRAIV
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::deallocateOperatorState()
+MultiphaseStaggeredVelocityAsymmetricFACOperator::deallocateOperatorState()
 {
     // Delete the operators, schedules, and algorithms
     d_un_restrict_op.setNull();
@@ -818,22 +816,22 @@ MultiphaseStaggeredStokesBlockFACOperator::deallocateOperatorState()
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::setUnderRelaxationParamater(const double w)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::setUnderRelaxationParamater(const double w)
 {
     d_w = w;
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::setCandDCoefficients(const double C, const double D)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::setCandDCoefficients(const double C, const double D)
 {
     d_C = C;
     d_D = D;
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::performProlongation(const std::array<int, 2>& dst_idxs,
-                                                                       const std::array<int, 2>& src_idxs,
-                                                                       const int dst_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::performProlongation(const std::array<int, 2>& dst_idxs,
+                                                                      const std::array<int, 2>& src_idxs,
+                                                                      const int dst_ln)
 {
     d_un_bc_op->setPatchDataIndex(dst_idxs[0]);
     d_un_bc_op->setHomogeneousBc(true);
@@ -852,9 +850,9 @@ MultiphaseStaggeredStokesBlockFACOperator::performProlongation(const std::array<
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::performRestriction(const std::array<int, 2>& dst_idxs,
-                                                                      const std::array<int, 2>& src_idxs,
-                                                                      const int dst_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::performRestriction(const std::array<int, 2>& dst_idxs,
+                                                                     const std::array<int, 2>& src_idxs,
+                                                                     const int dst_ln)
 {
     CoarsenAlgorithm<NDIM> coarsen_alg;
     coarsen_alg.registerCoarsen(dst_idxs[0], src_idxs[0], d_un_restrict_op);
@@ -866,8 +864,8 @@ MultiphaseStaggeredStokesBlockFACOperator::performRestriction(const std::array<i
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::performGhostFilling(const std::array<int, 2>& dst_idxs,
-                                                                       const int dst_ln)
+MultiphaseStaggeredVelocityAsymmetricFACOperator::performGhostFilling(const std::array<int, 2>& dst_idxs,
+                                                                      const int dst_ln)
 {
     d_un_bc_op->setPatchDataIndex(dst_idxs[0]);
     d_un_bc_op->setHomogeneousBc(true);

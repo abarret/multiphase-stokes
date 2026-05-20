@@ -2,10 +2,10 @@
 #include <ibtk/HierarchyGhostCellInterpolation.h>
 #include <ibtk/app_namespaces.h>
 
-#include <multiphase/MultiphaseStaggeredStokesBlockOperator.h>
 #include <multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h>
-#include <multiphase/MultiphaseStaggeredStokesVelocityFACOperator.h>
-#include <multiphase/MultiphaseStaggeredStokesVelocitySolve.h>
+#include <multiphase/MultiphaseStaggeredVelocityAsymmetricFACOperator.h>
+#include <multiphase/MultiphaseStaggeredVelocityAsymmetricOperator.h>
+#include <multiphase/MultiphaseStaggeredVelocityBlockOperator.h>
 #include <multiphase/fd_operators.h>
 #include <multiphase/utility_functions.h>
 
@@ -354,7 +354,7 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     Pointer<LinearOperator> stokes_op;
     if (d_using_symmetric)
     {
-        Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op = new MultiphaseStaggeredStokesBlockOperator(
+        Pointer<MultiphaseStaggeredVelocityBlockOperator> mp_stokes_op = new MultiphaseStaggeredVelocityBlockOperator(
             d_object_name + "::StokesBlockOP", true, d_params, d_thn_manager);
         mp_stokes_op->setCandDCoefficients(d_C, d_D);
         // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
@@ -362,8 +362,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     }
     else
     {
-        Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op = new MultiphaseStaggeredStokesVelocitySolve(
-            d_object_name + "::StokesVelocityOP", true, d_params, d_thn_manager);
+        Pointer<MultiphaseStaggeredVelocityAsymmetricOperator> mp_stokes_op =
+            new MultiphaseStaggeredVelocityAsymmetricOperator(
+                d_object_name + "::StokesVelocityOP", true, d_params, d_thn_manager);
         mp_stokes_op->setCandDCoefficients(d_C, d_D);
         // mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
         stokes_op = mp_stokes_op;
@@ -371,16 +372,16 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
 
     if (d_using_symmetric)
     {
-        Pointer<MultiphaseStaggeredStokesBlockFACOperator> mp_fac_precondition_strategy =
-            new MultiphaseStaggeredStokesBlockFACOperator(
+        Pointer<MultiphaseStaggeredVelocityBlockFACOperator> mp_fac_precondition_strategy =
+            new MultiphaseStaggeredVelocityBlockFACOperator(
                 d_object_name + "::StokesBlockFACStrategy", "Krylov_precond_", d_params, d_thn_manager);
         mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
         d_stokes_precond_op = mp_fac_precondition_strategy;
     }
     else
     {
-        Pointer<MultiphaseStaggeredStokesVelocityFACOperator> mp_fac_precondition_strategy =
-            new MultiphaseStaggeredStokesVelocityFACOperator(
+        Pointer<MultiphaseStaggeredVelocityAsymmetricFACOperator> mp_fac_precondition_strategy =
+            new MultiphaseStaggeredVelocityAsymmetricFACOperator(
                 d_object_name + "::StokesVelocityFACStrategy", "Krylov_precond_", d_params, d_thn_manager);
         mp_fac_precondition_strategy->setCandDCoefficients(d_C, d_D);
         d_stokes_precond_op = mp_fac_precondition_strategy;

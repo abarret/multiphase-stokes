@@ -1,4 +1,4 @@
-#include "multiphase/MultiphaseStaggeredStokesBlockOperator.h"
+#include "multiphase/MultiphaseStaggeredVelocityBlockOperator.h"
 
 #include <ibamr/PETScKrylovStaggeredStokesSolver.h>
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -261,7 +261,7 @@ main(int argc, char* argv[])
         params.lambda_n = params.eta_n;
         params.lambda_s = params.eta_s;
 
-        MultiphaseStaggeredStokesBlockOperator stokes_op("stokes_op", true, params, thn_manager);
+        MultiphaseStaggeredVelocityBlockOperator stokes_op("stokes_op", true, params, thn_manager);
         stokes_op.setCandDCoefficients(C, D);
         stokes_op.setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs);
 
