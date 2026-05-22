@@ -1,4 +1,5 @@
 #include "multiphase/FullFACPreconditioner.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredStokesOperator.h"
@@ -374,6 +375,21 @@ main(int argc, char* argv[])
             Krylov_precond->setNullSpace(false, null_vecs);
             krylov_solver->setPreconditioner(Krylov_precond);
         }
+        else if (use_precond && precond_type == PreconditionerType::BLOCK_FAC)
+        {
+            Pointer<MultiphaseStaggeredStokesBlockFACOperator> fac_precondition_strategy =
+                new MultiphaseStaggeredStokesBlockFACOperator(
+                    "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
+            fac_precondition_strategy->setCandDCoefficients(C, D);
+            fac_precondition_strategy->setUsingSymmetric(input_db->getBoolWithDefault("USING_SYMMETRIC", true));
+            Pointer<FullFACPreconditioner> Krylov_precond =
+                new FullFACPreconditioner("KrylovPrecond",
+                                          fac_precondition_strategy,
+                                          app_initializer->getComponentDatabase("KrylovPrecond"),
+                                          "Krylov_precond_");
+            Krylov_precond->setNullSpace(false, null_vecs);
+            krylov_solver->setPreconditioner(Krylov_precond);
+        }
         else if (use_precond && precond_type == PreconditionerType::BLOCK)
         {
             Pointer<MultiphaseStaggeredStokesBlockPreconditioner> precond =
@@ -388,7 +404,8 @@ main(int argc, char* argv[])
         krylov_solver->setNullSpace(false, null_vecs);
         krylov_solver->initializeSolverState(u_vec, f_vec);
 
-        if (use_precond && precond_type == PreconditionerType::MULTIGRID)
+        if (use_precond &&
+            (precond_type == PreconditionerType::MULTIGRID || precond_type == PreconditionerType::BLOCK_FAC))
         {
             Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
             // We need to set thn_cc_idx on the dense hierarchy.
@@ -419,7 +436,8 @@ main(int argc, char* argv[])
         visit_data_writer->writePlotData(patch_hierarchy, 0, 0.0);
         krylov_solver->solveSystem(u_vec, f_vec);
 
-        if (use_precond && precond_type == PreconditionerType::MULTIGRID)
+        if (use_precond &&
+            (precond_type == PreconditionerType::MULTIGRID || precond_type == PreconditionerType::BLOCK_FAC))
         {
             Pointer<FullFACPreconditioner> Krylov_precond = krylov_solver->getPreconditioner();
             thn_manager->deallocateData(Krylov_precond->getDenseHierarchy());

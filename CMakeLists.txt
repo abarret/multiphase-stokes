@@ -16,6 +16,7 @@ SET(MULTIPHASE_SRC
     src/MultiphaseConvectiveManager.cpp
     src/MultiphaseStaggeredHierarchyIntegrator.cpp
     src/MultiphaseStaggeredStokesBlockPreconditioner.cpp
+    src/MultiphaseStaggeredStokesBlockFACOperator.cpp
     src/MultiphaseStaggeredStokesBoxRelaxationFACOperator.cpp
     src/MultiphaseStaggeredStokesOperator.cpp
     src/MultiphaseStaggeredVelocityAsymmetricFACOperator.cpp

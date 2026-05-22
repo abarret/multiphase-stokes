@@ -309,6 +309,7 @@ enum class PreconditionerType
 {
     MULTIGRID,
     BLOCK,
+    BLOCK_FAC,
     UNKNOWN_TYPE = -1
 };
 
@@ -318,6 +319,7 @@ string_to_enum<PreconditionerType>(const std::string& val)
 {
     if (strcasecmp(val.c_str(), "MULTIGRID") == 0) return PreconditionerType::MULTIGRID;
     if (strcasecmp(val.c_str(), "BLOCK") == 0) return PreconditionerType::BLOCK;
+    if (strcasecmp(val.c_str(), "BLOCK_FAC") == 0) return PreconditionerType::BLOCK_FAC;
     return PreconditionerType::UNKNOWN_TYPE;
 }
 
@@ -327,6 +329,7 @@ enum_to_string<PreconditionerType>(PreconditionerType val)
 {
     if (val == PreconditionerType::MULTIGRID) return "MULTIGRID";
     if (val == PreconditionerType::BLOCK) return "BLOCK";
+    if (val == PreconditionerType::BLOCK_FAC) return "BLOCK_FAC";
     return "UNKNOWN_TYPE";
 }
 
