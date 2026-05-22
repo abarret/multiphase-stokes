@@ -1,5 +1,5 @@
-#ifndef included_multiphase_MultiphaseStaggeredStokesVelocitySolve
-#define included_multiphase_MultiphaseStaggeredStokesVelocitySolve
+#ifndef included_multiphase_MultiphaseStaggeredVelocityBlockOperator
+#define included_multiphase_MultiphaseStaggeredVelocityBlockOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -39,7 +39,7 @@ class RobinBcCoefStrategy;
 namespace multiphase
 {
 /*!
- * \brief Class MultiphaseStaggeredStokesVelocitySolve is a concrete IBTK::LinearOperator which
+ * \brief Class StaggeredStokesOperator is a concrete IBTK::LinearOperator which
  * implements a staggered-grid (MAC) discretization of the incompressible Stokes
  * operator.
  *
@@ -47,23 +47,23 @@ namespace multiphase
  * incompressible flow solver.
  *
  * This class knows how to apply the following operator:
- * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths ][un]
- * [ C*thn + A_n                         C*ths + A_s          ][us]
+ * [ C*thn + A_n + D_u*xi/nu_n*thn*ths   -D_u*xi/nu_n*thn*ths                ][un]
+ * [ -D_u*xi/nu_s*thn*ths                C*ths + A_s + D_u*xi/nu_s*thn*ths   ][us]
  * in which
- * A_i = D*div(eta_i*thn*((grad+grad^T)-lambda_i*div*I))
+ * A_i = D*eta_i*div(thn*((grad+grad^T)-div*I))
  *
  * The following parameters must be supplied before the operator can be applied:
  *   -- C: Constant, set via setCandDCoefficients().
  *   -- D_u: Constant, set via setCandDCoefficients().
  *   -- thn: Cell centered patch index for volume fraction, set via setThnIdx().
  *
- * Note that C and D values are typically set by the time stepping scheme.
+ * Note that C and D values are typically set by the time stepping scheme. 
  *
  * This class handles the case in which the drag coefficient is variable.
  *
  * \see INSStaggeredHierarchyIntegrator
  */
-class MultiphaseStaggeredStokesVelocitySolve : public IBTK::LinearOperator
+class MultiphaseStaggeredVelocityBlockOperator : public IBTK::LinearOperator
 {
 public:
     /*!
@@ -72,7 +72,7 @@ public:
      * Note that C and D MUST be provided by the call to setCandDCoefficients(). Their default values are 0.0 and -1.0
      * by default.
      */
-    MultiphaseStaggeredStokesVelocitySolve(const std::string& object_name,
+    MultiphaseStaggeredVelocityBlockOperator(const std::string& object_name,
                                            bool homogeneous_bc,
                                            const MultiphaseParameters& params,
                                            const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
@@ -80,7 +80,7 @@ public:
     /*!
      * \brief Destructor.
      */
-    ~MultiphaseStaggeredStokesVelocitySolve();
+    ~MultiphaseStaggeredVelocityBlockOperator();
 
     const std::unique_ptr<VolumeFractionDataManager>& getVolumeFractionManager() const
     {
@@ -259,4 +259,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_multiphase_MultiphaseStaggeredStokesVelocitySolve
+#endif // #ifndef included_multiphase_MultiphaseStaggeredVelocityBlockOperator

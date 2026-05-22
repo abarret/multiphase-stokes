@@ -16,6 +16,10 @@ class CFMultiphaseOldroydB : public IBAMR::CFStrategy
 public:
     /*!
      * \brief Constructor.
+     *
+     * \param input_db Database containing Oldroyd-B model parameters. This constructor reads:
+     * - "relaxation_time"
+     * - "alpha"
      */
     CFMultiphaseOldroydB(std::string object_name,
                          SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> thn_var,

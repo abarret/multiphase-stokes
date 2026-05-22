@@ -28,6 +28,9 @@
 
 using namespace multiphase;
 
+/*!
+ * \brief CartGridFunction that evaluates an osmotic-pressure force from the network volume fraction field.
+ */
 class OsmoticPressure : public CartGridFunction
 {
 public:
@@ -101,6 +104,9 @@ struct ExactParams
     double lambda = std::numeric_limits<double>::quiet_NaN();
 };
 
+/*!
+ * \brief CartGridFunction that sets the exact volume-fraction solution for the swelling benchmark.
+ */
 class ThnExactFcn : public CartGridFunction
 {
 public:
@@ -163,6 +169,9 @@ private:
     }
 };
 
+/*!
+ * \brief CartGridFunction that sets the exact velocity solution corresponding to the swelling benchmark.
+ */
 class VelExactFcn : public CartGridFunction
 {
 public:

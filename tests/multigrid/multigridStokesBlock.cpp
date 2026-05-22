@@ -1,8 +1,8 @@
 #include "multiphase/FullFACPreconditioner.h"
-#include "multiphase/MultiphaseStaggeredStokesBlockFACOperator.h"
-#include "multiphase/MultiphaseStaggeredStokesBlockOperator.h"
-#include "multiphase/MultiphaseStaggeredStokesVelocityFACOperator.h"
-#include "multiphase/MultiphaseStaggeredStokesVelocitySolve.h"
+#include "multiphase/MultiphaseStaggeredVelocityAsymmetricFACOperator.h"
+#include "multiphase/MultiphaseStaggeredVelocityAsymmetricOperator.h"
+#include "multiphase/MultiphaseStaggeredVelocityBlockFACOperator.h"
+#include "multiphase/MultiphaseStaggeredVelocityBlockOperator.h"
 #include "multiphase/utility_functions.h"
 
 #include <ibamr/StaggeredStokesSolverManager.h>
@@ -323,16 +323,16 @@ main(int argc, char* argv[])
         Pointer<LinearOperator> stokes_op;
         if (using_symmetric)
         {
-            Pointer<MultiphaseStaggeredStokesBlockOperator> mp_stokes_op =
-                new MultiphaseStaggeredStokesBlockOperator("stokes_op", true, params, thn_manager);
+            Pointer<MultiphaseStaggeredVelocityBlockOperator> mp_stokes_op =
+                new MultiphaseStaggeredVelocityBlockOperator("stokes_op", true, params, thn_manager);
             mp_stokes_op->setCandDCoefficients(C, D);
             mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
             stokes_op = mp_stokes_op;
         }
         else
         {
-            Pointer<MultiphaseStaggeredStokesVelocitySolve> mp_stokes_op =
-                new MultiphaseStaggeredStokesVelocitySolve("stokes_op", true, params, thn_manager);
+            Pointer<MultiphaseStaggeredVelocityAsymmetricOperator> mp_stokes_op =
+                new MultiphaseStaggeredVelocityAsymmetricOperator("stokes_op", true, params, thn_manager);
             mp_stokes_op->setCandDCoefficients(C, D);
             mp_stokes_op->setPhysicalBoundaryHelper(bc_helper);
             stokes_op = mp_stokes_op;
@@ -346,8 +346,8 @@ main(int argc, char* argv[])
         Pointer<FACPreconditionerStrategy> fac_precondition_strategy;
         if (using_symmetric)
         {
-            Pointer<MultiphaseStaggeredStokesBlockFACOperator> mp_fac_precondition_strategy =
-                new MultiphaseStaggeredStokesBlockFACOperator(
+            Pointer<MultiphaseStaggeredVelocityBlockFACOperator> mp_fac_precondition_strategy =
+                new MultiphaseStaggeredVelocityBlockFACOperator(
                     "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
             mp_fac_precondition_strategy->setCandDCoefficients(C, D);
             mp_fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));
@@ -355,8 +355,8 @@ main(int argc, char* argv[])
         }
         else
         {
-            Pointer<MultiphaseStaggeredStokesVelocityFACOperator> mp_fac_precondition_strategy =
-                new MultiphaseStaggeredStokesVelocityFACOperator(
+            Pointer<MultiphaseStaggeredVelocityAsymmetricFACOperator> mp_fac_precondition_strategy =
+                new MultiphaseStaggeredVelocityAsymmetricFACOperator(
                     "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
             mp_fac_precondition_strategy->setCandDCoefficients(C, D);
             mp_fac_precondition_strategy->setUnderRelaxationParamater(input_db->getDouble("w"));

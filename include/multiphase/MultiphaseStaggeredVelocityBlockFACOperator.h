@@ -1,5 +1,5 @@
-#ifndef included_multiphase_MultiphaseStaggeredStokesBlockFACOperator
-#define included_multiphase_MultiphaseStaggeredStokesBlockFACOperator
+#ifndef included_multiphase_MultiphaseStaggeredVelocityBlockFACOperator
+#define included_multiphase_MultiphaseStaggeredVelocityBlockFACOperator
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -31,7 +31,11 @@
 
 namespace multiphase
 {
-class MultiphaseStaggeredStokesBlockFACOperator : public IBTK::FACPreconditionerStrategy
+/*!
+ * \brief Class MultiphaseStaggeredVelocityBlockFACOperator is a FAC preconditioner strategy for the coupled network and
+ * solvent velocity block in the multiphase Stokes system.
+ */
+class MultiphaseStaggeredVelocityBlockFACOperator : public IBTK::FACPreconditionerStrategy
 {
 public:
     /*!
@@ -39,7 +43,7 @@ public:
      * \param w under relaxation factor in box relaxation scheme
      * \param C scaler-valued C in C*u term used to add diagonal dominance
      */
-    MultiphaseStaggeredStokesBlockFACOperator(const std::string& object_name,
+    MultiphaseStaggeredVelocityBlockFACOperator(const std::string& object_name,
                                               const std::string& default_options_prefix,
                                               const MultiphaseParameters& params,
                                               const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
@@ -47,7 +51,7 @@ public:
     /*!
      * \brief Destructor.
      */
-    ~MultiphaseStaggeredStokesBlockFACOperator();
+    ~MultiphaseStaggeredVelocityBlockFACOperator();
 
     void setPhysicalBcCoefs(const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
                             const std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*>& us_bc_coefs);
@@ -252,4 +256,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#endif // #ifndef included_IBTK_MultiphaseStaggeredStokesBlockFACOperator
+#endif // #ifndef included_IBTK_MultiphaseStaggeredVelocityBlockFACOperator

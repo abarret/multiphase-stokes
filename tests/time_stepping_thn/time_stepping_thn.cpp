@@ -26,6 +26,9 @@
 
 using namespace multiphase;
 
+/*!
+ * \brief CartGridFunction that computes a volume-fraction-dependent drag coefficient field for variable-drag tests.
+ */
 class DragCoefficient : public CartGridFunction
 {
 public:

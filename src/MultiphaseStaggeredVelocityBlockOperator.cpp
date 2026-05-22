@@ -1,6 +1,6 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include "multiphase/MultiphaseStaggeredStokesVelocitySolve.h"
+#include "multiphase/MultiphaseStaggeredVelocityBlockOperator.h"
 #include "multiphase/fd_operators.h"
 #include "multiphase/utility_functions.h"
 
@@ -71,7 +71,7 @@ static Timer* t_deallocate_operator_state;
 } // namespace
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
-MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(
+MultiphaseStaggeredVelocityBlockOperator::MultiphaseStaggeredVelocityBlockOperator(
     const std::string& object_name,
     bool homogeneous_bc,
     const MultiphaseParameters& params,
@@ -118,15 +118,16 @@ MultiphaseStaggeredStokesVelocitySolve::MultiphaseStaggeredStokesVelocitySolve(
                        std::vector<RobinBcCoefStrategy<NDIM>*>(NDIM, d_default_us_bc_coef));
 
     // Setup Timers.
-    IBAMR_DO_ONCE(t_apply = TimerManager::getManager()->getTimer("IBAMR::TwoFluidStaggeredStokesOperator::apply()");
-                  t_initialize_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::initializeOperatorState()");
-                  t_deallocate_operator_state = TimerManager::getManager()->getTimer(
-                      "IBAMR::TwoFluidStaggeredStokesOperator::deallocateOperatorState()"););
+    IBAMR_DO_ONCE(
+        t_apply = TimerManager::getManager()->getTimer("multiphase::MultiphaseStaggeredVelocityBlockOperator::apply()");
+        t_initialize_operator_state = TimerManager::getManager()->getTimer(
+            "multiphase::MultiphaseStaggeredVelocityBlockOperator::initializeOperatorState()");
+        t_deallocate_operator_state = TimerManager::getManager()->getTimer(
+            "multiphase::MultiphaseStaggeredVelocityBlockOperator::deallocateOperatorState()"););
     return;
 } // TwoFluidStaggeredStokesOperator
 
-MultiphaseStaggeredStokesVelocitySolve::~MultiphaseStaggeredStokesVelocitySolve()
+MultiphaseStaggeredVelocityBlockOperator::~MultiphaseStaggeredVelocityBlockOperator()
 {
     deallocateOperatorState();
     delete d_default_un_bc_coef;
@@ -138,7 +139,7 @@ MultiphaseStaggeredStokesVelocitySolve::~MultiphaseStaggeredStokesVelocitySolve(
 
 // Probably need another one for second fluid equation
 void
-MultiphaseStaggeredStokesVelocitySolve::setVelocityPoissonSpecifications(const PoissonSpecifications& coefs)
+MultiphaseStaggeredVelocityBlockOperator::setVelocityPoissonSpecifications(const PoissonSpecifications& coefs)
 {
     TBOX_WARNING(d_object_name +
                  "::setVelocityPoissonSpecifications: This function is not used. Use setCandDCoefficients instead.");
@@ -146,15 +147,15 @@ MultiphaseStaggeredStokesVelocitySolve::setVelocityPoissonSpecifications(const P
 } // setVelocityPoissonSpecifications
 
 void
-MultiphaseStaggeredStokesVelocitySolve::setCandDCoefficients(const double C, const double D_u)
+MultiphaseStaggeredVelocityBlockOperator::setCandDCoefficients(const double C, const double D_u)
 {
     d_C = C;
     d_D_u = D_u;
 }
 
 void
-MultiphaseStaggeredStokesVelocitySolve::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
-                                                           const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs)
+MultiphaseStaggeredVelocityBlockOperator::setPhysicalBcCoefs(const std::vector<RobinBcCoefStrategy<NDIM>*>& un_bc_coefs,
+                                                             const std::vector<RobinBcCoefStrategy<NDIM>*>& us_bc_coefs)
 {
 #if !defined(NDEBUG)
     TBOX_ASSERT(un_bc_coefs.size() == NDIM);
@@ -186,7 +187,7 @@ MultiphaseStaggeredStokesVelocitySolve::setPhysicalBcCoefs(const std::vector<Rob
 } // setPhysicalBcCoefs
 
 void
-MultiphaseStaggeredStokesVelocitySolve::setPhysicalBoundaryHelper(
+MultiphaseStaggeredVelocityBlockOperator::setPhysicalBoundaryHelper(
     Pointer<StaggeredStokesPhysicalBoundaryHelper> bc_helper)
 {
 #if !defined(NDEBUG)
@@ -197,7 +198,7 @@ MultiphaseStaggeredStokesVelocitySolve::setPhysicalBoundaryHelper(
 } // setPhysicalBoundaryHelper
 
 void
-MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x, SAMRAIVectorReal<NDIM, double>& y)
+MultiphaseStaggeredVelocityBlockOperator::apply(SAMRAIVectorReal<NDIM, double>& x, SAMRAIVectorReal<NDIM, double>& y)
 {
     IBAMR_TIMER_START(t_apply);
 
@@ -278,8 +279,8 @@ MultiphaseStaggeredStokesVelocitySolve::apply(SAMRAIVectorReal<NDIM, double>& x,
 } // apply
 
 void
-MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& in,
-                                                                const SAMRAIVectorReal<NDIM, double>& out)
+MultiphaseStaggeredVelocityBlockOperator::initializeOperatorState(const SAMRAIVectorReal<NDIM, double>& in,
+                                                                  const SAMRAIVectorReal<NDIM, double>& out)
 {
     IBAMR_TIMER_START(t_initialize_operator_state);
 
@@ -357,7 +358,7 @@ MultiphaseStaggeredStokesVelocitySolve::initializeOperatorState(const SAMRAIVect
 } // initializeOperatorState
 
 void
-MultiphaseStaggeredStokesVelocitySolve::deallocateOperatorState()
+MultiphaseStaggeredVelocityBlockOperator::deallocateOperatorState()
 {
     if (!d_is_initialized) return;
 
@@ -393,7 +394,7 @@ MultiphaseStaggeredStokesVelocitySolve::deallocateOperatorState()
 } // deallocateOperatorState
 
 void
-MultiphaseStaggeredStokesVelocitySolve::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double>& y)
+MultiphaseStaggeredVelocityBlockOperator::modifyRhsForBcs(SAMRAIVectorReal<NDIM, double>& y)
 {
     if (!d_homogeneous_bc)
     {
@@ -432,7 +433,7 @@ MultiphaseStaggeredStokesVelocitySolve::modifyRhsForBcs(SAMRAIVectorReal<NDIM, d
 } // modifyRhsForBcs
 
 void
-MultiphaseStaggeredStokesVelocitySolve::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& u)
+MultiphaseStaggeredVelocityBlockOperator::imposeSolBcs(SAMRAIVectorReal<NDIM, double>& u)
 {
     if (d_bc_helper)
     {
@@ -447,22 +448,45 @@ MultiphaseStaggeredStokesVelocitySolve::imposeSolBcs(SAMRAIVectorReal<NDIM, doub
 } // imposeSolBcs
 
 void
-MultiphaseStaggeredStokesVelocitySolve::applySpecialized(const int A_un_idx,
-                                                         const int A_us_idx,
-                                                         const int un_idx,
-                                                         const int us_idx,
-                                                         const int thn_cc_idx,
-                                                         const int thn_nc_idx,
-                                                         const int thn_sc_idx)
+MultiphaseStaggeredVelocityBlockOperator::applySpecialized(const int A_un_idx,
+                                                           const int A_us_idx,
+                                                           const int un_idx,
+                                                           const int us_idx,
+                                                           const int thn_cc_idx,
+                                                           const int thn_nc_idx,
+                                                           const int thn_sc_idx)
 {
+    // Compute the forces on momentum.
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            computeVelocitySubBlockOnPatch(
-                *patch, A_un_idx, A_us_idx, un_idx, us_idx, thn_cc_idx, thn_nc_idx, thn_sc_idx, d_params, d_C, d_D_u);
+            if (d_params.isVariableDrag())
+                accumulateMomentumWithoutPressureOnPatchVariableDrag(patch,
+                                                                     A_un_idx,
+                                                                     A_us_idx,
+                                                                     un_idx,
+                                                                     us_idx,
+                                                                     thn_cc_idx,
+                                                                     thn_nc_idx,
+                                                                     thn_sc_idx,
+                                                                     d_params,
+                                                                     d_C,
+                                                                     d_D_u);
+            else
+                accumulateMomentumWithoutPressureOnPatchConstantCoefficient(patch,
+                                                                            A_un_idx,
+                                                                            A_us_idx,
+                                                                            un_idx,
+                                                                            us_idx,
+                                                                            thn_cc_idx,
+                                                                            thn_nc_idx,
+                                                                            thn_sc_idx,
+                                                                            d_params,
+                                                                            d_C,
+                                                                            d_D_u);
         }
     }
 }

@@ -41,6 +41,9 @@ public:
      * values, reads in configuration information from input and restart
      * databases, and registers the integrator object with the restart manager
      * when requested.
+     *
+     * \param input_db Database containing IB integrator options. This constructor reads:
+     * - "use_structure_predictor" (optional, default: true)
      */
     IBMultiphaseHierarchyIntegrator(std::string object_name,
                                     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
@@ -94,6 +97,10 @@ public:
     void registerCrossLinkStrategy(SAMRAI::tbox::Pointer<MultiphaseCrossLinksStrategy> cross_link_strategy);
 
 protected:
+    /*!
+     * \brief Class IBMultiphaseEulerianForceFunction is a CartGridFunction adapter that evaluates and spreads either
+     * network or solvent immersed-boundary forcing associated with this integrator.
+     */
     class IBMultiphaseEulerianForceFunction : public IBTK::CartGridFunction
     {
     public:
