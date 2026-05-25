@@ -5,9 +5,10 @@
 #include "multiphase/fd_operators.h"
 #include "multiphase/utility_functions.h"
 
-#include "ibtk/CCPoissonSolverManager.h"
+#include "ibtk/CCPoissonBoxRelaxationFACOperator.h"
+#include "ibtk/CartSideDoubleQuadraticCFInterpolation.h"
 #include "ibtk/HierarchyGhostCellInterpolation.h"
-#include "ibtk/PoissonSolver.h"
+#include "ibtk/SideNoCornersFillPattern.h"
 #include "ibtk/app_namespaces.h"
 
 #include "CellVariable.h"
@@ -72,7 +73,12 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
     d_thn_ths_sq_idx = var_db->registerVariableAndContext(d_thn_ths_sq_var, ctx);
 
     d_pressure_solver_db = new tbox::MemoryDatabase(object_name + "::PressureLevelSolverDB");
-    d_pressure_solver_db->putString("ksp_type", "gmres");
+    // Match the existing FAC-style smoothers: use a local box-relaxation
+    // Poisson smoother instead of a Krylov level solve so refined levels see
+    // proper coarse-fine interface treatment.
+    d_pressure_solver_db->putString("smoother_type", "PATCH_GAUSS_SEIDEL");
+    d_pressure_solver_db->putString("coarse_solver_type", "PATCH_GAUSS_SEIDEL");
+    d_pressure_solver_db->putInteger("coarse_solver_max_iterations", 2);
 }
 
 MultiphaseStaggeredStokesBlockFACOperator::~MultiphaseStaggeredStokesBlockFACOperator()
@@ -134,14 +140,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(solv::SAMRAIVectorReal<ND
 {
     if (num_sweeps <= 0) return;
 
-    // Pressure solvers depend on dense-hierarchy `thn` data, which is only
+    // The pressure smoother depends on dense-hierarchy `thn` data, which is only
     // guaranteed to exist after the outer FullFACPreconditioner copies it over.
-    if (d_pressure_solvers.empty())
-    {
-        updateThnThsSqData();
-        initializePressureSolvers();
-    }
-
     Pointer<math::HierarchySideDataOpsReal<NDIM, double>> sc_ops =
         Pointer<math::HierarchySideDataOpsReal<NDIM, double>>(
             new math::HierarchySideDataOpsReal<NDIM, double>(d_hierarchy, level_num, level_num));
@@ -173,6 +173,12 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(solv::SAMRAIVectorReal<ND
     solv::SAMRAIVectorReal<NDIM, double> p_rhs_vec(d_object_name + "::p_rhs", d_hierarchy, level_num, level_num);
     p_rhs_vec.addComponent(d_p_rhs_var, d_p_rhs_idx, residual.getControlVolumeIndex(P_COMP), cc_ops);
 
+    if (!d_pressure_smoother)
+    {
+        updateThnThsSqData();
+        initializePressureSmoother();
+    }
+
     const int thn_cc_idx = d_thn_manager->getCellIndex();
     const int thn_sc_idx = d_thn_manager->getSideIndex();
     const int thn_nc_idx = d_thn_manager->getNodeIndex();
@@ -201,23 +207,21 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(solv::SAMRAIVectorReal<ND
         sc_ops->setToScalar(d_fn_scr_idx, 0.0, false);
         sc_ops->setToScalar(d_fs_scr_idx, 0.0, false);
 
-        // First half of the Schur approximation: solve G^T G p_1 = b_p.
-        d_pressure_solvers[level_num]->solveSystem(p_corr_vec, p_rhs_vec);
-
-        using ITC = IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        IBTK::HierarchyGhostCellInterpolation p_ghost_fill;
-        std::vector<ITC> p_ghost_comps{ ITC(d_p_corr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN") };
-        p_ghost_fill.initializeOperatorState(p_ghost_comps, d_hierarchy, level_num, level_num);
-        p_ghost_fill.fillData(d_solution_time);
+        // First half of the Schur approximation: apply an in-level Poisson
+        // smoother to approximate (G^T G)^{-1} b_p while respecting
+        // coarse-fine interfaces.
+        d_pressure_smoother->setToZero(p_corr_vec, level_num);
+        if (level_num == d_coarsest_ln)
+            d_pressure_smoother->solveCoarsestLevel(p_corr_vec, p_rhs_vec, level_num);
+        else
+            d_pressure_smoother->smoothError(p_corr_vec, p_rhs_vec, level_num, 2, false, false);
 
         multiphase_grad_on_hierarchy(
             *d_hierarchy, d_un_scr_idx, d_us_scr_idx, thn_sc_idx, d_p_corr_idx, -1.0, false, level_num, level_num);
 
-        IBTK::HierarchyGhostCellInterpolation u_ghost_fill;
-        std::vector<ITC> u_ghost_comps{ ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN"),
-                                        ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN") };
-        u_ghost_fill.initializeOperatorState(u_ghost_comps, d_hierarchy, level_num, level_num);
-        u_ghost_fill.fillData(d_solution_time);
+        // The momentum block uses these side-centered fields with one-cell
+        // stencils, so they also need coarse-fine normal extensions.
+        fillVelocityScratchData(level_num);
 
         if (d_params.isVariableDrag())
         {
@@ -241,12 +245,13 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(solv::SAMRAIVectorReal<ND
         applyCoincompressibility(
             *d_hierarchy, d_p_rhs_idx, d_fn_scr_idx, d_fs_scr_idx, thn_sc_idx, 1.0, level_num, level_num);
 
-        // Second half of the Schur approximation: solve G^T G p = G^T A G p_1.
-        d_pressure_solvers[level_num]->solveSystem(p_corr_vec, p_rhs_vec);
-
-        p_ghost_fill.deallocateOperatorState();
-        p_ghost_fill.initializeOperatorState(p_ghost_comps, d_hierarchy, level_num, level_num);
-        p_ghost_fill.fillData(d_solution_time);
+        // Second half of the Schur approximation: apply the same pressure
+        // smoother to approximate (G^T G)^{-1} G^T A G p_1.
+        d_pressure_smoother->setToZero(p_corr_vec, level_num);
+        if (level_num == d_coarsest_ln)
+            d_pressure_smoother->solveCoarsestLevel(p_corr_vec, p_rhs_vec, level_num);
+        else
+            d_pressure_smoother->smoothError(p_corr_vec, p_rhs_vec, level_num, 2, false, false);
 
         sc_ops->copyData(d_fn_scr_idx, d_un_rhs_idx, false);
         sc_ops->copyData(d_fs_scr_idx, d_us_rhs_idx, false);
@@ -331,11 +336,8 @@ MultiphaseStaggeredStokesBlockFACOperator::deallocateOperatorState()
 {
     if (d_velocity_block_smoother) d_velocity_block_smoother->deallocateOperatorState();
     if (d_velocity_asymmetric_smoother) d_velocity_asymmetric_smoother->deallocateOperatorState();
-    for (auto& solver : d_pressure_solvers)
-    {
-        if (solver) solver->deallocateSolverState();
-    }
-    d_pressure_solvers.clear();
+    if (d_pressure_smoother) d_pressure_smoother->deallocateOperatorState();
+    d_pressure_smoother.setNull();
     if (d_delegate) d_delegate->deallocateOperatorState();
 
     if (d_hierarchy)
@@ -386,39 +388,31 @@ MultiphaseStaggeredStokesBlockFACOperator::setUsingSymmetric(const bool using_sy
 }
 
 void
-MultiphaseStaggeredStokesBlockFACOperator::initializePressureSolvers()
+MultiphaseStaggeredStokesBlockFACOperator::initializePressureSmoother()
 {
-    d_pressure_solvers.resize(d_finest_ln + 1);
+    if (!d_pressure_smoother)
+    {
+        d_pressure_smoother = new IBTK::CCPoissonBoxRelaxationFACOperator(
+            d_object_name + "::PressureFAC", d_pressure_solver_db, "stokes_block_fac_pressure_");
+    }
+
     d_pressure_coefs.setCConstant(0.0);
     d_pressure_coefs.setDPatchDataId(d_thn_ths_sq_idx);
+    d_pressure_smoother->setPoissonSpecifications(d_pressure_coefs);
+    d_pressure_smoother->setPhysicalBcCoef(d_P_bc_coef);
+    d_pressure_smoother->setHomogeneousBc(true);
 
-    for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
-    {
-        if (!d_pressure_solvers[ln])
-        {
-            d_pressure_solvers[ln] = IBTK::CCPoissonSolverManager::getManager()->allocateSolver(
-                IBTK::CCPoissonSolverManager::PETSC_LEVEL_SOLVER,
-                d_object_name + "::PressureLevelSolver",
-                d_pressure_solver_db,
-                "stokes_block_fac_pressure_" + std::to_string(ln) + "_");
-        }
+    Pointer<math::HierarchyCellDataOpsReal<NDIM, double>> cc_ops =
+        Pointer<math::HierarchyCellDataOpsReal<NDIM, double>>(
+            new math::HierarchyCellDataOpsReal<NDIM, double>(d_hierarchy, d_coarsest_ln, d_finest_ln));
+    solv::SAMRAIVectorReal<NDIM, double> p_corr_vec(
+        d_object_name + "::PressureCorr", d_hierarchy, d_coarsest_ln, d_finest_ln);
+    p_corr_vec.addComponent(d_p_corr_var, d_p_corr_idx, -1, cc_ops);
+    solv::SAMRAIVectorReal<NDIM, double> p_rhs_vec(
+        d_object_name + "::PressureRhs", d_hierarchy, d_coarsest_ln, d_finest_ln);
+    p_rhs_vec.addComponent(d_p_rhs_var, d_p_rhs_idx, -1, cc_ops);
 
-        Pointer<math::HierarchyCellDataOpsReal<NDIM, double>> cc_ops =
-            Pointer<math::HierarchyCellDataOpsReal<NDIM, double>>(
-                new math::HierarchyCellDataOpsReal<NDIM, double>(d_hierarchy, ln, ln));
-        solv::SAMRAIVectorReal<NDIM, double> p_corr_vec(d_object_name + "::P", d_hierarchy, ln, ln);
-        p_corr_vec.addComponent(d_p_corr_var, d_p_corr_idx, -1, cc_ops);
-        solv::SAMRAIVectorReal<NDIM, double> p_rhs_vec(d_object_name + "::bP", d_hierarchy, ln, ln);
-        p_rhs_vec.addComponent(d_p_rhs_var, d_p_rhs_idx, -1, cc_ops);
-
-        d_pressure_solvers[ln]->setPoissonSpecifications(d_pressure_coefs);
-        d_pressure_solvers[ln]->setPhysicalBcCoef(d_P_bc_coef);
-        d_pressure_solvers[ln]->setHomogeneousBc(true);
-        d_pressure_solvers[ln]->setMaxIterations(25);
-        d_pressure_solvers[ln]->setRelativeTolerance(1.0e-8);
-        d_pressure_solvers[ln]->setAbsoluteTolerance(1.0e-50);
-        d_pressure_solvers[ln]->initializeSolverState(p_corr_vec, p_rhs_vec);
-    }
+    d_pressure_smoother->initializeOperatorState(p_corr_vec, p_rhs_vec);
 }
 
 void
@@ -485,6 +479,39 @@ MultiphaseStaggeredStokesBlockFACOperator::updateThnThsSqData()
                 }
             }
         }
+    }
+}
+
+void
+MultiphaseStaggeredStokesBlockFACOperator::fillVelocityScratchData(const int level_num)
+{
+    using ITC = IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+
+    Pointer<xfer::VariableFillPattern<NDIM>> un_fill_pattern = new IBTK::SideNoCornersFillPattern(1, false);
+    Pointer<xfer::VariableFillPattern<NDIM>> us_fill_pattern = new IBTK::SideNoCornersFillPattern(1, false);
+    IBTK::HierarchyGhostCellInterpolation ghost_fill;
+    std::vector<ITC> ghost_comps{
+        ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", false, d_un_bc_coefs, un_fill_pattern),
+        ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "NONE", "LINEAR", false, d_us_bc_coefs, us_fill_pattern)
+    };
+    ghost_fill.initializeOperatorState(ghost_comps, d_hierarchy, level_num, level_num);
+    ghost_fill.setHomogeneousBc(true);
+    ghost_fill.fillData(d_solution_time);
+
+    if (level_num == d_coarsest_ln) return;
+
+    Pointer<hier::PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
+    IBTK::CartSideDoubleQuadraticCFInterpolation sc_bdry_op;
+    sc_bdry_op.setConsistentInterpolationScheme(false);
+    sc_bdry_op.setPatchHierarchy(d_hierarchy);
+    sc_bdry_op.setPatchDataIndices({ d_un_scr_idx, d_us_scr_idx });
+
+    const hier::IntVector<NDIM>& ratio = level->getRatioToCoarserLevel();
+    const hier::IntVector<NDIM> gcw_to_fill(1);
+    for (hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
+    {
+        Pointer<hier::Patch<NDIM>> patch = level->getPatch(p());
+        sc_bdry_op.computeNormalExtension(*patch, ratio, gcw_to_fill);
     }
 }
 } // namespace multiphase

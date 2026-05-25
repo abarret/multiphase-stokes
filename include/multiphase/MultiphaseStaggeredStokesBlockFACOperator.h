@@ -47,7 +47,7 @@ class RefinePatchStrategy;
 
 namespace IBTK
 {
-class PoissonSolver;
+class PoissonFACPreconditionerStrategy;
 }
 
 namespace multiphase
@@ -145,12 +145,14 @@ public:
 
 private:
     /*!
-     * \brief Build one pressure level solver per FAC level.
+     * \brief Build the scalar pressure smoother used by the Schur
+     * approximation.
      *
-     * These are true single-level solvers and are initialized lazily after the
-     * dense hierarchy has been populated with `thn` data.
+     * The pressure stage must understand coarse-fine interfaces, so this uses
+     * a cell-centered Poisson FAC smoother rather than a bare patch-level
+     * solver.
      */
-    void initializePressureSolvers();
+    void initializePressureSmoother();
 
     /*!
      * \brief Initialize the velocity-block smoother used in the final block
@@ -165,7 +167,17 @@ private:
      */
     void updateThnThsSqData();
 
-    std::vector<SAMRAI::tbox::Pointer<IBTK::PoissonSolver>> d_pressure_solvers;
+    /*!
+     * \brief Fill patch-boundary and coarse-fine ghost values for the
+     * intermediate pressure-gradient data on one FAC level.
+     *
+     * These side-centered scratch fields are consumed by the momentum block,
+     * so their coarse-fine ghost cells must be extended the same way as the
+     * existing velocity FAC smoothers.
+     */
+    void fillVelocityScratchData(int level_num);
+
+    SAMRAI::tbox::Pointer<IBTK::PoissonFACPreconditionerStrategy> d_pressure_smoother;
     SAMRAI::solv::PoissonSpecifications d_pressure_coefs;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_solver_db;
 
