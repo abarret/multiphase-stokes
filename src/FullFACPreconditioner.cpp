@@ -41,8 +41,10 @@ namespace multiphase
 FullFACPreconditioner::FullFACPreconditioner(std::string object_name,
                                              Pointer<FACPreconditionerStrategy> fac_strategy,
                                              Pointer<Database> input_db,
-                                             const std::string& default_options_prefix)
-    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix)
+                                             const std::string& default_options_prefix,
+                                             Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
+    : FACPreconditioner(std::move(object_name), fac_strategy, input_db, default_options_prefix),
+      d_grid_alg(std::move(gridding_alg))
 {
     d_multigrid_max_levels = input_db->getInteger("max_multigrid_levels");
     d_coarsening_operator = input_db->getStringWithDefault("preconditioner_coarsening_op", "CONSERVATIVE_COARSEN");
@@ -264,13 +266,37 @@ FullFACPreconditioner::generateDenseHierarchy(Pointer<PatchHierarchy<NDIM>> base
         base_geom->makeCoarsenedGridGeometry("DenseGeom", std::pow(2, num_levels_not_in_base), false);
     d_dense_hierarchy = new PatchHierarchy<NDIM>(d_object_name + "::DenseHierarchy", dense_geom, false);
 
-    Pointer<PatchLevel<NDIM>> base_level = base_hierarchy->getPatchLevel(0);
     for (int ln = 0; ln < num_levels_not_in_base; ++ln)
     {
-        Pointer<PatchLevel<NDIM>> dense_level = new PatchLevel<NDIM>();
-        dense_level->setCoarsenedPatchLevel(base_level, std::pow(2, num_levels_not_in_base - ln), dense_geom);
-        d_dense_hierarchy->makeNewPatchLevel(
-            ln, std::pow(2, ln), dense_level->getBoxes(), dense_level->getProcessorMapping());
+        const IntVector<NDIM> ratio_to_dense_coarsest(std::pow(2, ln));
+        if (d_grid_alg)
+        {
+            Pointer<LoadBalanceStrategy<NDIM>> load_balancer = d_grid_alg->getLoadBalanceStrategy();
+            BoxArray<NDIM> physical_domain = dense_geom->getPhysicalDomain();
+            physical_domain.refine(ratio_to_dense_coarsest);
+            BoxList<NDIM> domain_boxes(physical_domain);
+            BoxArray<NDIM> level_boxes;
+            ProcessorMapping mapping;
+            load_balancer->loadBalanceBoxes(level_boxes,
+                                            mapping,
+                                            domain_boxes,
+                                            d_dense_hierarchy,
+                                            ln,
+                                            physical_domain,
+                                            ratio_to_dense_coarsest,
+                                            d_grid_alg->getSmallestPatchSize(0),
+                                            d_grid_alg->getLargestPatchSize(0),
+                                            IntVector<NDIM>(1),
+                                            IntVector<NDIM>(1));
+            d_dense_hierarchy->makeNewPatchLevel(ln, ratio_to_dense_coarsest, level_boxes, mapping);
+        }
+        else
+        {
+            BoxArray<NDIM> level_boxes = dense_geom->getPhysicalDomain();
+            level_boxes.refine(ratio_to_dense_coarsest);
+            ProcessorMapping mapping(level_boxes.size());
+            d_dense_hierarchy->makeNewPatchLevel(ln, ratio_to_dense_coarsest, level_boxes, mapping);
+        }
     }
 
     // Now copy the levels from the base hierarchy to the dense hierarchy

@@ -172,6 +172,7 @@ private:
             PreconditionerType precond_type,
             SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
             SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+            SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> gridding_alg,
             const MultiphaseParameters& params,
             double C,
             double D,

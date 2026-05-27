@@ -481,6 +481,7 @@ MultiphaseStandardHierarchyIntegrator::preprocessIntegrateHierarchy(const double
         d_precond = std::make_unique<MultiphasePreconditioner>(d_precond_type,
                                                                d_hierarchy,
                                                                d_precond_db,
+                                                               d_gridding_alg,
                                                                d_params,
                                                                C,
                                                                D2,
@@ -942,6 +943,7 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
     PreconditionerType precond_type,
     Pointer<PatchHierarchy<NDIM>> hierarchy,
     Pointer<Database> input_db,
+    Pointer<GriddingAlgorithm<NDIM>> gridding_alg,
     const MultiphaseParameters& params,
     const double C,
     const double D,
@@ -969,8 +971,8 @@ MultiphaseStandardHierarchyIntegrator::MultiphasePreconditioner::MultiphasePreco
         d_fac_op->setUnderRelaxationParamater(input_db->getDouble("relaxation_parameter"));
         d_fac_op->setCandDCoefficients(C, D);
         d_fac_op->setPhysicalBcCoefs(un_bc_coefs, us_bc_coefs, p_bc_coef);
-        d_fac_precond =
-            new FullFACPreconditioner("KrylovMultigridPreconditioner", d_fac_op, input_db, "Krylov_precond_");
+        d_fac_precond = new FullFACPreconditioner(
+            "KrylovMultigridPreconditioner", d_fac_op, input_db, "Krylov_precond_", gridding_alg);
         d_fac_precond->setNullSpace(false, null_vecs);
         break;
     }
