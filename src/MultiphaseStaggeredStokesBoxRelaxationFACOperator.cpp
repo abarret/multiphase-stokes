@@ -20,6 +20,7 @@
 #include "ibtk/PETScLevelSolver.h"
 #include "ibtk/PoissonSolver.h"
 #include "ibtk/RobinPhysBdryPatchStrategy.h"
+#include "ibtk/SideDataSynchronization.h"
 #include "ibtk/SideNoCornersFillPattern.h"
 #include "ibtk/ibtk_utilities.h"
 #include <ibtk/CartCellDoubleQuadraticCFInterpolation.h>
@@ -506,6 +507,10 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
 
     d_hierarchy = error.getPatchHierarchy();
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
+    SideDataSynchronization side_synch_op;
+    using SynchronizationTransactionComponent = SideDataSynchronization::SynchronizationTransactionComponent;
+    side_synch_op.initializeOperatorState(
+        { SynchronizationTransactionComponent(un_idx), SynchronizationTransactionComponent(us_idx) }, d_hierarchy);
 
     // Cache coarse-fine interface ghost cell values in the "scratch" data.
     if (level_num > 0 && num_sweeps > 1)
@@ -816,6 +821,7 @@ MultiphaseStaggeredStokesBoxRelaxationFACOperator::smoothError(
                 }
             }
         } // patchess
+        side_synch_op.synchronizeData(d_solution_time);
     }     // num_sweeps
     performGhostFilling({ un_idx, us_idx, P_idx }, level_num);
     IBTK_TIMER_STOP(t_smooth_error);

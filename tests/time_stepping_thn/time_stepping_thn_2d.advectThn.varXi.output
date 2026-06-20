@@ -1,19 +1,19 @@
 Network velocity
-Un L1-norm:  0.00686748
-Un L2-norm:  0.00624981
-Un max-norm: 0.0148078
+Un L1-norm:  0.00686946
+Un L2-norm:  0.00625098
+Un max-norm: 0.01481
 
 Solvent velocity
-Us L1-norm:  0.0100463
-Us L2-norm:  0.00876898
-Us max-norm: 0.0161377
+Us L1-norm:  0.0100474
+Us L2-norm:  0.00876968
+Us max-norm: 0.0161407
 
 Pressure
-P L1-norm:  0.0504449
-P L2-norm:  0.0639261
-P max-norm: 0.192555
+P L1-norm:  0.0504665
+P L2-norm:  0.0639431
+P max-norm: 0.192546
 
 Volume fraction
-Thn L1-norm:  0.000622878
-Thn L2-norm:  0.000805805
+Thn L1-norm:  0.000622891
+Thn L2-norm:  0.000805814
 Thn max-norm: 0.00274046

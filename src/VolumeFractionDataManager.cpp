@@ -1,5 +1,8 @@
 #include <ibamr/app_namespaces.h>
 
+#include <ibtk/NodeDataSynchronization.h>
+#include <ibtk/SideDataSynchronization.h>
+
 #include <multiphase/MultiphaseStaggeredHierarchyIntegrator.h>
 #include <multiphase/VolumeFractionDataManager.h>
 #include <multiphase/utility_functions.h>
@@ -153,6 +156,16 @@ VolumeFractionDataManager::fillNodeAndSideData(Pointer<PatchHierarchy<NDIM>>& hi
 
     convert_to_ndim_cc(d_cc_ndim_idx, d_thn_cc_idx, *hierarchy);
     hier_math_ops.interp(d_thn_sc_idx, d_thn_sc_var, true, d_cc_ndim_idx, d_cc_ndim_var, nullptr, time);
+
+    NodeDataSynchronization node_synch_op;
+    node_synch_op.initializeOperatorState(NodeDataSynchronization::SynchronizationTransactionComponent(d_thn_nc_idx),
+                                          hierarchy);
+    node_synch_op.synchronizeData(time);
+
+    SideDataSynchronization side_synch_op;
+    side_synch_op.initializeOperatorState(SideDataSynchronization::SynchronizationTransactionComponent(d_thn_sc_idx),
+                                          hierarchy);
+    side_synch_op.synchronizeData(time);
 }
 
 void

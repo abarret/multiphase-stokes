@@ -57,7 +57,8 @@ public:
     FullFACPreconditioner(std::string object_name,
                           SAMRAI::tbox::Pointer<IBTK::FACPreconditionerStrategy> fac_strategy,
                           SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
-                          const std::string& default_options_prefix);
+                          const std::string& default_options_prefix,
+                          SAMRAI::tbox::Pointer<SAMRAI::mesh::GriddingAlgorithm<NDIM>> gridding_alg = nullptr);
 
     /*!
      * Destructor.
