@@ -171,7 +171,7 @@ private:
      * Actually computes the action of the operator. Computes the fluid's momentum, computes a limited approximation at
      * control volume faces, then performs flux differencing.
      */
-    void approximateOperator(int dst_un_idx, int dst_us_idx, double eval_time, int un_idx, int us_idx, int thn_idx);
+    void approximateOperator(int dst_un_idx, int dst_us_idx, double eval_time, int thn_idx);
 
     /*!
      * On a given patch, compute the advection velocity for a control volume. This uses linear interpolation to compute
@@ -249,6 +249,7 @@ private:
     int d_N_un_idx = IBTK::invalid_index, d_N_us_idx = IBTK::invalid_index;
     int d_N0_un_idx = IBTK::invalid_index, d_N0_us_idx = IBTK::invalid_index;
     int d_un_scr_idx = IBTK::invalid_index, d_us_scr_idx = IBTK::invalid_index;
+    int d_un_ghost_idx = IBTK::invalid_index, d_us_ghost_idx = IBTK::invalid_index;
 
     /*!
      * Scratch volume fraction variables
