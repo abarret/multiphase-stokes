@@ -223,7 +223,7 @@ private:
                                                                          // so we can deallocate data on the dense
                                                                          // hierarchy if necessary.
 
-        PreconditionerType d_precond_type;
+        PreconditionerType d_precond_type = PreconditionerType::MULTIGRID;
 
         SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
         SAMRAI::tbox::Pointer<FullFACPreconditioner> d_fac_precond;
@@ -236,7 +236,7 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_precond_db;
 
     bool d_use_preconditioner = true;
-    PreconditionerType d_precond_type;
+    PreconditionerType d_precond_type = PreconditionerType::MULTIGRID;
 
     bool d_make_div_rhs_sum_to_zero = true;
 

@@ -1,16 +1,16 @@
 Printing error norms
 
 Network velocity
-Un L1-norm:  0.0111297
-Un L2-norm:  0.00967342
-Un max-norm: 0.0184368
+Un L1-norm:  0.0111379
+Un L2-norm:  0.00967826
+Un max-norm: 0.0184419
 
 Solvent velocity
-Us L1-norm:  0.0141643
-Us L2-norm:  0.0127516
-Us max-norm: 0.0230516
+Us L1-norm:  0.0141514
+Us L2-norm:  0.012747
+Us max-norm: 0.0233845
 
 Pressure
-P L1-norm:  0.0203454
-P L2-norm:  0.0270376
-P max-norm: 0.0873272
+P L1-norm:  0.0203176
+P L2-norm:  0.0270361
+P max-norm: 0.0873711

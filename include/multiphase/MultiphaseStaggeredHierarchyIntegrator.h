@@ -342,6 +342,8 @@ public:
                                           bool uses_richardson_extrapolation_too);
 
 protected:
+    bool atRegridPointSpecialized() const override;
+    void regridHierarchyEndSpecialized() override;
     void setupPlotDataSpecialized() override;
 
     /*!
@@ -446,6 +448,10 @@ protected:
 
     // Network CFL number
     double d_cfl_un_current = std::numeric_limits<double>::quiet_NaN();
+
+    // Regridding CFL criteria
+    double d_regrid_us_cfl_interval = -1.0, d_regrid_un_cfl_interval = -1.0;
+    double d_regrid_us_cfl_estimate = 0.0, d_regrid_un_cfl_estimate = 0.0;
 
     double d_regularize_thn = 1.0e-5;
 };
