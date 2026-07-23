@@ -224,6 +224,7 @@ protected:
 
     // Reference patch hierarchy
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
+    int d_coarsest_ln = IBTK::invalid_level_number, d_finest_ln = IBTK::invalid_level_number;
 
     // Boundary condition helper object.
     SAMRAI::tbox::Pointer<IBAMR::StaggeredStokesPhysicalBoundaryHelper> d_bc_helper;

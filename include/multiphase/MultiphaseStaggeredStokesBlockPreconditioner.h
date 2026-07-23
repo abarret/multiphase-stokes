@@ -1,12 +1,12 @@
 #ifndef included_MultiphaseStaggeredStokesBlockPreconditioner
 #define included_MultiphaseStaggeredStokesBlockPreconditioner
 
+#include <ibtk/FACPreconditioner.h>
 #include <ibtk/LinearSolver.h>
 #include <ibtk/PETScKrylovLinearSolver.h>
 #include <ibtk/PoissonSolver.h>
 
 #include "Patch.h"
-#include <multiphase/FullFACPreconditioner.h>
 #include <multiphase/MultiphaseParameters.h>
 #include <multiphase/MultiphaseStaggeredVelocityBlockFACOperator.h>
 #include <multiphase/VolumeFractionDataManager.h>
@@ -87,7 +87,7 @@ private:
     // Velocity solver settings.
     std::unique_ptr<IBTK::PETScKrylovLinearSolver> d_stokes_solver;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_solver_db;
-    SAMRAI::tbox::Pointer<FullFACPreconditioner> d_stokes_precond;
+    SAMRAI::tbox::Pointer<IBTK::FACPreconditioner> d_stokes_precond;
     SAMRAI::tbox::Pointer<IBTK::FACPreconditionerStrategy> d_stokes_precond_op;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_stokes_precond_db;
     MultiphaseParameters d_params;

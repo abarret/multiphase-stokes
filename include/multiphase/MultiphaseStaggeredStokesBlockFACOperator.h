@@ -53,6 +53,7 @@ class PoissonFACPreconditionerStrategy;
 namespace multiphase
 {
 class MultiphaseStaggeredStokesBoxRelaxationFACOperator;
+class MultiphaseStaggeredStokesBlockPreconditioner;
 class MultiphaseStaggeredVelocityAsymmetricFACOperator;
 class MultiphaseStaggeredVelocityBlockFACOperator;
 
@@ -83,7 +84,8 @@ public:
     MultiphaseStaggeredStokesBlockFACOperator(const std::string& object_name,
                                               const std::string& default_options_prefix,
                                               const MultiphaseParameters& params,
-                                              const std::unique_ptr<VolumeFractionDataManager>& thn_manager);
+                                              const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
+                                              SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db = nullptr);
 
     /*!
      * \brief Destructor.
@@ -162,6 +164,13 @@ private:
                                     const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& rhs);
 
     /*!
+     * \brief Initialize the original block preconditioner for the active
+     * coarsest FAC level.
+     */
+    void initializeCoarsestLevelSolver(const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& solution,
+                                       const SAMRAI::solv::SAMRAIVectorReal<NDIM, double>& rhs);
+
+    /*!
      * \brief Compute the `thn^2 + ths^2` side coefficient used by the pressure
      * Schur approximation on the active hierarchy range.
      */
@@ -180,6 +189,7 @@ private:
     SAMRAI::tbox::Pointer<IBTK::PoissonFACPreconditionerStrategy> d_pressure_smoother;
     SAMRAI::solv::PoissonSpecifications d_pressure_coefs;
     SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_pressure_solver_db;
+    SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> d_coarsest_solver_db;
 
     const MultiphaseParameters& d_params;
     const std::unique_ptr<VolumeFractionDataManager>& d_thn_manager;
@@ -189,6 +199,7 @@ private:
 
     SAMRAI::tbox::Pointer<MultiphaseStaggeredVelocityBlockFACOperator> d_velocity_block_smoother;
     SAMRAI::tbox::Pointer<MultiphaseStaggeredVelocityAsymmetricFACOperator> d_velocity_asymmetric_smoother;
+    SAMRAI::tbox::Pointer<MultiphaseStaggeredStokesBlockPreconditioner> d_coarsest_solver;
 
     SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> d_un_corr_var, d_us_corr_var;
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_p_corr_var, d_p_rhs_var;
@@ -207,6 +218,7 @@ private:
     double d_C = std::numeric_limits<double>::quiet_NaN();
     double d_D = std::numeric_limits<double>::quiet_NaN();
     bool d_using_symmetric = true;
+    bool d_use_smoother_as_coarse_solver = false;
 
     std::vector<SAMRAI::solv::RobinBcCoefStrategy<NDIM>*> d_un_bc_coefs, d_us_bc_coefs;
     SAMRAI::solv::RobinBcCoefStrategy<NDIM>* d_P_bc_coef = nullptr;

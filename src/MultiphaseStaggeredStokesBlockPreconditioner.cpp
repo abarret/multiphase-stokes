@@ -170,8 +170,9 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
 
     // Fill ghost cells for p_vec.
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    const std::string coarsen_op = d_coarsest_ln == 0 ? "CONSERVATIVE_COARSEN" : "NONE";
     std::vector<ITC> ghost_comps{ ITC(
-        p_vec.getComponentDescriptorIndex(0), "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN") };
+        p_vec.getComponentDescriptorIndex(0), "CONSERVATIVE_LINEAR_REFINE", true, coarsen_op) };
     HierarchyGhostCellInterpolation hier_ghost_fill;
     hier_ghost_fill.initializeOperatorState(ghost_comps, d_hierarchy, d_coarsest_ln, d_finest_ln);
     hier_ghost_fill.fillData(d_solution_time);
@@ -189,8 +190,8 @@ MultiphaseStaggeredStokesBlockPreconditioner::solveSystem(SAMRAIVectorReal<NDIM,
                                  d_coarsest_ln,
                                  d_finest_ln);
 
-    std::vector<ITC> u_ghost_comps{ ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN"),
-                                    ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, "CONSERVATIVE_COARSEN") };
+    std::vector<ITC> u_ghost_comps{ ITC(d_un_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, coarsen_op),
+                                    ITC(d_us_scr_idx, "CONSERVATIVE_LINEAR_REFINE", true, coarsen_op) };
     hier_ghost_fill.deallocateOperatorState();
     hier_ghost_fill.initializeOperatorState(u_ghost_comps, d_hierarchy, d_coarsest_ln, d_finest_ln);
     hier_ghost_fill.fillData(d_solution_time);
@@ -279,8 +280,11 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     d_hierarchy = x.getPatchHierarchy();
 #ifndef NDEBUG
     TBOX_ASSERT(d_hierarchy.getPointer() == b.getPatchHierarchy());
+    TBOX_ASSERT(x.getCoarsestLevelNumber() == b.getCoarsestLevelNumber());
+    TBOX_ASSERT(x.getFinestLevelNumber() == b.getFinestLevelNumber());
 #endif
-    set_valid_level_numbers(*d_hierarchy, d_coarsest_ln, d_finest_ln);
+    d_coarsest_ln = x.getCoarsestLevelNumber();
+    d_finest_ln = x.getFinestLevelNumber();
 
     d_hier_cc_data_ops = new HierarchyCellDataOpsReal<NDIM, double>(d_hierarchy, d_coarsest_ln, d_finest_ln);
     d_hier_sc_data_ops = new HierarchySideDataOpsReal<NDIM, double>(d_hierarchy, d_coarsest_ln, d_finest_ln);
@@ -389,16 +393,12 @@ MultiphaseStaggeredStokesBlockPreconditioner::initializeSolverState(const SAMRAI
     d_stokes_solver = std::make_unique<PETScKrylovLinearSolver>(
         d_object_name + "::stokes_solver", d_stokes_solver_db, "stokes_velocity_");
     d_stokes_solver->setOperator(stokes_op);
-    d_stokes_precond = new FullFACPreconditioner(d_object_name + "::StokesBlockPreconditioner",
-                                                 d_stokes_precond_op,
-                                                 d_stokes_precond_db,
-                                                 d_object_name + "_stokes_pc_");
+    d_stokes_precond = new FACPreconditioner(d_object_name + "::StokesBlockPreconditioner",
+                                             d_stokes_precond_op,
+                                             d_stokes_precond_db,
+                                             d_object_name + "_stokes_pc_");
     d_stokes_solver->setPreconditioner(d_stokes_precond);
     d_stokes_solver->initializeSolverState(u_vec, bu_vec);
-
-    d_stokes_precond->transferToDense(d_thn_manager->getCellIndex());
-    d_thn_manager->updateVolumeFraction(
-        d_thn_manager->getCellIndex(), d_stokes_precond->getDenseHierarchy(), d_solution_time);
 
     IBTK_TIMER_STOP(t_initialize_solver_state);
 }
@@ -415,8 +415,6 @@ MultiphaseStaggeredStokesBlockPreconditioner::deallocateSolverState()
                           d_hierarchy,
                           d_coarsest_ln,
                           d_finest_ln);
-
-    d_thn_manager->deallocateData(d_stokes_precond->getDenseHierarchy());
 
     d_coarsest_ln = IBTK::invalid_level_number;
     d_finest_ln = IBTK::invalid_level_number;

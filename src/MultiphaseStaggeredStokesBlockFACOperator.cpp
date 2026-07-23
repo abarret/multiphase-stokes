@@ -1,4 +1,5 @@
 #include "multiphase/MultiphaseStaggeredStokesBlockFACOperator.h"
+#include "multiphase/MultiphaseStaggeredStokesBlockPreconditioner.h"
 #include "multiphase/MultiphaseStaggeredStokesBoxRelaxationFACOperator.h"
 #include "multiphase/MultiphaseStaggeredVelocityAsymmetricFACOperator.h"
 #include "multiphase/MultiphaseStaggeredVelocityBlockFACOperator.h"
@@ -35,12 +36,17 @@ MultiphaseStaggeredStokesBlockFACOperator::MultiphaseStaggeredStokesBlockFACOper
     const std::string& object_name,
     const std::string& default_options_prefix,
     const MultiphaseParameters& params,
-    const std::unique_ptr<VolumeFractionDataManager>& thn_manager)
+    const std::unique_ptr<VolumeFractionDataManager>& thn_manager,
+    Pointer<tbox::Database> input_db)
     : FACPreconditionerStrategy(object_name),
       d_pressure_coefs(object_name + "::pressure_coefs"),
+      d_coarsest_solver_db(input_db),
       d_params(params),
       d_thn_manager(thn_manager)
 {
+    d_use_smoother_as_coarse_solver =
+        input_db ? input_db->getBoolWithDefault("use_smoother_as_coarse_solver", false) : true;
+
     // Reuse the existing FAC transfer operators and composite residual code.
     d_delegate = new MultiphaseStaggeredStokesBoxRelaxationFACOperator(
         object_name + "::Delegate", default_options_prefix, params, thn_manager);
@@ -263,8 +269,8 @@ MultiphaseStaggeredStokesBlockFACOperator::smoothError(solv::SAMRAIVectorReal<ND
             sc_ops->add(d_fs_scr_idx, d_fs_scr_idx, d_fn_scr_idx, false);
         }
 
-        // Finish the block application with the level-local velocity solve.
-        velocity_smoother->solveCoarsestLevel(u_corr_vec, u_rhs_vec, level_num);
+        // Finish the block application with level-local velocity relaxation.
+        velocity_smoother->smoothError(u_corr_vec, u_rhs_vec, level_num, 10, false, false);
 
         sc_ops->add(error.getComponentDescriptorIndex(UN_COMP),
                     error.getComponentDescriptorIndex(UN_COMP),
@@ -284,7 +290,17 @@ MultiphaseStaggeredStokesBlockFACOperator::solveCoarsestLevel(solv::SAMRAIVector
                                                               const solv::SAMRAIVectorReal<NDIM, double>& residual,
                                                               const int coarsest_ln)
 {
-    smoothError(error, residual, coarsest_ln, 2, false, false);
+    if (d_use_smoother_as_coarse_solver)
+    {
+        smoothError(error, residual, coarsest_ln, 2, false, false);
+        return true;
+    }
+
+    if (!d_coarsest_solver)
+    {
+        initializeCoarsestLevelSolver(error, residual);
+    }
+    d_coarsest_solver->solveSystem(error, const_cast<solv::SAMRAIVectorReal<NDIM, double>&>(residual));
     return true;
 }
 
@@ -334,6 +350,8 @@ MultiphaseStaggeredStokesBlockFACOperator::initializeOperatorState(const solv::S
 void
 MultiphaseStaggeredStokesBlockFACOperator::deallocateOperatorState()
 {
+    if (d_coarsest_solver) d_coarsest_solver->deallocateSolverState();
+    d_coarsest_solver.setNull();
     if (d_velocity_block_smoother) d_velocity_block_smoother->deallocateOperatorState();
     if (d_velocity_asymmetric_smoother) d_velocity_asymmetric_smoother->deallocateOperatorState();
     if (d_pressure_smoother) d_pressure_smoother->deallocateOperatorState();
@@ -374,6 +392,7 @@ MultiphaseStaggeredStokesBlockFACOperator::setCandDCoefficients(const double C, 
     // updated after construction.
     if (d_velocity_block_smoother) d_velocity_block_smoother->setCandDCoefficients(C, D);
     if (d_velocity_asymmetric_smoother) d_velocity_asymmetric_smoother->setCandDCoefficients(C, D);
+    if (d_coarsest_solver) d_coarsest_solver->setCAndDCoefficients(C, D);
 }
 
 void
@@ -453,6 +472,61 @@ MultiphaseStaggeredStokesBlockFACOperator::initializeVelocitySmoother(
         d_velocity_asymmetric_smoother->setCandDCoefficients(d_C, d_D);
         d_velocity_asymmetric_smoother->initializeOperatorState(u_corr_vec, u_rhs_vec);
     }
+}
+
+void
+MultiphaseStaggeredStokesBlockFACOperator::initializeCoarsestLevelSolver(
+    const solv::SAMRAIVectorReal<NDIM, double>& solution,
+    const solv::SAMRAIVectorReal<NDIM, double>& rhs)
+{
+    if (!d_coarsest_solver_db)
+    {
+        TBOX_ERROR(d_object_name << "::initializeCoarsestLevelSolver()\n"
+                                 << "  a coarsest solver database is required when "
+                                    "use_smoother_as_coarse_solver = FALSE.\n");
+    }
+
+    Pointer<math::HierarchySideDataOpsReal<NDIM, double>> sc_ops =
+        Pointer<math::HierarchySideDataOpsReal<NDIM, double>>(
+            new math::HierarchySideDataOpsReal<NDIM, double>(d_hierarchy, d_coarsest_ln, d_coarsest_ln));
+    Pointer<math::HierarchyCellDataOpsReal<NDIM, double>> cc_ops =
+        Pointer<math::HierarchyCellDataOpsReal<NDIM, double>>(
+            new math::HierarchyCellDataOpsReal<NDIM, double>(d_hierarchy, d_coarsest_ln, d_coarsest_ln));
+
+    solv::SAMRAIVectorReal<NDIM, double> coarse_solution(
+        d_object_name + "::CoarsestSolution", d_hierarchy, d_coarsest_ln, d_coarsest_ln);
+    coarse_solution.addComponent(solution.getComponentVariable(UN_COMP),
+                                 solution.getComponentDescriptorIndex(UN_COMP),
+                                 solution.getControlVolumeIndex(UN_COMP),
+                                 sc_ops);
+    coarse_solution.addComponent(solution.getComponentVariable(US_COMP),
+                                 solution.getComponentDescriptorIndex(US_COMP),
+                                 solution.getControlVolumeIndex(US_COMP),
+                                 sc_ops);
+    coarse_solution.addComponent(solution.getComponentVariable(P_COMP),
+                                 solution.getComponentDescriptorIndex(P_COMP),
+                                 solution.getControlVolumeIndex(P_COMP),
+                                 cc_ops);
+
+    solv::SAMRAIVectorReal<NDIM, double> coarse_rhs(
+        d_object_name + "::CoarsestRHS", d_hierarchy, d_coarsest_ln, d_coarsest_ln);
+    coarse_rhs.addComponent(rhs.getComponentVariable(UN_COMP),
+                            rhs.getComponentDescriptorIndex(UN_COMP),
+                            rhs.getControlVolumeIndex(UN_COMP),
+                            sc_ops);
+    coarse_rhs.addComponent(rhs.getComponentVariable(US_COMP),
+                            rhs.getComponentDescriptorIndex(US_COMP),
+                            rhs.getControlVolumeIndex(US_COMP),
+                            sc_ops);
+    coarse_rhs.addComponent(rhs.getComponentVariable(P_COMP),
+                            rhs.getComponentDescriptorIndex(P_COMP),
+                            rhs.getControlVolumeIndex(P_COMP),
+                            cc_ops);
+
+    d_coarsest_solver = new MultiphaseStaggeredStokesBlockPreconditioner(
+        d_object_name + "::CoarsestBlockSolver", d_params, d_coarsest_solver_db, d_thn_manager);
+    d_coarsest_solver->setCAndDCoefficients(d_C, d_D);
+    d_coarsest_solver->initializeSolverState(coarse_solution, coarse_rhs);
 }
 
 void

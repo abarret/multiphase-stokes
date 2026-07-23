@@ -378,8 +378,11 @@ main(int argc, char* argv[])
         else if (use_precond && precond_type == PreconditionerType::BLOCK_FAC)
         {
             Pointer<MultiphaseStaggeredStokesBlockFACOperator> fac_precondition_strategy =
-                new MultiphaseStaggeredStokesBlockFACOperator(
-                    "KrylovPrecondStrategy", "Krylov_precond_", params, thn_manager);
+                new MultiphaseStaggeredStokesBlockFACOperator("KrylovPrecondStrategy",
+                                                              "Krylov_precond_",
+                                                              params,
+                                                              thn_manager,
+                                                              input_db->getDatabase("BlockPreconditioner"));
             fac_precondition_strategy->setCandDCoefficients(C, D);
             fac_precondition_strategy->setUsingSymmetric(input_db->getBoolWithDefault("USING_SYMMETRIC", true));
             Pointer<FullFACPreconditioner> Krylov_precond =

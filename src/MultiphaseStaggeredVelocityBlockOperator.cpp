@@ -213,18 +213,19 @@ MultiphaseStaggeredVelocityBlockOperator::apply(SAMRAIVectorReal<NDIM, double>& 
 
     // Simultaneously fill ghost cell values for all components.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    const std::string data_coarsen_type = d_coarsest_ln == 0 ? DATA_COARSEN_TYPE : "NONE";
     std::vector<InterpolationTransactionComponent> transaction_comps(2);
     transaction_comps[0] = InterpolationTransactionComponent(un_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
+                                                             data_coarsen_type,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_un_bc_coefs);
     transaction_comps[1] = InterpolationTransactionComponent(us_idx,
                                                              SC_DATA_REFINE_TYPE,
                                                              USE_CF_INTERPOLATION,
-                                                             DATA_COARSEN_TYPE,
+                                                             data_coarsen_type,
                                                              BDRY_EXTRAP_TYPE,
                                                              CONSISTENT_TYPE_2_BDRY,
                                                              d_us_bc_coefs);
@@ -244,16 +245,17 @@ MultiphaseStaggeredVelocityBlockOperator::apply(SAMRAIVectorReal<NDIM, double>& 
 
     {
         using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comp = { ITC(A_us_idx, "NONE", false, "CONSERVATIVE_COARSEN"),
-                                             ITC(A_un_idx, "NONE", false, "CONSERVATIVE_COARSEN") };
+        const std::string coarsen_op = d_coarsest_ln == 0 ? "CONSERVATIVE_COARSEN" : "NONE";
+        std::vector<ITC> ghost_cell_comp = { ITC(A_us_idx, "NONE", false, coarsen_op),
+                                             ITC(A_un_idx, "NONE", false, coarsen_op) };
         HierarchyGhostCellInterpolation ghost_cell_fill;
-        ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+        ghost_cell_fill.initializeOperatorState(ghost_cell_comp, d_hierarchy, d_coarsest_ln, d_finest_ln);
         ghost_cell_fill.fillData(d_new_time);
     }
 
     auto sync_fcn = [&](const int dst_idx) -> void
     {
-        for (int ln = d_hierarchy->getFinestLevelNumber(); ln > 0; --ln)
+        for (int ln = d_finest_ln; ln > d_coarsest_ln; --ln)
         {
             Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
             for (PatchLevel<NDIM>::Iterator p(level); p; p++)
@@ -265,9 +267,9 @@ MultiphaseStaggeredVelocityBlockOperator::apply(SAMRAIVectorReal<NDIM, double>& 
             }
             Pointer<CoarsenAlgorithm<NDIM>> coarsen_alg = new CoarsenAlgorithm<NDIM>();
             coarsen_alg->registerCoarsen(dst_idx, d_os_idx, d_os_coarsen_op);
-            coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
-            d_os_coarsen_scheds[ln - 1]->coarsenData();
-            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - 1]);
+            coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - d_coarsest_ln - 1]);
+            d_os_coarsen_scheds[ln - d_coarsest_ln - 1]->coarsenData();
+            d_os_coarsen_alg->resetSchedule(d_os_coarsen_scheds[ln - d_coarsest_ln - 1]);
         }
     };
 
@@ -289,11 +291,11 @@ MultiphaseStaggeredVelocityBlockOperator::initializeOperatorState(const SAMRAIVe
 
     // Setup operator state.
     d_hierarchy = in.getPatchHierarchy();
+    d_coarsest_ln = in.getCoarsestLevelNumber();
+    d_finest_ln = in.getFinestLevelNumber();
 
     // Allocate synchronization variable
-    const int coarsest_ln = 0;
-    const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         if (!level->checkAllocated(d_os_idx)) level->allocatePatchData(d_os_idx);
@@ -303,35 +305,36 @@ MultiphaseStaggeredVelocityBlockOperator::initializeOperatorState(const SAMRAIVe
     d_os_coarsen_op = grid_geom->lookupCoarsenOperator(d_os_var, "CONSERVATIVE_COARSEN");
     d_os_coarsen_alg = new CoarsenAlgorithm<NDIM>();
     d_os_coarsen_alg->registerCoarsen(out.getComponentDescriptorIndex(0), d_os_idx, d_os_coarsen_op);
-    d_os_coarsen_scheds.resize(finest_ln - coarsest_ln);
-    for (int dst_ln = coarsest_ln; dst_ln < finest_ln; ++dst_ln)
+    d_os_coarsen_scheds.resize(d_finest_ln - d_coarsest_ln);
+    for (int dst_ln = d_coarsest_ln; dst_ln < d_finest_ln; ++dst_ln)
     {
         Pointer<PatchLevel<NDIM>> src_level = d_hierarchy->getPatchLevel(dst_ln + 1);
         Pointer<PatchLevel<NDIM>> dst_level = d_hierarchy->getPatchLevel(dst_ln);
-        d_os_coarsen_scheds[dst_ln] = d_os_coarsen_alg->createSchedule(dst_level, src_level);
+        d_os_coarsen_scheds[dst_ln - d_coarsest_ln] = d_os_coarsen_alg->createSchedule(dst_level, src_level);
     }
 
     // Setup the interpolation transaction information.
     using InterpolationTransactionComponent = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    const std::string data_coarsen_type = d_coarsest_ln == 0 ? DATA_COARSEN_TYPE : "NONE";
     d_transaction_comps.resize(2);
     d_transaction_comps[0] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(0),
                                                                SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
-                                                               DATA_COARSEN_TYPE,
+                                                               data_coarsen_type,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_un_bc_coefs);
     d_transaction_comps[1] = InterpolationTransactionComponent(in.getComponentDescriptorIndex(1),
                                                                SC_DATA_REFINE_TYPE,
                                                                USE_CF_INTERPOLATION,
-                                                               DATA_COARSEN_TYPE,
+                                                               data_coarsen_type,
                                                                BDRY_EXTRAP_TYPE,
                                                                CONSISTENT_TYPE_2_BDRY,
                                                                d_us_bc_coefs); // noFillCorners
 
     // Initialize the interpolation operators.
     d_hier_bdry_fill = new HierarchyGhostCellInterpolation();
-    d_hier_bdry_fill->initializeOperatorState(d_transaction_comps, in.getPatchHierarchy());
+    d_hier_bdry_fill->initializeOperatorState(d_transaction_comps, in.getPatchHierarchy(), d_coarsest_ln, d_finest_ln);
 
     // Initialize hierarchy math ops object.
     if (!d_hier_math_ops_external)
@@ -376,15 +379,15 @@ MultiphaseStaggeredVelocityBlockOperator::deallocateOperatorState()
     d_P_fill_pattern.setNull();
 
     // Deallocate synchronization variable
-    const int coarsest_ln = 0;
-    const int finest_ln = d_hierarchy->getFinestLevelNumber();
-    for (int ln = coarsest_ln; ln <= finest_ln; ++ln)
+    for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         if (level->checkAllocated(d_os_idx)) level->deallocatePatchData(d_os_idx);
     }
     d_os_coarsen_scheds.clear();
     d_os_coarsen_alg = nullptr;
+    d_coarsest_ln = IBTK::invalid_level_number;
+    d_finest_ln = IBTK::invalid_level_number;
 
     // Indicate that the operator is NOT initialized.
     d_is_initialized = false;
@@ -457,7 +460,7 @@ MultiphaseStaggeredVelocityBlockOperator::applySpecialized(const int A_un_idx,
                                                            const int thn_sc_idx)
 {
     // Compute the forces on momentum.
-    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+    for (int ln = d_coarsest_ln; ln <= d_finest_ln; ++ln)
     {
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
